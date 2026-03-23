@@ -76,6 +76,13 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             cd ${{ secrets.VPS_DEPLOY_PATH }}
+            # Ensure prod overlay exists
+            cat > docker-compose.prod.yml << 'PRODEOF'
+            services:
+              app:
+                image: ghcr.io/denysdevelopment/shorter-email-laptopguru:latest
+                build: !reset null
+            PRODEOF
             echo ${{ secrets.GHCR_TOKEN }} | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
             docker pull ghcr.io/denysdevelopment/shorter-email-laptopguru:latest
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps app
