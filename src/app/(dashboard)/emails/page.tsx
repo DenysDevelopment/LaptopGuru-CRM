@@ -48,8 +48,9 @@ export default function EmailsPage() {
   }, [filter, page]);
 
   useEffect(() => {
-    fetchEmails();
-    const interval = setInterval(fetchEmails, 60_000);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetching pattern
+    void fetchEmails();
+    const interval = setInterval(() => void fetchEmails(), 60_000);
     return () => clearInterval(interval);
   }, [fetchEmails]);
 

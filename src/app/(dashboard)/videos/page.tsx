@@ -28,8 +28,9 @@ export default function VideosPage() {
 	}, []);
 
 	useEffect(() => {
-		fetchVideos();
-		const interval = setInterval(fetchVideos, 300_000);
+		// eslint-disable-next-line react-hooks/set-state-in-effect -- data fetching pattern
+		void fetchVideos();
+		const interval = setInterval(() => void fetchVideos(), 300_000);
 		return () => clearInterval(interval);
 	}, [fetchVideos]);
 

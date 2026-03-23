@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { Lato } from "next/font/google";
 import Image from "next/image";
 import { Laptop, Cpu, MemoryStick, HardDrive, Monitor, MonitorSmartphone } from "lucide-react";
@@ -157,9 +157,8 @@ export function LandingClient({ landing, video }: Props) {
   const tr = t[lang] || t.pl;
   const specs = parseSpecs(landing.productName);
 
-  const [viewerCount] = useState(() => Math.floor(Math.random() * 4) + 2);
   const visitIdRef = useRef<string | null>(null);
-  const startTimeRef = useRef(Date.now());
+  const startTimeRef = useRef<number>(null);
   const maxScrollRef = useRef(0);
   const clickCountRef = useRef(0);
   const tabSwitchesRef = useRef(0);
@@ -183,6 +182,7 @@ export function LandingClient({ landing, video }: Props) {
 
   // Initial visit registration — collect ABSOLUTELY EVERYTHING
   useEffect(() => {
+    startTimeRef.current = Date.now();
     const sessionId = sessionStorage.getItem("_sid") || crypto.randomUUID();
     sessionStorage.setItem("_sid", sessionId);
     const urlParams = new URLSearchParams(window.location.search);
@@ -768,11 +768,3 @@ function SpecRow({ icon, label, value }: { icon: React.ReactNode; label: string;
   );
 }
 
-function TrustBadge({ icon, text }: { icon: React.ReactNode; text: string }) {
-  return (
-    <div className="flex items-center gap-1.5 text-sm text-gray-600">
-      <span className="text-green-500">{icon}</span>
-      {text}
-    </div>
-  );
-}
