@@ -1,18 +1,10 @@
 "use client";
 
 import { useState } from "react";
-
-interface IncomingEmail {
-  id: string;
-  customerName: string | null;
-  customerEmail: string | null;
-  customerPhone: string | null;
-  productUrl: string | null;
-  productName: string | null;
-}
+import type { IncomingEmail } from "@/types";
 
 interface Props {
-  email: IncomingEmail;
+  email: Pick<IncomingEmail, "id" | "customerName" | "customerEmail" | "customerPhone" | "productUrl" | "productName">;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -83,15 +75,9 @@ export function EditEmailModal({ email, onClose, onSaved }: Props) {
 }
 
 function Field({
-  label,
-  value,
-  onChange,
-  type = "text",
+  label, value, onChange, type = "text",
 }: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  type?: string;
+  label: string; value: string; onChange: (v: string) => void; type?: string;
 }) {
   return (
     <div>

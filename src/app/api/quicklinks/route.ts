@@ -53,6 +53,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "slug может содержать только a-z, 0-9, -" }, { status: 400 });
   }
 
+  // Validate slug length
+  if (slug.length > 50) {
+    return NextResponse.json({ error: "slug не может быть длиннее 50 символов" }, { status: 400 });
+  }
+
+  // Validate targetUrl format
+  try {
+    const parsedUrl = new URL(targetUrl);
+    if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+      return NextResponse.json({ error: "URL должен начинаться с http:// или https://" }, { status: 400 });
+    }
+  } catch {
+    return NextResponse.json({ error: "Некорректный URL" }, { status: 400 });
+  }
+
   // Check if slug already exists
   const existing = await prisma.quickLink.findUnique({ where: { slug } });
   if (existing) {
@@ -82,8 +97,11 @@ export async function DELETE(request: NextRequest) {
   if (!id) return NextResponse.json({ error: "id обязателен" }, { status: 400 });
 
   // Delete visits first, then link
-  await prisma.quickLinkVisit.deleteMany({ where: { quickLinkId: id } });
-  await prisma.quickLink.delete({ where: { id } });
-
-  return NextResponse.json({ ok: true });
+  try {
+    await prisma.quickLinkVisit.deleteMany({ where: { quickLinkId: id } });
+    await prisma.quickLink.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ error: "Ошибка удаления" }, { status: 500 });
+  }
 }

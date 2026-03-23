@@ -180,13 +180,6 @@ export function Sidebar() {
 					{/* User section */}
 					<div className='border-t border-gray-100 p-4'>
 						<div className='flex items-center gap-3'>
-							<div className='w-8 h-8 rounded-full bg-brand-light flex items-center justify-center text-brand text-sm font-semibold'>
-								{(
-									session?.user?.name?.[0] ||
-									session?.user?.email?.[0] ||
-									'U'
-								).toUpperCase()}
-							</div>
 							<div className='flex-1 min-w-0'>
 								<p className='text-sm font-medium text-gray-900 truncate'>
 									{session?.user?.name || 'Пользователь'}

@@ -1,28 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-
-function parseUA(ua: string) {
-  const browser =
-    ua.match(/Edg\//i) ? "Edge" :
-    ua.match(/OPR\//i) ? "Opera" :
-    ua.match(/(?:Chrome|CriOS)\//i) && !ua.match(/Edg\//i) ? "Chrome" :
-    ua.match(/(?:Firefox|FxiOS)\//i) ? "Firefox" :
-    ua.match(/Safari\//i) && !ua.match(/Chrome/i) ? "Safari" : "Other";
-  const os =
-    ua.match(/Windows/i) ? "Windows" :
-    ua.match(/Mac OS X|macOS/i) ? "macOS" :
-    ua.match(/Android/i) ? "Android" :
-    ua.match(/iPhone|iPad|iPod/i) ? "iOS" :
-    ua.match(/Linux/i) ? "Linux" : "Other";
-  const isMobile = /Mobile|Android|iPhone|iPod/i.test(ua);
-  const isTablet = /iPad|Tablet|Android(?!.*Mobile)/i.test(ua);
-  return { browser, os, deviceType: isTablet ? "tablet" : isMobile ? "mobile" : "desktop" };
-}
-
-function extractDomain(url: string | null): string | null {
-  if (!url) return null;
-  try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return null; }
-}
+import { parseUASimple } from "@/lib/utils/user-agent";
+import { geolocateSimple } from "@/lib/utils/geo";
+import { extractDomain, extractIP } from "@/lib/utils/headers";
 
 export async function GET(
   request: NextRequest,
@@ -43,22 +23,13 @@ export async function GET(
 
   // Log visit with analytics
   const ua = request.headers.get("user-agent") || "";
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-    || request.headers.get("x-real-ip")
-    || request.headers.get("cf-connecting-ip")
-    || null;
+  const ip = extractIP(request);
   const ref = request.headers.get("referer") || null;
-  const parsed = parseUA(ua);
+  const parsed = parseUASimple(ua);
 
   // Fire and forget — don't block redirect
   (async () => {
-    let country: string | null = null, city: string | null = null;
-    if (ip && ip !== "127.0.0.1" && ip !== "::1") {
-      try {
-        const geo = await fetch(`http://ip-api.com/json/${ip}?fields=country,city`, { signal: AbortSignal.timeout(2000) });
-        if (geo.ok) { const d = await geo.json(); country = d.country; city = d.city; }
-      } catch { /* */ }
-    }
+    const { country, city } = ip ? await geolocateSimple(ip) : { country: null, city: null };
     await prisma.quickLinkVisit.create({
       data: {
         quickLinkId: link.id,

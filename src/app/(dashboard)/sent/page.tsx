@@ -1,24 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-
-interface SentEmail {
-  id: string;
-  to: string;
-  subject: string;
-  status: string;
-  errorMessage: string | null;
-  sentAt: string;
-  landing: {
-    slug: string;
-    title: string;
-    video: { title: string };
-  };
-  sentBy: { name: string | null; email: string };
-}
+import type { SentEmailWithDetails } from "@/types";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export default function SentPage() {
-  const [emails, setEmails] = useState<SentEmail[]>([]);
+  const [emails, setEmails] = useState<SentEmailWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -37,9 +24,7 @@ export default function SentPage() {
       {loading ? (
         <div className="text-center py-12 text-gray-400">Загрузка...</div>
       ) : emails.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-gray-400 text-lg">Ещё ничего не отправлено</p>
-        </div>
+        <EmptyState title="Ещё ничего не отправлено" />
       ) : (
         <div className="space-y-3">
           {emails.map((email) => (
@@ -55,9 +40,7 @@ export default function SentPage() {
                         email.status === "sent" ? "bg-green-500" : "bg-red-500"
                       }`}
                     />
-                    <h3 className="text-sm font-semibold text-gray-900 truncate">
-                      {email.to}
-                    </h3>
+                    <h3 className="text-sm font-semibold text-gray-900 truncate">{email.to}</h3>
                   </div>
                   <p className="text-sm text-gray-600 truncate">{email.subject}</p>
                   <p className="text-xs text-gray-400 mt-1">{email.landing.video.title}</p>

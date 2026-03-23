@@ -12,6 +12,7 @@
     "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",
     "bcryptjs": "^3.0.3",
+    "dompurify": "^3.3.3",
     "imapflow": "^1.2.15",
     "lucide-react": "^0.577.0",
     "mailparser": "^3.9.4",

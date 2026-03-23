@@ -8,19 +8,23 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const sentEmails = await prisma.sentEmail.findMany({
-    orderBy: { sentAt: "desc" },
-    include: {
-      landing: {
-        select: {
-          slug: true,
-          title: true,
-          video: { select: { title: true } },
+  try {
+    const sentEmails = await prisma.sentEmail.findMany({
+      orderBy: { sentAt: "desc" },
+      include: {
+        landing: {
+          select: {
+            slug: true,
+            title: true,
+            video: { select: { title: true } },
+          },
         },
+        sentBy: { select: { name: true, email: true } },
       },
-      sentBy: { select: { name: true, email: true } },
-    },
-  });
+    });
 
-  return NextResponse.json(sentEmails);
+    return NextResponse.json(sentEmails);
+  } catch {
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }

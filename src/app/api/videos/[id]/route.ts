@@ -15,10 +15,13 @@ export async function DELETE(
   const { id } = await params;
 
   // Soft delete
-  await prisma.video.update({
-    where: { id },
-    data: { active: false },
-  });
-
-  return NextResponse.json({ ok: true });
+  try {
+    await prisma.video.update({
+      where: { id },
+      data: { active: false },
+    });
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ error: "Ошибка удаления" }, { status: 500 });
+  }
 }
