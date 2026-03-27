@@ -1,17 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateScheduleDto, UpdateScheduleDto, CreateSlotDto } from './dto/create-schedule.dto';
-import { DayOfWeek } from '../../../generated/prisma';
-
-const DAY_ORDER: DayOfWeek[] = [
-  'MONDAY',
-  'TUESDAY',
-  'WEDNESDAY',
-  'THURSDAY',
-  'FRIDAY',
-  'SATURDAY',
-  'SUNDAY',
-];
 
 @Injectable()
 export class BusinessHoursService {

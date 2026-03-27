@@ -10,7 +10,7 @@ export class AutoReplyService {
     return this.prisma.autoReplyRule.findMany({
       where: {
         ...(filters.channelId && { channelId: filters.channelId }),
-        ...(filters.trigger && { trigger: filters.trigger as any }),
+        ...(filters.trigger && { trigger: filters.trigger as string }),
         ...(filters.isActive !== undefined && { isActive: filters.isActive === 'true' }),
       },
       include: {

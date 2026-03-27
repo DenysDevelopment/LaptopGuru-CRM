@@ -13,7 +13,7 @@ export class TemplatesService {
     const limit = filters.limit ?? 50;
     const where = {
       ...(filters.channelId && { channelId: filters.channelId }),
-      ...(filters.status && { status: filters.status as any }),
+      ...(filters.status && { status: filters.status as string }),
       ...(filters.language && { language: filters.language }),
     };
     const [data, total] = await Promise.all([
