@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef } from "react";
 
 const MAX_RETRIES = 10;
 const INITIAL_BACKOFF_MS = 1000;
@@ -20,54 +20,62 @@ type EventHandler = (event: MessagingEvent) => void;
  */
 export function useMessagingEvents(onEvent: EventHandler) {
   const handlerRef = useRef(onEvent);
-  handlerRef.current = onEvent;
-
   const retryCountRef = useRef(0);
 
-  const connect = useCallback(() => {
-    const eventSource = new EventSource("/api/messaging/events");
-
-    const handleMessage = (type: string) => (e: MessageEvent) => {
-      try {
-        const data = JSON.parse(e.data);
-        handlerRef.current({ ...data, type });
-      } catch {
-        // ignore parse errors
-      }
-    };
-
-    eventSource.addEventListener("new_message", handleMessage("new_message"));
-    eventSource.addEventListener("new_conversation", handleMessage("new_conversation"));
-    eventSource.addEventListener("conversation_updated", handleMessage("conversation_updated"));
-
-    eventSource.onopen = () => {
-      // Reset retry count on successful connection
-      retryCountRef.current = 0;
-    };
-
-    eventSource.onerror = () => {
-      eventSource.close();
-
-      if (retryCountRef.current >= MAX_RETRIES) {
-        console.warn("[MessagingEvents] Max retries reached, giving up");
-        return;
-      }
-
-      const backoff = Math.min(
-        INITIAL_BACKOFF_MS * Math.pow(2, retryCountRef.current),
-        MAX_BACKOFF_MS,
-      );
-      retryCountRef.current += 1;
-      setTimeout(connect, backoff);
-    };
-
-    return eventSource;
-  }, []);
+  useEffect(() => {
+    handlerRef.current = onEvent;
+  });
 
   useEffect(() => {
-    const eventSource = connect();
+    let closed = false;
+    let eventSource: EventSource | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function connect() {
+      eventSource = new EventSource("/api/messaging/events");
+
+      const handleMessage = (type: string) => (e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data);
+          handlerRef.current({ ...data, type });
+        } catch {
+          // ignore parse errors
+        }
+      };
+
+      eventSource.addEventListener("new_message", handleMessage("new_message"));
+      eventSource.addEventListener("new_conversation", handleMessage("new_conversation"));
+      eventSource.addEventListener("conversation_updated", handleMessage("conversation_updated"));
+
+      eventSource.onopen = () => {
+        retryCountRef.current = 0;
+      };
+
+      eventSource.onerror = () => {
+        eventSource?.close();
+
+        if (closed) return;
+
+        if (retryCountRef.current >= MAX_RETRIES) {
+          console.warn("[MessagingEvents] Max retries reached, giving up");
+          return;
+        }
+
+        const backoff = Math.min(
+          INITIAL_BACKOFF_MS * Math.pow(2, retryCountRef.current),
+          MAX_BACKOFF_MS,
+        );
+        retryCountRef.current += 1;
+        retryTimer = setTimeout(connect, backoff);
+      };
+    }
+
+    connect();
+
     return () => {
-      eventSource.close();
+      closed = true;
+      eventSource?.close();
+      if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [connect]);
+  }, []);
 }

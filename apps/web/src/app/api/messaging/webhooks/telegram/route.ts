@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!contactChannel) {
-      const contact = await prisma.contact.create({
+      await prisma.contact.create({
         data: {
           displayName: senderName,
           firstName: msg.from?.first_name || null,

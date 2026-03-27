@@ -43,6 +43,7 @@ export default function TemplatesSettingsPage() {
 	};
 
 	useEffect(() => {
+		// eslint-disable-next-line react-hooks/set-state-in-effect
 		fetchTemplates();
 	}, []);
 

@@ -18,7 +18,7 @@ const TABS = [
 	{ key: 'CLOSED', label: 'Закрытые' },
 ];
 
-export function ConversationList({ status: initialStatus, assigneeId }: ConversationListProps) {
+export function ConversationList({ status: initialStatus }: ConversationListProps) {
 	const pathname = usePathname();
 	const [conversations, setConversations] = useState<Conversation[]>([]);
 	const [loading, setLoading] = useState(true);

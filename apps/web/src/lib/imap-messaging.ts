@@ -98,7 +98,7 @@ export async function syncEmailsToMessaging(): Promise<number> {
         });
 
         if (!contactChannel) {
-          const newContact = await prisma.contact.create({
+          await prisma.contact.create({
             data: {
               displayName: actualName,
               firstName: actualName.split(" ")[0] || null,

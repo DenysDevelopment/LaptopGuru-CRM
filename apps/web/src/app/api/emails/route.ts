@@ -5,7 +5,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { PERMISSIONS } from "@shorterlink/shared";
 
 export async function GET(request: NextRequest) {
-  const { session, error } = await authorize(PERMISSIONS.EMAILS_READ);
+  const { error } = await authorize(PERMISSIONS.EMAILS_READ);
   if (error) return error;
 
   const { searchParams } = request.nextUrl;
