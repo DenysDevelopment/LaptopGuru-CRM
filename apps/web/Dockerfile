@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/
 COPY packages/api-client/package.json packages/api-client/
-RUN npm ci --legacy-peer-deps --workspace=@shorterlink/web
+RUN npm ci --legacy-peer-deps --workspace=@shorterlink/web --ignore-scripts
 
 # Generate Prisma client
 FROM base AS prisma
