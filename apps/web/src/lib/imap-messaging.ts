@@ -199,7 +199,7 @@ async function syncSingleChannel(
             conversationId: conversation.id,
             channelId: channel.id,
             direction: "INBOUND",
-            contentType: hasAttachments ? "MEDIA" : "TEXT",
+            contentType: hasAttachments ? "FILE" : "TEXT",
             body: body.slice(0, 10000),
             externalId: messageId,
             contactId: contact.id,
