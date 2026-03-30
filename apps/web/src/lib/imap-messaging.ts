@@ -3,6 +3,12 @@ import { simpleParser } from "mailparser";
 import { prisma } from "@/lib/db";
 import { emitMessagingEvent } from "@/lib/messaging-events";
 import { parseEmail } from "@/lib/parser";
+import fs from "fs";
+import path from "path";
+
+const UPLOADS_DIR = path.join(process.cwd(), "public", "uploads");
+const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024; // 25MB
+const MAX_ATTACHMENTS_PER_EMAIL = 10;
 
 /**
  * Sync emails from IMAP into the messaging system (Contact → Conversation → Message).
@@ -186,17 +192,53 @@ async function syncSingleChannel(
           });
         }
 
+        const hasAttachments = parsed.attachments && parsed.attachments.length > 0;
+
         const message = await prisma.message.create({
           data: {
             conversationId: conversation.id,
             channelId: channel.id,
             direction: "INBOUND",
-            contentType: "TEXT",
+            contentType: hasAttachments ? "MEDIA" : "TEXT",
             body: body.slice(0, 10000),
             externalId: messageId,
             contactId: contact.id,
           },
         });
+
+        // Save attachments from email
+        if (parsed.attachments && parsed.attachments.length > 0) {
+          const attachments = parsed.attachments.slice(0, MAX_ATTACHMENTS_PER_EMAIL);
+          const attachDir = path.join(UPLOADS_DIR, channel.id, message.id);
+          fs.mkdirSync(attachDir, { recursive: true });
+
+          for (const att of attachments) {
+            if (!att.content || att.size > MAX_ATTACHMENT_SIZE) continue;
+            const fileName = att.filename || `attachment-${Date.now()}`;
+            const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+            const filePath = path.join(attachDir, safeName);
+
+            try {
+              fs.writeFileSync(filePath, att.content);
+              const storageKey = `uploads/${channel.id}/${message.id}/${safeName}`;
+              const storageUrl = `/${storageKey}`;
+
+              await prisma.messageAttachment.create({
+                data: {
+                  messageId: message.id,
+                  fileName: att.filename || safeName,
+                  mimeType: att.contentType || "application/octet-stream",
+                  fileSize: att.size || att.content.length,
+                  storageKey,
+                  storageUrl,
+                },
+              });
+              console.log(`[Email Sync] Saved attachment: ${fileName} (${att.size} bytes)`);
+            } catch (attErr) {
+              console.error(`[Email Sync] Failed to save attachment ${fileName}:`, attErr);
+            }
+          }
+        }
 
         await prisma.messageStatusEvent.create({
           data: { messageId: message.id, status: "DELIVERED" },

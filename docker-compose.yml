@@ -6,6 +6,8 @@ services:
     restart: always
     ports:
       - "3000:3000"
+    volumes:
+      - uploads:/app/public/uploads
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - AUTH_SECRET=${AUTH_SECRET}
@@ -68,5 +70,6 @@ services:
 
 volumes:
   pgdata:
+  uploads:
   caddy_data:
   caddy_config:

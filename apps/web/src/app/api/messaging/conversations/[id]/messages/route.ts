@@ -63,7 +63,13 @@ export async function GET(
     contact: m.contact
       ? { id: m.contact.id, name: m.contact.displayName, avatarUrl: m.contact.avatarUrl }
       : null,
-    attachments: m.attachments,
+    attachments: m.attachments.map((a) => ({
+      id: a.id,
+      fileName: a.fileName,
+      mimeType: a.mimeType,
+      url: a.storageUrl,
+      size: a.fileSize,
+    })),
     status: m.statuses[0]?.status || null,
   }));
 

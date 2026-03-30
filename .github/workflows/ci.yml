@@ -111,6 +111,10 @@ jobs:
                 image: ghcr.io/denysdevelopment/shorter-email-laptopguru:latest
                 build: !reset null
                 restart: always
+                volumes:
+                  - uploads:/app/public/uploads
+            volumes:
+              uploads:
             PRODEOF
             echo ${{ secrets.GHCR_TOKEN }} | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
             docker pull ghcr.io/denysdevelopment/shorter-email-laptopguru:latest

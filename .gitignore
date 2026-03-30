@@ -49,3 +49,6 @@ apps/api/src/generated/prisma
 deploy_key
 deploy_key.pub
 *.key
+
+# uploads (attachments stored locally)
+apps/web/public/uploads/
