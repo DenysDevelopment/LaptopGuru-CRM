@@ -20,6 +20,8 @@ RUN npx prisma generate
 # Build the app
 FROM base AS builder
 WORKDIR /app
+ARG NEXT_PUBLIC_BUILD_VERSION=dev
+ENV NEXT_PUBLIC_BUILD_VERSION=$NEXT_PUBLIC_BUILD_VERSION
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=prisma /app/apps/web/src/generated ./apps/web/src/generated
 COPY package.json turbo.json prisma.config.ts ./

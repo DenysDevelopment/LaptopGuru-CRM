@@ -1,6 +1,7 @@
 'use client';
 
 import { signOut, useSession } from 'next-auth/react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
@@ -37,7 +38,7 @@ const navItems: NavItem[] = [
 	},
 	{
 		href: '/messaging',
-		label: 'Мессенджер',
+		label: 'Письма',
 		permission: PERMISSIONS.MESSAGING_INBOX_READ,
 		icon: (
 			<svg
@@ -187,11 +188,14 @@ export function Sidebar() {
 			<aside className='hidden md:flex md:w-60 md:flex-col md:fixed md:inset-y-0 bg-white border-r border-gray-200'>
 				<div className='flex flex-col flex-1 min-h-0'>
 					{/* Logo */}
-					<div className='h-16 flex items-center px-5 border-b border-gray-100'>
-						<Link href='/dashboard' className='flex items-baseline gap-1.5'>
-							<span className='text-lg font-bold text-gray-900'>
-								LaptopGuru
-							</span>
+					<div className='h-24 flex items-end pb-2 px-5 border-b border-gray-100'>
+						<Link href='/dashboard' className='flex flex-col items-center w-full'>
+							<Image src='/LG_logo2.webp' alt='LaptopGuru' width={180} height={72} className='h-16 w-auto object-contain' unoptimized />
+							<div className='flex items-center gap-1.5 -mt-0.5'>
+								<div className='h-px w-6 bg-gradient-to-r from-transparent to-brand/40' />
+								<span className='text-[11px] font-black tracking-[0.3em] text-brand'>CRM</span>
+								<div className='h-px w-6 bg-gradient-to-l from-transparent to-brand/40' />
+							</div>
 						</Link>
 					</div>
 
@@ -282,8 +286,11 @@ export function Sidebar() {
 							Выйти
 						</button>
 						<p className='mt-4 text-[10px] text-gray-500 text-center'>
-							Developed with 💛 by
-							<a href='https://t.me/denys_maksymuck'>Denys</a>
+							Developed with 💛 by{' '}
+							<a href='https://t.me/denys_maksymuck' className='hover:text-gray-700'>Denys</a>
+						</p>
+						<p className='mt-1 text-[9px] text-gray-300 text-center font-mono'>
+							v{process.env.NEXT_PUBLIC_BUILD_VERSION || 'dev'}
 						</p>
 					</div>
 				</div>

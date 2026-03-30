@@ -39,11 +39,28 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Bump version
+        id: version
+        run: |
+          CURRENT=$(node -p "require('./version.json').version")
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          PATCH=$((PATCH + 1))
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          echo "{\"version\":\"$NEW_VERSION\"}" > version.json
+          echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add version.json
+          git commit -m "v$NEW_VERSION"
+          git push
 
       - uses: docker/login-action@v3
         with:
@@ -68,6 +85,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            NEXT_PUBLIC_BUILD_VERSION=${{ steps.version.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

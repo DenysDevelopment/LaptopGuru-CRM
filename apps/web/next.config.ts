@@ -1,7 +1,12 @@
 import type { NextConfig } from "next";
 import path from "path";
 
+const buildVersion = process.env.NEXT_PUBLIC_BUILD_VERSION || "dev";
+
 const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_BUILD_VERSION: buildVersion,
+  },
   output: "standalone",
   transpilePackages: ["@shorterlink/shared"],
   outputFileTracingRoot: path.resolve(__dirname, "../../"),

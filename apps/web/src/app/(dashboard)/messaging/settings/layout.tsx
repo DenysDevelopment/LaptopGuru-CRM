@@ -8,8 +8,6 @@ const SETTINGS_TABS = [
 	{ href: '/messaging/settings/templates', label: 'Шаблоны' },
 	{ href: '/messaging/settings/quick-replies', label: 'Быстрые ответы' },
 	{ href: '/messaging/settings/auto-replies', label: 'Авто-ответы' },
-	{ href: '/messaging/settings/teams', label: 'Команды' },
-	{ href: '/messaging/settings/business-hours', label: 'Рабочие часы' },
 ];
 
 export default function SettingsLayout({
