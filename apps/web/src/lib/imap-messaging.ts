@@ -6,20 +6,33 @@ import { parseEmail } from "@/lib/parser";
 
 /**
  * Sync emails from IMAP into the messaging system (Contact → Conversation → Message).
- * Uses ChannelConfig from the EMAIL channel in DB.
+ * Iterates over ALL active EMAIL channels from DB.
  */
 export async function syncEmailsToMessaging(): Promise<number> {
-  // Find active EMAIL channel
-  const channel = await prisma.channel.findFirst({
+  // Find ALL active EMAIL channels
+  const channels = await prisma.channel.findMany({
     where: { type: "EMAIL", isActive: true },
     include: { config: true },
   });
 
-  if (!channel) {
-    console.warn("[Email Sync] No active EMAIL channel found");
+  if (channels.length === 0) {
+    console.warn("[Email Sync] No active EMAIL channels found");
     return 0;
   }
 
+  let totalImported = 0;
+
+  for (const channel of channels) {
+    const imported = await syncSingleChannel(channel);
+    totalImported += imported;
+  }
+
+  return totalImported;
+}
+
+async function syncSingleChannel(
+  channel: Awaited<ReturnType<typeof prisma.channel.findFirst<{ include: { config: true } }>>> & { config: { key: string; value: string }[] },
+): Promise<number> {
   const config = Object.fromEntries(channel.config.map((c) => [c.key, c.value]));
 
   const imapHost = config.imap_host || config.imapHost;
@@ -28,7 +41,7 @@ export async function syncEmailsToMessaging(): Promise<number> {
   const imapPass = config.imap_password || config.password || config.imapPassword;
 
   if (!imapHost || !imapUser || !imapPass) {
-    console.warn("[Email Sync] IMAP config incomplete");
+    console.warn(`[Email Sync] IMAP config incomplete for channel "${channel.name}"`);
     return 0;
   }
 
@@ -44,13 +57,13 @@ export async function syncEmailsToMessaging(): Promise<number> {
 
   try {
     await client.connect();
+    console.log(`[Email Sync] Connected to ${imapUser} (channel: ${channel.name})`);
     const lock = await client.getMailboxLock("INBOX");
 
     try {
-      // Check if mailbox has messages before fetching
       const mailboxStatus = client.mailbox;
       if (!mailboxStatus || mailboxStatus.exists === 0) {
-        console.warn("[Email Sync] Mailbox is empty");
+        console.warn(`[Email Sync] Mailbox empty for ${imapUser}`);
         return 0;
       }
 
@@ -64,7 +77,6 @@ export async function syncEmailsToMessaging(): Promise<number> {
         const messageId = msg.envelope?.messageId;
         if (!messageId) continue;
 
-        // Skip if message already exists in messaging system
         const existing = await prisma.message.findFirst({
           where: { externalId: messageId },
         });
@@ -80,13 +92,10 @@ export async function syncEmailsToMessaging(): Promise<number> {
 
         if (!senderEmail) continue;
 
-        // Parse Shopify/lead data from email body
         const leadData = parseEmail(body, subject);
-        // Use parsed customer email/name if available (from form fields)
         const actualEmail = leadData.customerEmail || senderEmail;
         const actualName = leadData.customerName || senderName;
 
-        // Find or create contact (use customer email from form if available)
         let contactChannel = await prisma.contactChannel.findUnique({
           where: {
             channelType_identifier: {
@@ -110,7 +119,6 @@ export async function syncEmailsToMessaging(): Promise<number> {
                   displayName: actualName,
                 },
               },
-              // Store parsed lead data as custom fields
               ...(leadData.category === "lead" ? {
                 customFields: {
                   create: [
@@ -136,7 +144,6 @@ export async function syncEmailsToMessaging(): Promise<number> {
 
         const contact = contactChannel.contact;
 
-        // Find or create conversation (group by email thread or subject)
         const threadId = parsed.references
           ? Array.isArray(parsed.references)
             ? parsed.references[0]
@@ -154,7 +161,6 @@ export async function syncEmailsToMessaging(): Promise<number> {
           : null;
 
         if (!conversation) {
-          // Try to find open conversation with same contact
           conversation = await prisma.conversation.findFirst({
             where: {
               contactId: contact.id,
@@ -180,14 +186,13 @@ export async function syncEmailsToMessaging(): Promise<number> {
           });
         }
 
-        // Create message
         const message = await prisma.message.create({
           data: {
             conversationId: conversation.id,
             channelId: channel.id,
             direction: "INBOUND",
             contentType: "TEXT",
-            body: body.slice(0, 10000), // limit body size
+            body: body.slice(0, 10000),
             externalId: messageId,
             contactId: contact.id,
           },
@@ -205,7 +210,6 @@ export async function syncEmailsToMessaging(): Promise<number> {
           },
         });
 
-        // Emit SSE event
         emitMessagingEvent({
           type: isNew ? "new_conversation" : "new_message",
           conversationId: conversation.id,
@@ -223,13 +227,12 @@ export async function syncEmailsToMessaging(): Promise<number> {
       lock.release();
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error("[Email Sync] Error:", message);
-    // Wrap raw errors to avoid leaking internal details
-    throw new Error(`Email sync failed: ${message}`);
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error(`[Email Sync] Error for ${imapUser}:`, errMsg);
   } finally {
     await client.logout().catch(() => {});
   }
 
+  console.log(`[Email Sync] Imported ${imported} emails from ${imapUser}`);
   return imported;
 }
