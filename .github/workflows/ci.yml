@@ -95,7 +95,10 @@ jobs:
             PRODEOF
             echo ${{ secrets.GHCR_TOKEN }} | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
             docker pull ghcr.io/denysdevelopment/shorter-email-laptopguru:latest
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml down app 2>/dev/null || true
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml stop app 2>/dev/null || true
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml rm -f app 2>/dev/null || true
+            # Kill anything else on port 3000
+            fuser -k 3000/tcp 2>/dev/null || true
             sleep 2
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps app
             # Health check
