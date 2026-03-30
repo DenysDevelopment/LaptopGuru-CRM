@@ -35,15 +35,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // Validate webhook secret token — always enforce if configured
-    const secretToken = request.headers.get("x-telegram-bot-api-secret-token");
+    // Validate webhook secret token if configured
     const configSecret = channel.config.find((c) => c.key === "webhook_secret")?.value;
-    if (!configSecret) {
-      console.warn("[TG Webhook] No webhook_secret configured — rejecting for security");
-      return NextResponse.json({ error: "Webhook secret not configured" }, { status: 403 });
-    }
-    if (secretToken !== configSecret) {
-      return NextResponse.json({ error: "Invalid secret token" }, { status: 403 });
+    if (configSecret) {
+      const secretToken = request.headers.get("x-telegram-bot-api-secret-token");
+      if (secretToken !== configSecret) {
+        return NextResponse.json({ error: "Invalid secret token" }, { status: 403 });
+      }
     }
 
     // Find or create contact

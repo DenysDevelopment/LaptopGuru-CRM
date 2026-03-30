@@ -138,25 +138,25 @@ export async function POST(request: NextRequest) {
     if (botToken) {
       const appUrl = process.env.APP_URL || "";
       const webhookUrl = `${appUrl}/api/messaging/webhooks/telegram`;
+      const webhookSecret = crypto.randomUUID().replace(/-/g, "");
       try {
         const res = await fetch(
           `https://api.telegram.org/bot${botToken}/setWebhook`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ url: webhookUrl }),
+            body: JSON.stringify({ url: webhookUrl, secret_token: webhookSecret }),
           },
         );
         const result = await res.json();
         if (!result.ok) console.error("[Telegram] setWebhook failed:", result.description);
 
-        // Save webhook URL to config
-        await prisma.channelConfig.create({
-          data: {
-            channelId: channel.id,
-            key: "webhook_url",
-            value: webhookUrl,
-          },
+        // Save webhook URL and secret to config
+        await prisma.channelConfig.createMany({
+          data: [
+            { channelId: channel.id, key: "webhook_url", value: webhookUrl },
+            { channelId: channel.id, key: "webhook_secret", value: webhookSecret, isSecret: true },
+          ],
         });
       } catch (err) {
         console.error("[Telegram] Failed to set webhook:", err);
