@@ -95,7 +95,7 @@ jobs:
             PRODEOF
             echo ${{ secrets.GHCR_TOKEN }} | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
             docker pull ghcr.io/denysdevelopment/shorter-email-laptopguru:latest
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps app
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps --force-recreate app
             # Health check
             sleep 10
             curl -sf http://localhost:3000/api/health || echo "WARNING: Health check failed"
