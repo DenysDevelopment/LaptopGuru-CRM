@@ -42,14 +42,26 @@ COPY --from=builder /app/apps/web/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
 
-# Copy Prisma for migrations (schema + CLI + config + deps)
+# Copy Prisma for migrations (schema + CLI + config + all deps)
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
-COPY --from=deps /app/node_modules/prisma ./node_modules/prisma
-COPY --from=deps /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=deps /app/node_modules/dotenv ./node_modules/dotenv
-COPY --from=deps /app/node_modules/valibot ./node_modules/valibot
-COPY --from=deps /app/node_modules/pathe ./node_modules/pathe
+COPY --from=deps /app/node_modules ./node_modules_full
+RUN node -e " \
+const fs=require('fs'),path=require('path'); \
+const seen=new Set(); \
+function copy(pkg){ \
+  if(seen.has(pkg))return; seen.add(pkg); \
+  const src='/app/node_modules_full/'+pkg, dst='/app/node_modules/'+pkg; \
+  if(!fs.existsSync(src))return; \
+  fs.cpSync(src,dst,{recursive:true}); \
+  try{ \
+    const p=JSON.parse(fs.readFileSync(src+'/package.json','utf8')); \
+    for(const d of Object.keys(p.dependencies||{}))copy(d); \
+  }catch{} \
+} \
+['prisma','@prisma/config','dotenv','valibot'].forEach(copy); \
+fs.readdirSync('/app/node_modules_full/@prisma').forEach(d=>copy('@prisma/'+d)); \
+" && rm -rf node_modules_full
 
 # Entrypoint: run migrations then start
 RUN printf '#!/bin/sh\necho "Running migrations..."\nnode -e "\
