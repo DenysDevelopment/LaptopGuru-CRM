@@ -61,7 +61,8 @@ function copy(pkg){ \
 } \
 ['prisma','@prisma/config','dotenv','valibot'].forEach(copy); \
 fs.readdirSync('/app/node_modules_full/@prisma').forEach(d=>copy('@prisma/'+d)); \
-" && rm -rf node_modules_full
+" && rm -rf node_modules_full && \
+    chown -R nextjs:nodejs node_modules
 
 # Entrypoint: run migrations then start
 RUN printf '#!/bin/sh\necho "Running migrations..."\nnode -e "\
