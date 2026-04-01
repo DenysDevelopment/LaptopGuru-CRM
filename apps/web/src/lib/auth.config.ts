@@ -73,6 +73,7 @@ export const authConfig: NextAuthConfig = {
         token.companyId = u.companyId ?? null;
         token.companyName = u.companyName ?? null;
         token.tokenVersion = u.tokenVersion ?? 0;
+        token.accessToken = u.accessToken as string | undefined;
       }
       return token;
     },
@@ -84,6 +85,7 @@ export const authConfig: NextAuthConfig = {
         u.permissions = token.permissions as string[];
         u.companyId = token.companyId as string | null;
         u.companyName = token.companyName as string | null;
+        u.accessToken = token.accessToken as string | undefined;
       }
       return session;
     },

@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import Link from "next/link";
 
 interface CompanyStats {
   id: string;
@@ -37,7 +38,7 @@ async function getDashboardStats(token: string): Promise<DashboardData | null> {
 
 export default async function SuperAdminDashboardPage() {
   const session = await auth();
-  const token = (session as unknown as Record<string, unknown>)?.accessToken as string | undefined;
+  const token = (session?.user as unknown as Record<string, unknown>)?.accessToken as string | undefined;
   const stats = token ? await getDashboardStats(token) : null;
 
   return (
@@ -54,7 +55,10 @@ export default async function SuperAdminDashboardPage() {
               { label: "Contacts", value: stats.totals.totalContacts },
               { label: "Conversations", value: stats.totals.totalConversations },
             ].map((s) => (
-              <div key={s.label} className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+              <div
+                key={s.label}
+                className="bg-white rounded-lg p-4 shadow-sm border border-gray-200"
+              >
                 <div className="text-2xl font-bold text-gray-900">{s.value}</div>
                 <div className="text-gray-500 text-sm mt-1">{s.label}</div>
               </div>
@@ -62,8 +66,14 @@ export default async function SuperAdminDashboardPage() {
           </div>
 
           <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="px-4 py-3 border-b border-gray-200">
+            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
               <h2 className="font-semibold text-gray-800">Recent Companies</h2>
+              <Link
+                href="/super-admin/companies"
+                className="text-sm text-blue-600 hover:underline"
+              >
+                View all →
+              </Link>
             </div>
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-left">
@@ -77,11 +87,24 @@ export default async function SuperAdminDashboardPage() {
               <tbody className="divide-y divide-gray-100">
                 {stats.companies.map((c) => (
                   <tr key={c.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-2 font-medium">{c.name}</td>
+                    <td className="px-4 py-2 font-medium">
+                      <Link
+                        href={`/super-admin/companies/${c.id}`}
+                        className="hover:text-blue-600"
+                      >
+                        {c.name}
+                      </Link>
+                    </td>
                     <td className="px-4 py-2 text-gray-600">{c._count.users}</td>
                     <td className="px-4 py-2 text-gray-600">{c._count.contacts}</td>
                     <td className="px-4 py-2">
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${c.isActive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                      <span
+                        className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          c.isActive
+                            ? "bg-green-100 text-green-700"
+                            : "bg-red-100 text-red-700"
+                        }`}
+                      >
                         {c.isActive ? "Active" : "Inactive"}
                       </span>
                     </td>
@@ -92,7 +115,13 @@ export default async function SuperAdminDashboardPage() {
           </div>
         </>
       ) : (
-        <p className="text-gray-500">Failed to load stats. Make sure the API is running.</p>
+        <p className="text-amber-600 bg-amber-50 rounded-lg px-4 py-3 text-sm">
+          Нет данных. Убедись, что NestJS API запущен на{" "}
+          <code className="font-mono">
+            {process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"}
+          </code>
+          .
+        </p>
       )}
     </div>
   );

@@ -18,6 +18,7 @@ declare module "next-auth" {
       companyName: string | null;
       tokenVersion: number;
       impersonating?: boolean;
+      accessToken?: string;
     } & DefaultSession["user"];
   }
 }
@@ -31,5 +32,6 @@ declare module "next-auth/jwt" {
     companyName: string | null;
     tokenVersion: number;
     impersonating?: boolean;
+    accessToken?: string;
   }
 }

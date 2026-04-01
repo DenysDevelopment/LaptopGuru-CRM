@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import Link from "next/link";
+import { CreateCompanyForm } from "./create-company-form";
 
 interface Company {
   id: string;
@@ -28,18 +29,27 @@ async function getCompanies(token: string): Promise<Company[]> {
 
 export default async function SuperAdminCompaniesPage() {
   const session = await auth();
-  const token = (session as unknown as Record<string, unknown>)?.accessToken as string | undefined;
+  const token = (session?.user as unknown as Record<string, unknown>)?.accessToken as string | undefined;
   const companies = token ? await getCompanies(token) : [];
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Companies</h1>
+        {token && <CreateCompanyForm accessToken={token} />}
       </div>
+
+      {!token && (
+        <p className="text-amber-600 bg-amber-50 rounded-lg px-4 py-3 text-sm mb-4">
+          Нет токена API. Выйди и войди заново.
+        </p>
+      )}
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         {companies.length === 0 ? (
-          <p className="px-4 py-8 text-center text-gray-500">No companies yet.</p>
+          <p className="px-4 py-8 text-center text-gray-500">
+            Компаний пока нет. Нажми «+ Новая компания» чтобы создать первую.
+          </p>
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-left">
@@ -59,7 +69,13 @@ export default async function SuperAdminCompaniesPage() {
                   <td className="px-4 py-3 text-gray-500 font-mono text-xs">{c.slug}</td>
                   <td className="px-4 py-3 text-gray-600">{c._count.users}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${c.isActive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                    <span
+                      className={`px-2 py-0.5 rounded text-xs font-medium ${
+                        c.isActive
+                          ? "bg-green-100 text-green-700"
+                          : "bg-red-100 text-red-700"
+                      }`}
+                    >
                       {c.isActive ? "Active" : "Inactive"}
                     </span>
                   </td>
