@@ -6,6 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { hash } from 'bcryptjs';
+import { ClsService } from 'nestjs-cls';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ALL_PERMISSIONS } from '@shorterlink/shared';
 
@@ -13,10 +14,18 @@ import { ALL_PERMISSIONS } from '@shorterlink/shared';
 export class AdminService {
   private readonly logger = new Logger(AdminService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cls: ClsService,
+  ) {}
 
   // POST /admin/seed-email-channel
   async seedEmailChannel() {
+    const companyId = this.cls.get<string | null>('companyId');
+    if (!companyId) {
+      throw new BadRequestException('No company context — cannot seed email channel');
+    }
+
     const env = process.env;
     const imapHost = env.IMAP_HOST;
     const smtpHost = env.SMTP_HOST;
@@ -25,8 +34,8 @@ export class AdminService {
       throw new BadRequestException('IMAP_HOST and SMTP_HOST are not configured in env');
     }
 
-    const existing = await this.prisma.channel.findFirst({
-      where: { type: 'EMAIL' },
+    const existing = await this.prisma.raw.channel.findFirst({
+      where: { type: 'EMAIL', companyId },
     });
 
     if (existing) {
@@ -36,11 +45,12 @@ export class AdminService {
       });
     }
 
-    const channel = await this.prisma.channel.create({
+    const channel = await this.prisma.raw.channel.create({
       data: {
         name: env.SMTP_FROM || 'Email',
         type: 'EMAIL',
         isActive: true,
+        companyId,
         config: {
           create: [
             { key: 'imap_host', value: env.IMAP_HOST || '' },
@@ -68,7 +78,9 @@ export class AdminService {
 
   // GET /admin/users
   async findAllUsers() {
-    return this.prisma.user.findMany({
+    const companyId = this.cls.get<string | null>('companyId');
+    return this.prisma.raw.user.findMany({
+      where: companyId ? { companyId } : {},
       select: {
         id: true,
         email: true,
@@ -106,19 +118,25 @@ export class AdminService {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
-    const existing = await this.prisma.user.findUnique({
+    const existing = await this.prisma.raw.user.findUnique({
       where: { email: normalizedEmail },
     });
     if (existing) {
       throw new ConflictException('User with this email already exists');
     }
 
+    const companyId = this.cls.get<string | null>('companyId');
+    if (!companyId) {
+      throw new BadRequestException('No company context — cannot create user');
+    }
+
     const passwordHash = await hash(password, 12);
-    return this.prisma.user.create({
+    return this.prisma.raw.user.create({
       data: {
         email: normalizedEmail,
         name: typeof name === 'string' ? name.trim().slice(0, 255) : null,
         passwordHash,
+        companyId,
       },
       select: {
         id: true,
@@ -174,17 +192,23 @@ export class AdminService {
     }
 
     // Verify target user exists
-    const targetUser = await this.prisma.user.findUnique({ where: { id } });
+    const targetUser = await this.prisma.raw.user.findUnique({ where: { id } });
     if (!targetUser) {
       throw new NotFoundException('User not found');
     }
 
-    const user = await this.prisma.user.update({
+    const companyId = this.cls.get<string | null>('companyId');
+    if (companyId && targetUser.companyId !== companyId) {
+      throw new NotFoundException('User not found');
+    }
+
+    const updateData: Record<string, unknown> = {};
+    if (role !== undefined) updateData.role = role;
+    if (permissions !== undefined) updateData.permissions = permissions;
+
+    const user = await this.prisma.raw.user.update({
       where: { id },
-      data: {
-        ...(role !== undefined && { role }),
-        ...(permissions !== undefined && { permissions }),
-      },
+      data: updateData as Parameters<typeof this.prisma.raw.user.update>[0]['data'],
       select: {
         id: true,
         email: true,
