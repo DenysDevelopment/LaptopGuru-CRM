@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { compare, hash } from 'bcryptjs';
 import { timingSafeEqual } from 'crypto';
@@ -14,7 +14,7 @@ export class AuthService {
   ) {}
 
   async login(dto: LoginDto) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.raw.user.findUnique({
       where: { email: dto.email.toLowerCase().trim() },
     });
 
@@ -32,43 +32,23 @@ export class AuthService {
       email: user.email,
       role: user.role,
       permissions: user.permissions,
+      companyId: user.companyId ?? null,
+      tokenVersion: user.tokenVersion,
     };
+
     return {
       accessToken: this.jwtService.sign(payload),
-      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        companyId: user.companyId ?? null,
+      },
     };
   }
 
-  async register(dto: RegisterDto) {
-    const normalizedEmail = dto.email.toLowerCase().trim();
-    const existing = await this.prisma.user.findUnique({
-      where: { email: normalizedEmail },
-    });
-
-    if (existing) {
-      throw new ConflictException('Email already registered');
-    }
-
-    const requiredCode = process.env.INVITE_CODE;
-    if (requiredCode) {
-      const code = dto.inviteCode || '';
-      const isValid =
-        code.length === requiredCode.length &&
-        timingSafeEqual(Buffer.from(code), Buffer.from(requiredCode));
-      if (!isValid) {
-        throw new UnauthorizedException('Invalid invite code');
-      }
-    }
-
-    const passwordHash = await hash(dto.password, 12);
-    const user = await this.prisma.user.create({
-      data: {
-        email: normalizedEmail,
-        name: dto.name?.trim() || null,
-        passwordHash,
-      },
-    });
-
-    return { id: user.id, email: user.email };
+  async register(_dto: RegisterDto) {
+    throw new NotFoundException('Registration is disabled. Contact your administrator.');
   }
 }
