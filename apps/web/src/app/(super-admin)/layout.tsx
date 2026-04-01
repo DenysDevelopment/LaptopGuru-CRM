@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { SuperAdminNavActions } from "@/components/super-admin/nav-actions";
 
 export default async function SuperAdminLayout({
   children,
@@ -9,6 +10,7 @@ export default async function SuperAdminLayout({
 }) {
   const session = await auth();
   const role = (session?.user as unknown as Record<string, unknown>)?.role as string | undefined;
+  const email = session?.user?.email ?? "";
 
   if (role !== "SUPER_ADMIN") {
     redirect("/dashboard");
@@ -27,6 +29,9 @@ export default async function SuperAdminLayout({
         <Link href="/super-admin/users" className="text-gray-300 hover:text-white text-sm transition-colors">
           Users
         </Link>
+        <div className="ml-auto">
+          <SuperAdminNavActions email={email} />
+        </div>
       </nav>
       <main className="p-6 max-w-7xl mx-auto">{children}</main>
     </div>
