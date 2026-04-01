@@ -3,7 +3,12 @@
 import { useState, useCallback, useEffect } from "react";
 import type { IncomingEmail, Filter, Category } from "@/types";
 
-export function useEmails() {
+interface UseEmailsOptions {
+  channelId?: string | null;
+}
+
+export function useEmails(options: UseEmailsOptions = {}) {
+  const { channelId } = options;
   const [emails, setEmails] = useState<IncomingEmail[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
   const [category, setCategory] = useState<Category>("all");
@@ -16,13 +21,14 @@ export function useEmails() {
     setLoading(true);
     const params = new URLSearchParams({ filter, page: String(page) });
     if (category !== "all") params.set("category", category);
+    if (channelId) params.set("channelId", channelId);
     const res = await fetch(`/api/emails?${params}`);
     const data = await res.json();
     setEmails(data.emails);
     setTotalPages(data.totalPages);
     setTotal(data.total);
     setLoading(false);
-  }, [filter, category, page]);
+  }, [filter, category, page, channelId]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetching pattern

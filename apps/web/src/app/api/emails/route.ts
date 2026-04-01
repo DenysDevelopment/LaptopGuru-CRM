@@ -11,10 +11,16 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const filter = searchParams.get("filter") || "all";
   const category = searchParams.get("category");
+  const channelId = searchParams.get("channelId");
   const page = Math.max(1, Number(searchParams.get("page")) || 1);
   const perPage = 20;
 
   const where: Prisma.IncomingEmailWhereInput = {};
+
+  // Channel filter
+  if (channelId) {
+    where.channelId = channelId;
+  }
 
   // Status filter
   if (filter === "new") {

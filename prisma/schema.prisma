@@ -65,6 +65,8 @@ model IncomingEmail {
   archived      Boolean   @default(false)
   processedBy   User?     @relation(fields: [processedById], references: [id], onDelete: SetNull)
   processedById String?
+  channel       Channel?  @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  channelId     String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -76,6 +78,7 @@ model IncomingEmail {
   @@index([from])
   @@index([customerEmail, productUrl])
   @@index([receivedAt])
+  @@index([channelId])
 }
 
 model Video {
@@ -500,11 +503,12 @@ model Channel {
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 
-  config        ChannelConfig[]
-  conversations Conversation[]
-  messages      Message[]
-  templates     Template[]
-  autoRules     AutoReplyRule[]
+  config         ChannelConfig[]
+  conversations  Conversation[]
+  messages       Message[]
+  templates      Template[]
+  autoRules      AutoReplyRule[]
+  incomingEmails IncomingEmail[]
 
   @@index([type])
 }

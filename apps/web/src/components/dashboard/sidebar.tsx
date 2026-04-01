@@ -3,18 +3,31 @@
 import { signOut, useSession } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
 import { hasPermission, PERMISSIONS } from '@shorterlink/shared';
 import type { Permission } from '@shorterlink/shared';
 import { useMessagingEvents } from '@/hooks/use-messaging-events';
+
+interface NavChild {
+	href: string;
+	label: string;
+	permission?: Permission;
+	color?: string;
+}
 
 interface NavItem {
 	href: string;
 	label: string;
 	permission?: Permission;
 	icon: React.ReactNode;
-	children?: { href: string; label: string; permission?: Permission }[];
+	children?: NavChild[];
+}
+
+interface EmailChannel {
+	id: string;
+	name: string;
+	isActive: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -38,7 +51,7 @@ const navItems: NavItem[] = [
 	},
 	{
 		href: '/messaging',
-		label: 'Письма',
+		label: 'Почта',
 		permission: PERMISSIONS.MESSAGING_INBOX_READ,
 		icon: (
 			<svg
@@ -54,6 +67,10 @@ const navItems: NavItem[] = [
 				/>
 			</svg>
 		),
+		children: [
+			{ href: '/messaging', label: 'Все', permission: PERMISSIONS.MESSAGING_INBOX_READ },
+			// Dynamic EMAIL channel children are added in the component
+		],
 	},
 	{
 		href: '/emails',
@@ -146,8 +163,11 @@ const navItems: NavItem[] = [
 
 export function Sidebar() {
 	const pathname = usePathname();
+	const searchParams = useSearchParams();
+	const currentChannelId = searchParams.get('channel');
 	const { data: session } = useSession();
 	const [unreadCount, setUnreadCount] = useState(0);
+	const [emailChannels, setEmailChannels] = useState<EmailChannel[]>([]);
 
 	const userRole = session?.user?.role;
 	const userPermissions = session?.user?.permissions;
@@ -169,6 +189,24 @@ export function Sidebar() {
 		fetchUnread();
 	}, [fetchUnread]);
 
+	// Fetch EMAIL channels for sidebar
+	useEffect(() => {
+		async function fetchEmailChannels() {
+			try {
+				const res = await fetch('/api/messaging/channels');
+				if (res.ok) {
+					const data = await res.json();
+					const channels = (data.channels || []).filter(
+						(ch: { type: string; isActive: boolean }) => ch.type === 'EMAIL' && ch.isActive
+					);
+					// eslint-disable-next-line react-hooks/set-state-in-effect
+					setEmailChannels(channels);
+				}
+			} catch {}
+		}
+		fetchEmailChannels();
+	}, []);
+
 	// Real-time update unread count
 	useMessagingEvents((event) => {
 		if (event.type === 'new_message' || event.type === 'new_conversation' || event.type === 'conversation_updated') {
@@ -176,7 +214,22 @@ export function Sidebar() {
 		}
 	});
 
-	const visibleItems = navItems.filter(
+	// Build nav items with dynamic EMAIL channels under "Почта"
+	const enrichedNavItems = navItems.map(item => {
+		if (item.href !== '/messaging' || emailChannels.length === 0) return item;
+
+		const channelChildren: NavChild[] = emailChannels.map(ch => ({
+			href: `/emails?channel=${ch.id}`,
+			label: ch.name,
+			permission: PERMISSIONS.MESSAGING_INBOX_READ,
+		}));
+
+		const children = [...(item.children || [])];
+		children.push(...channelChildren);
+		return { ...item, children };
+	});
+
+	const visibleItems = enrichedNavItems.filter(
 		(item) =>
 			!item.permission ||
 			hasPermission(userRole, userPermissions, item.permission),
@@ -224,7 +277,12 @@ export function Sidebar() {
 								item.href === '/dashboard'
 									? pathname === '/dashboard'
 									: pathname.startsWith(item.href);
-							const isParentActive = item.children?.some(c => pathname.startsWith(c.href));
+							const isParentActive = item.children?.some(c => {
+							if (c.href.includes('?channel=')) {
+								return pathname === '/emails' && currentChannelId === new URL(c.href, 'http://x').searchParams.get('channel');
+							}
+							return pathname.startsWith(c.href);
+						});
 
 							return (
 								<div key={item.href}>
@@ -249,18 +307,31 @@ export function Sidebar() {
 										<div className='ml-8 mt-1 space-y-0.5'>
 											{item.children
 												.filter(c => !c.permission || hasPermission(userRole, userPermissions, c.permission))
-												.map(child => (
-													<Link
-														key={child.href}
-														href={child.href}
-														className={`block px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-															pathname.startsWith(child.href) && !(child.href === '/emails' && pathname.startsWith('/emails') === false)
-																? 'text-brand bg-brand-light/50'
-																: 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-														}`}>
-														{child.label}
-													</Link>
-												))}
+												.map(child => {
+													const isChannelLink = child.href.includes('?channel=');
+													const channelParam = isChannelLink ? new URL(child.href, 'http://x').searchParams.get('channel') : null;
+													const isChildActive = isChannelLink
+														? pathname === '/emails' && currentChannelId === channelParam
+														: child.href === '/emails'
+															? pathname.startsWith('/emails') && !currentChannelId
+															: pathname.startsWith(child.href);
+
+													return (
+														<Link
+															key={child.href}
+															href={child.href}
+															className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+																isChildActive
+																	? 'text-brand bg-brand-light/50'
+																	: 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+															}`}>
+															{child.color && (
+																<span className='w-2 h-2 rounded-full flex-shrink-0' style={{ backgroundColor: child.color }} />
+															)}
+															{child.label}
+														</Link>
+													);
+												})}
 										</div>
 									)}
 								</div>
