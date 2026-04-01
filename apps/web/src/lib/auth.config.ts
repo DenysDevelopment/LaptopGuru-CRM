@@ -12,6 +12,7 @@ const PROTECTED_PREFIXES = [
   "/quicklinks",
   "/analytics",
   "/admin",
+  "/super-admin",
 ];
 
 export const authConfig: NextAuthConfig = {
@@ -31,6 +32,18 @@ export const authConfig: NextAuthConfig = {
 
       if (!isProtected) return true;
       if (!isLoggedIn) return false;
+
+      const userRole = (auth?.user as unknown as Record<string, unknown> | undefined)?.role as string | undefined;
+
+      // Redirect SUPER_ADMIN away from regular dashboard to super-admin area
+      if (pathname === '/dashboard' && userRole === 'SUPER_ADMIN') {
+        return Response.redirect(new URL('/super-admin/dashboard', request.nextUrl));
+      }
+
+      // Block non-SUPER_ADMIN from super-admin routes
+      if (pathname.startsWith('/super-admin') && userRole !== 'SUPER_ADMIN') {
+        return Response.redirect(new URL('/dashboard', request.nextUrl));
+      }
 
       // Dashboard is always accessible (shows empty state without data permission)
       if (pathname.startsWith("/dashboard")) return true;
@@ -53,17 +66,22 @@ export const authConfig: NextAuthConfig = {
     },
     jwt({ token, user }) {
       if (user) {
+        const u = user as unknown as Record<string, unknown>;
         token.id = user.id;
-        token.role = (user as unknown as Record<string, unknown>).role as string ?? 'USER';
-        token.permissions = (user as unknown as Record<string, unknown>).permissions as string[] ?? [];
+        token.role = u.role ?? 'USER';
+        token.permissions = u.permissions ?? [];
+        token.companyId = u.companyId ?? null;
+        token.tokenVersion = u.tokenVersion ?? 0;
       }
       return token;
     },
     session({ session, token }) {
       if (session.user) {
+        const u = session.user as unknown as Record<string, unknown>;
         session.user.id = token.id as string;
-        session.user.role = token.role as string;
-        session.user.permissions = token.permissions as string[];
+        u.role = token.role as string;
+        u.permissions = token.permissions as string[];
+        u.companyId = token.companyId as string | null;
       }
       return session;
     },
