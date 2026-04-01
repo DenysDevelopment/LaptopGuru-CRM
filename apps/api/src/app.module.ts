@@ -16,6 +16,7 @@ import { QuickLinksModule } from './modules/quicklinks/quicklinks.module';
 import { LandingsModule } from './modules/landings/landings.module';
 import { StatsModule } from './modules/stats/stats.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { CompanyGuard } from './common/guards/company.guard';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { AdminModule } from './modules/admin/admin.module';
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: CompanyGuard },
   ],
 })
 export class AppModule {}
