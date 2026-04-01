@@ -9,8 +9,13 @@ import { PERMISSIONS } from "@shorterlink/shared";
  * Only for ADMIN / messaging:channels:write.
  */
 export async function POST() {
-  const { error } = await authorize(PERMISSIONS.MESSAGING_CHANNELS_WRITE);
+  const { session, error } = await authorize(PERMISSIONS.MESSAGING_CHANNELS_WRITE);
   if (error) return error;
+
+  const companyId = session.user.companyId;
+  if (!companyId) {
+    return NextResponse.json({ error: "No company assigned" }, { status: 403 });
+  }
 
   const env = process.env;
 
@@ -26,7 +31,7 @@ export async function POST() {
 
   // Check if email channel already exists
   const existing = await prisma.channel.findFirst({
-    where: { type: "EMAIL" },
+    where: { type: "EMAIL", companyId },
   });
 
   if (existing) {
@@ -42,6 +47,7 @@ export async function POST() {
       name: env.SMTP_FROM || "Email",
       type: "EMAIL",
       isActive: true,
+      companyId,
       config: {
         create: [
           { key: "imap_host", value: env.IMAP_HOST || "" },
