@@ -64,10 +64,28 @@ export class LandingsService {
 
   // POST /landings/:slug/track
   async createVisit(slug: string, body: Record<string, any>, req: Request) {
-    const landing = await this.prisma.landing.findUnique({
-      where: { slug },
-      select: { id: true },
-    });
+    // Accept optional companySlug in body to narrow the search
+    const companySlug = body.companySlug as string | undefined;
+    let landing: { id: string; companyId: string } | null = null;
+
+    if (companySlug) {
+      const company = await this.prisma.raw.company.findUnique({
+        where: { slug: companySlug },
+        select: { id: true },
+      });
+      if (company) {
+        landing = await this.prisma.raw.landing.findFirst({
+          where: { slug, companyId: company.id },
+          select: { id: true, companyId: true },
+        });
+      }
+    } else {
+      landing = await this.prisma.raw.landing.findFirst({
+        where: { slug },
+        select: { id: true, companyId: true },
+      });
+    }
+
     if (!landing) {
       throw new NotFoundException('Not found');
     }
@@ -93,9 +111,10 @@ export class LandingsService {
         };
     const headers = extractHeaders(req);
 
-    const visit = await this.prisma.landingVisit.create({
+    const visit = await this.prisma.raw.landingVisit.create({
       data: {
         landingId: landing.id,
+        companyId: landing.companyId,
         sessionId: body.sessionId || randomUUID(),
 
         // Network & Geo
@@ -198,7 +217,7 @@ export class LandingsService {
 
     if (Object.keys(safeData).length === 0) return { ok: true };
 
-    await this.prisma.landingVisit.update({
+    await this.prisma.raw.landingVisit.update({
       where: { id: visitId },
       data: safeData,
     });
@@ -207,7 +226,7 @@ export class LandingsService {
 
   // GET /landings/:slug/analytics
   async getAnalytics(slug: string) {
-    const landing = await this.prisma.landing.findUnique({
+    const landing = await this.prisma.landing.findFirst({
       where: { slug },
       include: {
         video: { select: { title: true, thumbnail: true } },
