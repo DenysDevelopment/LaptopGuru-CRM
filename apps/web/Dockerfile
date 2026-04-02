@@ -3,18 +3,14 @@ FROM node:22-alpine AS base
 # Install dependencies (from monorepo root context)
 FROM base AS deps
 WORKDIR /app
-# libc6-compat needed for native musl bindings (lightningcss, tailwindcss-oxide)
 RUN apk add --no-cache libc6-compat
 COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/
 COPY packages/shared/package.json packages/shared/
 COPY packages/api-client/package.json packages/api-client/
-RUN npm ci --legacy-peer-deps --workspace=@laptopguru-crm/web --workspace=@laptopguru-crm/shared --ignore-scripts && \
-    # Verify/install native musl binaries for alpine
-    node -e "try{require('lightningcss-linux-x64-musl')}catch(e){process.exit(1)}" || \
-      npm install --no-save lightningcss-linux-x64-musl && \
-    node -e "try{require('@tailwindcss/oxide-linux-x64-musl')}catch(e){process.exit(1)}" || \
-      npm install --no-save @tailwindcss/oxide-linux-x64-musl
+# Remove husky prepare script (not needed in Docker), then install all deps
+RUN node -e "const p=require('./package.json');delete p.scripts.prepare;require('fs').writeFileSync('package.json',JSON.stringify(p,null,2))" && \
+    npm ci --legacy-peer-deps
 
 # Generate Prisma client
 FROM base AS prisma
