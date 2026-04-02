@@ -7,7 +7,8 @@ COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/
 COPY packages/shared/package.json packages/shared/
 COPY packages/api-client/package.json packages/api-client/
-RUN npm ci --legacy-peer-deps --workspace=@laptopguru-crm/web --workspace=@laptopguru-crm/shared
+RUN npm ci --legacy-peer-deps --workspace=@laptopguru-crm/web --workspace=@laptopguru-crm/shared --ignore-scripts && \
+    npm install --no-save lightningcss-linux-x64-musl 2>/dev/null || true
 
 # Generate Prisma client
 FROM base AS prisma
