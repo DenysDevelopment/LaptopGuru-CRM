@@ -27,6 +27,9 @@ jobs:
       - name: Generate Prisma clients
         run: npx prisma generate
 
+      - name: Build shared package
+        run: npm run build --workspace=@laptopguru-crm/shared
+
       - name: Lint
         run: npm run lint
 
