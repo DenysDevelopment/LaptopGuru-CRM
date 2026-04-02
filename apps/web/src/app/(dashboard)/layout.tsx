@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { AutoSync } from "@/components/dashboard/auto-sync";
 import { MessagingDetector } from "@/components/dashboard/messaging-detector";
@@ -12,7 +13,9 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen bg-gray-50/50">
       <ImpersonationBanner />
-      <Sidebar />
+      <Suspense>
+        <Sidebar />
+      </Suspense>
       <AutoSync />
       <main className="md:pl-60">
         <MessagingDetector>{children}</MessagingDetector>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { Suspense, useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import type { IncomingEmail } from "@/types";
 import { useEmails } from "@/hooks/use-emails";
@@ -11,6 +11,14 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { EditEmailModal } from "@/components/dashboard/edit-email-modal";
 
 export default function EmailsPage() {
+  return (
+    <Suspense>
+      <EmailsPageContent />
+    </Suspense>
+  );
+}
+
+function EmailsPageContent() {
   const searchParams = useSearchParams();
   const channelId = searchParams.get("channel");
   const [fetchedChannelName, setFetchedChannelName] = useState<{ id: string | null; name: string | null }>({ id: null, name: null });
