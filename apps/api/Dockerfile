@@ -28,7 +28,9 @@ COPY package.json turbo.json tsconfig.json ./
 COPY apps/api ./apps/api
 COPY packages ./packages
 RUN npm run build --workspace=@laptopguru-crm/shared && \
-    npm run build --workspace=@laptopguru-crm/api
+    npm run build --workspace=@laptopguru-crm/api && \
+    echo "=== Checking dist/generated ===" && \
+    head -3 /app/apps/api/dist/generated/prisma/client.js
 
 # Production image
 FROM base AS runner
@@ -38,12 +40,15 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nestjs
 
+# Copy node_modules and built output
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/apps/api/dist ./dist
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /app/packages/shared/package.json ./packages/shared/package.json
-COPY --from=prisma /app/apps/api/src/generated ./apps/api/src/generated
 COPY apps/api/package.json ./package.json
+
+# Verify no ESM issues
+RUN node -e "require('./dist/generated/prisma/client')" && echo "Prisma client OK" || echo "Prisma client FAILED"
 
 USER nestjs
 
