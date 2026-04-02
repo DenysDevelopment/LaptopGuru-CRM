@@ -7,7 +7,7 @@ COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/
 COPY packages/shared/package.json packages/shared/
 COPY packages/api-client/package.json packages/api-client/
-RUN npm ci --legacy-peer-deps --workspace=@laptopguru-crm/web --workspace=@laptopguru-crm/shared --ignore-scripts
+RUN npm ci --legacy-peer-deps --workspace=@laptopguru-crm/web --workspace=@laptopguru-crm/shared
 
 # Generate Prisma client
 FROM base AS prisma
@@ -28,7 +28,8 @@ COPY package.json turbo.json prisma.config.ts ./
 COPY prisma ./prisma
 COPY apps/web ./apps/web
 COPY packages ./packages
-RUN npm run build --workspace=@laptopguru-crm/web
+RUN npm run build --workspace=@laptopguru-crm/shared && \
+    npm run build --workspace=@laptopguru-crm/web
 
 # Production image
 FROM base AS runner
