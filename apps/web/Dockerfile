@@ -10,7 +10,12 @@ COPY packages/shared/package.json packages/shared/
 COPY packages/api-client/package.json packages/api-client/
 # Remove husky prepare script (not needed in Docker), then install all deps
 RUN node -e "const p=require('./package.json');delete p.scripts.prepare;require('fs').writeFileSync('package.json',JSON.stringify(p,null,2))" && \
-    npm ci --legacy-peer-deps
+    npm ci --legacy-peer-deps && \
+    # Force-install musl native binaries (npm skips them on glibc buildx runners)
+    npm install --no-save --force lightningcss-linux-x64-musl @tailwindcss/oxide-linux-x64-musl && \
+    # Debug: verify binaries are found
+    node -e "console.log('lightningcss:',require.resolve('lightningcss-linux-x64-musl'))" && \
+    node -e "console.log('oxide:',require.resolve('@tailwindcss/oxide-linux-x64-musl'))"
 
 # Generate Prisma client
 FROM base AS prisma
