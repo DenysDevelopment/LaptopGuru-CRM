@@ -4,10 +4,16 @@ import { prisma } from "@/lib/db";
 import { PERMISSIONS } from "@shorterlink/shared";
 
 export async function GET() {
-  const { error } = await authorize(PERMISSIONS.MESSAGING_CHANNELS_READ);
+  const { session, error } = await authorize(PERMISSIONS.MESSAGING_CHANNELS_READ);
   if (error) return error;
 
+  const companyId = session.user.companyId;
+  if (!companyId) {
+    return NextResponse.json({ error: "No company assigned" }, { status: 403 });
+  }
+
   const channels = await prisma.channel.findMany({
+    where: { companyId },
     orderBy: { createdAt: "asc" },
     include: {
       config: {
@@ -35,7 +41,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const { name, type, isActive, config } = body;
 
-  const ALLOWED_TYPES = ["EMAIL", "SMS", "WHATSAPP", "TELEGRAM", "FACEBOOK_MESSENGER", "INSTAGRAM_DIRECT"];
+  const ALLOWED_TYPES = ["EMAIL", "SMS", "WHATSAPP", "TELEGRAM", "FACEBOOK", "FACEBOOK_MESSENGER", "INSTAGRAM", "INSTAGRAM_DIRECT", "WEBCHAT"];
 
   if (!name || !type) {
     return NextResponse.json(
@@ -63,26 +69,17 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Check for duplicate channel by username/login (EMAIL) or name
+  const companyId = session.user!.companyId;
+  if (!companyId) {
+    return NextResponse.json({ error: "No company assigned" }, { status: 403 });
+  }
+
+  // Check for duplicate channel by username/login (EMAIL) within company
   if (type === "EMAIL" && config && Array.isArray(config)) {
     const username = config.find((c: { key: string }) => c.key === "username")?.value;
     if (username) {
-      const existing = await prisma.channel.findFirst({
-        where: { type: "EMAIL" },
-        include: { config: true },
-      });
-      if (existing) {
-        const existingUsername = existing.config.find((c) => c.key === "username")?.value;
-        if (existingUsername === username) {
-          return NextResponse.json(
-            { error: `Канал с логином ${username} уже существует` },
-            { status: 409 },
-          );
-        }
-      }
-      // Check all EMAIL channels
       const allEmailChannels = await prisma.channel.findMany({
-        where: { type: "EMAIL" },
+        where: { type: "EMAIL", companyId },
         include: { config: true },
       });
       for (const ch of allEmailChannels) {
@@ -97,9 +94,9 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Check duplicate by name
+  // Check duplicate by name within company
   const existingByName = await prisma.channel.findFirst({
-    where: { name, type },
+    where: { name, type, companyId },
   });
   if (existingByName) {
     return NextResponse.json(
@@ -113,7 +110,7 @@ export async function POST(request: NextRequest) {
       name,
       type,
       isActive: isActive ?? true,
-      companyId: session.user!.companyId ?? "",
+      companyId,
       ...(config && config.length > 0
         ? {
             config: {
