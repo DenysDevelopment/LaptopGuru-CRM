@@ -3,11 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-interface Props {
-  accessToken: string;
-}
-
-export function CreateCompanyForm({ accessToken }: Props) {
+export function CreateCompanyForm() {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -35,17 +31,11 @@ export function CreateCompanyForm({ accessToken }: Props) {
 
     startTransition(async () => {
       try {
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"}/api/super-admin/companies`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${accessToken}`,
-            },
-            body: JSON.stringify(body),
-          }
-        );
+        const res = await fetch("/api/super-admin/companies", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
 
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));

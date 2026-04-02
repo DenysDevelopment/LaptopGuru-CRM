@@ -93,6 +93,24 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - uses: docker/metadata-action@v5
+        id: meta-api
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          tags: ${{ steps.meta-api.outputs.tags }}
+          labels: ${{ steps.meta-api.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   deploy:
     name: Deploy to VPS
     needs: build-and-push
@@ -116,16 +134,22 @@ jobs:
                 restart: always
                 volumes:
                   - uploads:/app/public/uploads
+              api:
+                image: ghcr.io/denysdevelopment/shorter-email-laptopguru-api:latest
+                build: !reset null
+                restart: always
             volumes:
               uploads:
             PRODEOF
             echo ${{ secrets.GHCR_TOKEN }} | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
             docker pull ghcr.io/denysdevelopment/shorter-email-laptopguru:latest
+            docker pull ghcr.io/denysdevelopment/shorter-email-laptopguru-api:latest
             # Stop ANY container using port 3000 (including from other projects)
             docker ps -q --filter "publish=3000" | xargs -r docker stop
             docker ps -aq --filter "publish=3000" | xargs -r docker rm -f
             sleep 2
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps app
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps api app
             # Health check
-            sleep 10
-            curl -sf http://localhost:3000/api/health || echo "WARNING: Health check failed"
+            sleep 15
+            curl -sf http://localhost:4000/api/health || echo "WARNING: API health check failed"
+            curl -sf http://localhost:3000/api/health || echo "WARNING: App health check failed"

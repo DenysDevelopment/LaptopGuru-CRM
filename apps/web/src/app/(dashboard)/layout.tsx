@@ -5,6 +5,8 @@ import { MessagingDetector } from "@/components/dashboard/messaging-detector";
 import { MessagingToastNotifications } from "@/components/messaging/toast-notifications";
 import { ImpersonationBanner } from "@/components/dashboard/impersonation-banner";
 
+export const dynamic = 'force-dynamic';
+
 export default function DashboardLayout({
   children,
 }: {

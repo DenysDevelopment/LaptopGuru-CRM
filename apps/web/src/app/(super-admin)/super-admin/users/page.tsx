@@ -13,7 +13,7 @@ interface User {
 async function getUsers(token: string): Promise<User[]> {
   try {
     const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"}/api/super-admin/users`,
+      `${process.env.INTERNAL_API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"}/api/super-admin/users`,
       {
         headers: { Authorization: `Bearer ${token}` },
         cache: "no-store",

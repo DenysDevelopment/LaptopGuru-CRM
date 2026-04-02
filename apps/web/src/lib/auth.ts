@@ -4,7 +4,7 @@ import { compare } from "bcryptjs";
 import { authConfig } from "@/lib/auth.config";
 import { prisma } from "@/lib/db";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+const API_URL = process.env.INTERNAL_API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,

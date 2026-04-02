@@ -14,7 +14,7 @@ interface Company {
 async function getCompanies(token: string): Promise<Company[]> {
   try {
     const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"}/api/super-admin/companies`,
+      `${process.env.INTERNAL_API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"}/api/super-admin/companies`,
       {
         headers: { Authorization: `Bearer ${token}` },
         cache: "no-store",
@@ -36,14 +36,8 @@ export default async function SuperAdminCompaniesPage() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Компании</h1>
-        {token && <CreateCompanyForm accessToken={token} />}
+        <CreateCompanyForm />
       </div>
-
-      {!token && (
-        <p className="text-amber-600 bg-amber-50 rounded-lg px-4 py-3 text-sm mb-4">
-          Нет токена API. Выйди и войди заново.
-        </p>
-      )}
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         {companies.length === 0 ? (
