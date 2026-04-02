@@ -7,7 +7,7 @@ import {
   MaxLength,
   Matches,
 } from 'class-validator';
-import { DayOfWeek } from '../../../../generated/prisma';
+import { DayOfWeek } from '../../../../generated/prisma/client';
 
 export class CreateScheduleDto {
   @IsString()

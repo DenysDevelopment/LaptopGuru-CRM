@@ -10,7 +10,7 @@ import {
   IsUrl,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ChannelType } from '../../../../generated/prisma';
+import { ChannelType } from '../../../../generated/prisma/client';
 
 export class ContactChannelDto {
   @IsEnum(ChannelType)

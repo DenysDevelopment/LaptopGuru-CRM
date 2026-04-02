@@ -5,10 +5,16 @@ import { PERMISSIONS } from "@shorterlink/shared";
 import { hash } from "bcryptjs";
 
 export async function GET() {
-  const { error } = await authorize(PERMISSIONS.USERS_MANAGE);
+  const { session, error } = await authorize(PERMISSIONS.USERS_MANAGE);
   if (error) return error;
 
+  const companyId = session.user.companyId;
+  if (!companyId) {
+    return NextResponse.json({ error: "No company assigned" }, { status: 403 });
+  }
+
   const users = await prisma.user.findMany({
+    where: { companyId },
     select: {
       id: true,
       email: true,
@@ -24,8 +30,13 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const { error } = await authorize(PERMISSIONS.USERS_MANAGE);
+  const { session, error } = await authorize(PERMISSIONS.USERS_MANAGE);
   if (error) return error;
+
+  const companyId = session.user.companyId;
+  if (!companyId) {
+    return NextResponse.json({ error: "No company assigned" }, { status: 403 });
+  }
 
   const body = await request.json();
   const { email, name, password } = body;
@@ -74,6 +85,7 @@ export async function POST(request: NextRequest) {
       email: normalizedEmail,
       name: typeof name === "string" ? name.trim().slice(0, 255) : null,
       passwordHash,
+      companyId,
     },
     select: {
       id: true,

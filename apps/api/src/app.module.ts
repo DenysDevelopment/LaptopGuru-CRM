@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { BullModule } from '@nestjs/bullmq';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ClsModule } from 'nestjs-cls';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
@@ -15,9 +16,15 @@ import { QuickLinksModule } from './modules/quicklinks/quicklinks.module';
 import { LandingsModule } from './modules/landings/landings.module';
 import { StatsModule } from './modules/stats/stats.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { SuperAdminModule } from './modules/super-admin/super-admin.module';
+import { CompanyGuard } from './common/guards/company.guard';
 
 @Module({
   imports: [
+    ClsModule.forRoot({
+      global: true,
+      middleware: { mount: true },
+    }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 20 }]),
     BullModule.forRoot({
       connection: {
@@ -37,9 +44,11 @@ import { AdminModule } from './modules/admin/admin.module';
     LandingsModule,
     StatsModule,
     AdminModule,
+    SuperAdminModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: CompanyGuard },
   ],
 })
 export class AppModule {}

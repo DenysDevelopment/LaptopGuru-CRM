@@ -10,7 +10,7 @@ import {
   ConversationStatus,
   MessageDirection,
   WebhookEventStatus,
-} from '../../../generated/prisma';
+} from '../../../generated/prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
 
 const AVATARS_DIR = path.join(process.cwd(), 'public', 'uploads', 'avatars');
@@ -75,14 +75,12 @@ export class InboundProcessor extends WorkerHost {
       const botToken = channelConfig.find((c) => c.key === 'bot_token')?.value;
 
       // Find or create ContactChannel + Contact
-      let contactChannel = await this.prisma.contactChannel.findUnique({
+      let contactChannel = await this.prisma.contactChannel.findFirst({
         where: {
-          channelType_identifier: {
-            channelType,
-            identifier: parsed.senderIdentifier,
-          },
+          channelType,
+          identifier: parsed.senderIdentifier,
+          companyId: channel.companyId,
         },
-        include: { contact: true },
       });
 
       if (!contactChannel) {
@@ -92,6 +90,7 @@ export class InboundProcessor extends WorkerHost {
             displayName: parsed.senderDisplayName ?? parsed.senderIdentifier,
             firstName: parsed.senderFirstName ?? null,
             lastName: parsed.senderLastName ?? null,
+            companyId: channel.companyId,
           },
         });
 
@@ -104,8 +103,8 @@ export class InboundProcessor extends WorkerHost {
               ? `@${parsed.senderUsername}`
               : parsed.senderDisplayName,
             isPrimary: true,
+            companyId: channel.companyId,
           },
-          include: { contact: true },
         });
 
         this.logger.log(
@@ -128,11 +127,7 @@ export class InboundProcessor extends WorkerHost {
               where: { id: contact.id },
               data: { avatarUrl },
             });
-            // Refresh contactChannel to get updated contact
-            contactChannel = await this.prisma.contactChannel.findUnique({
-              where: { id: contactChannel.id },
-              include: { contact: true },
-            });
+            // contactChannel already set; no refresh needed
           }
         }
       } else {
@@ -152,27 +147,31 @@ export class InboundProcessor extends WorkerHost {
         }
 
         // Fetch avatar for existing Telegram contacts without one
+        const existingContact = await this.prisma.contact.findUnique({
+          where: { id: contactChannel.contactId },
+        });
         if (
           channelType === ChannelType.TELEGRAM &&
-          !contactChannel.contact.avatarUrl &&
+          existingContact &&
+          !existingContact.avatarUrl &&
           botToken &&
           parsed.senderUserId
         ) {
           const avatarUrl = await this.fetchTelegramAvatar(
             botToken,
             parsed.senderUserId,
-            contactChannel.contact.id,
+            contactChannel.contactId,
           );
           if (avatarUrl) {
             await this.prisma.contact.update({
-              where: { id: contactChannel.contact.id },
+              where: { id: contactChannel.contactId },
               data: { avatarUrl },
             });
           }
         }
       }
 
-      const contact = contactChannel!.contact;
+      const contact = await this.prisma.contact.findUniqueOrThrow({ where: { id: contactChannel!.contactId } });
 
       // Find or create conversation
       let conversation = await this.findExistingConversation(
@@ -189,6 +188,7 @@ export class InboundProcessor extends WorkerHost {
             status: ConversationStatus.NEW,
             externalId: parsed.conversationExternalId,
             lastMessageAt: parsed.timestamp,
+            companyId: channel.companyId,
           },
         });
         this.logger.log(`Created new conversation ${conversation.id}`);
@@ -204,6 +204,7 @@ export class InboundProcessor extends WorkerHost {
           body: parsed.body,
           externalId: parsed.externalId,
           contactId: contact.id,
+          companyId: channel.companyId,
         },
       });
 

@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
-import { PERMISSIONS } from "@shorterlink/shared";
+import { PERMISSIONS } from "@laptopguru-crm/shared";
 
 export async function GET() {
-  const { error } = await authorize(PERMISSIONS.MESSAGING_TEMPLATES_READ);
+  const { session, error } = await authorize(PERMISSIONS.MESSAGING_TEMPLATES_READ);
   if (error) return error;
 
   const templates = await prisma.template.findMany({
+    where: { companyId: session.user.companyId ?? "" },
     orderBy: { createdAt: "desc" },
     include: {
       variables: {
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
   let channelId: string | null = null;
   if (channelType) {
     const channel = await prisma.channel.findFirst({
-      where: { type: channelType },
+      where: { type: channelType, companyId: session.user!.companyId ?? "" },
       select: { id: true },
     });
     channelId = channel?.id || null;
@@ -66,6 +67,7 @@ export async function POST(request: NextRequest) {
       channelId,
       status: "DRAFT",
       createdBy: session.user!.id,
+      companyId: session.user!.companyId ?? "",
       variables: {
         create: variableKeys.map((key: string, idx: number) => ({
           key,

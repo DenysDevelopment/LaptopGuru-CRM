@@ -4,7 +4,7 @@ import {
   MessageContentType,
   MessageDeliveryStatus,
   MessageDirection,
-} from '../../../../generated/prisma';
+} from '../../../../generated/prisma/client';
 import {
   ChannelProvider,
   SendTextParams,
@@ -159,7 +159,7 @@ export class TelegramProviderService implements ChannelProvider {
     const chat = message.chat;
     const from = message.from;
 
-    let contentType = MessageContentType.TEXT;
+    let contentType: MessageContentType = MessageContentType.TEXT;
     let body: string | undefined = message.text;
     let mediaUrl: string | undefined;
     let mediaMimeType: string | undefined;

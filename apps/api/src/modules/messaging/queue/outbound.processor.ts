@@ -7,7 +7,7 @@ import {
   ChannelType,
   JobStatus,
   MessageDeliveryStatus,
-} from '../../../generated/prisma';
+} from '../../../generated/prisma/client';
 
 export interface OutboundJobData {
   outboundJobId: string;

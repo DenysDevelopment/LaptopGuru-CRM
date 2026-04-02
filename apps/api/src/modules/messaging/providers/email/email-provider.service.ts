@@ -7,7 +7,7 @@ import {
   MessageContentType,
   MessageDeliveryStatus,
   MessageDirection,
-} from '../../../../generated/prisma';
+} from '../../../../generated/prisma/client';
 import {
   ChannelProvider,
   SendTextParams,
@@ -111,7 +111,7 @@ export class EmailProviderService implements ChannelProvider {
       parsed.from?.value?.[0]?.address ?? 'unknown@unknown.com';
     const senderName = parsed.from?.value?.[0]?.name ?? senderAddress;
 
-    let contentType = MessageContentType.TEXT;
+    let contentType: MessageContentType = MessageContentType.TEXT;
     let mediaUrl: string | undefined;
     let mediaMimeType: string | undefined;
     let mediaFileName: string | undefined;
@@ -140,7 +140,7 @@ export class EmailProviderService implements ChannelProvider {
         : parsed.messageId ?? undefined,
       direction: MessageDirection.INBOUND,
       contentType,
-      body: parsed.text ?? parsed.html ?? undefined,
+      body: (parsed.text || parsed.html || undefined) as string | undefined,
       mediaUrl,
       mediaMimeType,
       mediaFileName,

@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateAutoReplyDto, UpdateAutoReplyDto } from './dto/create-auto-reply.dto';
+import { ClsService } from 'nestjs-cls';
+import { AutoReplyTrigger, ChannelType } from '../../../generated/prisma/client';
 
 const TRIGGER_MAP: Record<string, string> = {
   NEW_CONVERSATION: 'FIRST_MESSAGE',
@@ -12,13 +14,16 @@ const TRIGGER_MAP: Record<string, string> = {
 
 @Injectable()
 export class AutoReplyService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cls: ClsService,
+  ) {}
 
   async findAll(filters: { channelId?: string; trigger?: string; isActive?: string }) {
     const rules = await this.prisma.autoReplyRule.findMany({
       where: {
         ...(filters.channelId && { channelId: filters.channelId }),
-        ...(filters.trigger && { trigger: filters.trigger as string }),
+        ...(filters.trigger && { trigger: filters.trigger as AutoReplyTrigger }),
         ...(filters.isActive !== undefined && { isActive: filters.isActive === 'true' }),
       },
       include: {
@@ -53,12 +58,13 @@ export class AutoReplyService {
     let channelId: string | null = dto.channelId || null;
     if (dto.channelType && !channelId) {
       const channel = await this.prisma.channel.findFirst({
-        where: { type: dto.channelType },
+        where: { type: dto.channelType as ChannelType },
         select: { id: true },
       });
       channelId = channel?.id || null;
     }
 
+    const companyId = this.cls.get<string>('companyId');
     const rule = await this.prisma.autoReplyRule.create({
       data: {
         channelId,
@@ -68,6 +74,7 @@ export class AutoReplyService {
         isActive: dto.isActive ?? dto.enabled ?? true,
         priority: dto.priority ?? 0,
         createdBy: userId,
+        companyId,
       },
       include: {
         channel: { select: { type: true } },
@@ -108,7 +115,7 @@ export class AutoReplyService {
     if (dto.channelType !== undefined) {
       if (dto.channelType) {
         const channel = await this.prisma.channel.findFirst({
-          where: { type: dto.channelType },
+          where: { type: dto.channelType as ChannelType },
           select: { id: true },
         });
         data.channelId = channel?.id || null;

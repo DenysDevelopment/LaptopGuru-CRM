@@ -1,17 +1,14 @@
 import type { NextAuthConfig } from "next-auth";
-import { ROUTE_PERMISSIONS, hasPermission } from "@shorterlink/shared";
-import type { Permission } from "@shorterlink/shared";
+import { ROUTE_PERMISSIONS, hasPermission } from "@laptopguru-crm/shared";
+import type { Permission } from "@laptopguru-crm/shared";
 
-const PROTECTED_PREFIXES = [
-  "/dashboard",
-  "/emails",
-  "/videos",
-  "/send",
-  "/sent",
-  "/links",
-  "/quicklinks",
-  "/analytics",
-  "/admin",
+/** Public routes that do NOT require authentication */
+const PUBLIC_PREFIXES = [
+  "/login",
+  "/register",
+  "/api/auth",
+  "/_next",
+  "/favicon",
 ];
 
 export const authConfig: NextAuthConfig = {
@@ -27,13 +24,25 @@ export const authConfig: NextAuthConfig = {
     authorized({ auth, request }) {
       const isLoggedIn = !!auth?.user;
       const { pathname } = request.nextUrl;
-      const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
+      const isPublic = PUBLIC_PREFIXES.some((p) => pathname.startsWith(p)) || pathname === '/';
 
-      if (!isProtected) return true;
+      if (isPublic) return true;
       if (!isLoggedIn) return false;
 
-      // Dashboard is always accessible (shows empty state without data permission)
-      if (pathname.startsWith("/dashboard")) return true;
+      const userRole = (auth?.user as unknown as Record<string, unknown> | undefined)?.role as string | undefined;
+
+      // Redirect SUPER_ADMIN away from regular dashboard to super-admin area
+      if (pathname === '/dashboard' && userRole === 'SUPER_ADMIN') {
+        return Response.redirect(new URL('/super-admin/dashboard', request.nextUrl));
+      }
+
+      // Block non-SUPER_ADMIN from super-admin routes
+      if (pathname.startsWith('/super-admin') && userRole !== 'SUPER_ADMIN') {
+        return Response.redirect(new URL('/dashboard', request.nextUrl));
+      }
+
+      // Dashboard and admin are always accessible
+      if (pathname.startsWith("/dashboard") || pathname.startsWith("/admin")) return true;
 
       // Check route-level permissions
       const matchedRoute = Object.keys(ROUTE_PERMISSIONS).find((route) =>
@@ -53,17 +62,34 @@ export const authConfig: NextAuthConfig = {
     },
     jwt({ token, user }) {
       if (user) {
+        const u = user as unknown as Record<string, unknown>;
         token.id = user.id;
-        token.role = (user as unknown as Record<string, unknown>).role as string ?? 'USER';
-        token.permissions = (user as unknown as Record<string, unknown>).permissions as string[] ?? [];
+        token.role = u.role ?? 'USER';
+        token.permissions = u.permissions ?? [];
+        token.companyId = u.companyId ?? null;
+        token.companyName = u.companyName ?? null;
+        token.enabledModules = u.enabledModules ?? [];
+        token.tokenVersion = u.tokenVersion ?? 0;
+        token.accessToken = u.accessToken as string | undefined;
       }
       return token;
     },
     session({ session, token }) {
+      // Token cleared (user deleted) — empty the session so client detects sign-out
+      if (!token.id) {
+        session.user = undefined as unknown as typeof session.user;
+        return session;
+      }
       if (session.user) {
+        const u = session.user as unknown as Record<string, unknown>;
         session.user.id = token.id as string;
-        session.user.role = token.role as string;
-        session.user.permissions = token.permissions as string[];
+        u.role = token.role as string;
+        u.permissions = token.permissions as string[];
+        u.companyId = token.companyId as string | null;
+        u.companyName = token.companyName as string | null;
+        u.enabledModules = token.enabledModules as string[] ?? [];
+        u.tokenVersion = token.tokenVersion as number;
+        u.accessToken = token.accessToken as string | undefined;
       }
       return session;
     },

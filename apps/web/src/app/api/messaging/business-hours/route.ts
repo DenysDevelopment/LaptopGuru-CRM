@@ -69,7 +69,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const { error } = await authorize(PERMISSIONS.MESSAGING_HOURS_MANAGE);
+  const { session, error } = await authorize(PERMISSIONS.MESSAGING_HOURS_MANAGE);
   if (error) return error;
 
   const body = await request.json();
@@ -80,6 +80,7 @@ export async function POST(request: NextRequest) {
       name: "Default",
       timezone: timezone || "Europe/Warsaw",
       isDefault: true,
+      companyId: session.user!.companyId ?? "",
       slots: {
         create: Object.entries(scheduleData as Record<string, DaySchedule>).map(
           ([day, data]) => ({

@@ -1,10 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateScheduleDto, UpdateScheduleDto, CreateSlotDto } from './dto/create-schedule.dto';
+import { ClsService } from 'nestjs-cls';
+import { DayOfWeek } from '../../../generated/prisma/client';
 
 @Injectable()
 export class BusinessHoursService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cls: ClsService,
+  ) {}
 
   async findAll() {
     return this.prisma.businessHoursSchedule.findMany({
@@ -30,11 +35,13 @@ export class BusinessHoursService {
       });
     }
 
+    const companyId = this.cls.get<string>('companyId');
     return this.prisma.businessHoursSchedule.create({
       data: {
         name: dto.name,
         timezone: dto.timezone ?? 'Europe/Warsaw',
         isDefault: dto.isDefault ?? false,
+        companyId,
       },
       include: { slots: true },
     });

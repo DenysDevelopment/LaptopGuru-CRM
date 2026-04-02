@@ -16,7 +16,7 @@ const metaByLang: Record<string, { desc: string; og: string }> = {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const landing = await prisma.landing.findUnique({
+  const landing = await prisma.landing.findFirst({
     where: { slug },
     include: { video: true },
   });
@@ -40,7 +40,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function LandingPage({ params }: Props) {
   const { slug } = await params;
 
-  const landing = await prisma.landing.findUnique({
+  const landing = await prisma.landing.findFirst({
     where: { slug },
     include: { video: true },
   });

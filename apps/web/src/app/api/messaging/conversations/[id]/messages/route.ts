@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
-import { PERMISSIONS } from "@shorterlink/shared";
+import { PERMISSIONS } from "@laptopguru-crm/shared";
 import { emitMessagingEvent } from "@/lib/messaging-events";
 
 function escapeHtml(str: string): string {
@@ -17,10 +17,19 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { error } = await authorize(PERMISSIONS.MESSAGING_CONVERSATIONS_READ);
+  const { session, error } = await authorize(PERMISSIONS.MESSAGING_CONVERSATIONS_READ);
   if (error) return error;
 
   const { id } = await params;
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id },
+    select: { companyId: true },
+  });
+  if (!conversation || conversation.companyId !== (session.user.companyId ?? "")) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const url = request.nextUrl;
   const page = Math.max(1, Number(url.searchParams.get("page")) || 1);
   const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit")) || 50));
@@ -88,10 +97,10 @@ export async function POST(
 
   const conversation = await prisma.conversation.findUnique({
     where: { id },
-    select: { id: true, channelId: true, contactId: true },
+    select: { id: true, channelId: true, contactId: true, companyId: true },
   });
 
-  if (!conversation) {
+  if (!conversation || conversation.companyId !== (session.user!.companyId ?? "")) {
     return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
   }
 
@@ -104,6 +113,7 @@ export async function POST(
       body: body.body,
       senderId: session.user!.id,
       contactId: conversation.contactId,
+      companyId: session.user!.companyId ?? "",
     },
   });
 

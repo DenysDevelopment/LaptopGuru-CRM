@@ -8,19 +8,26 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await authorize(PERMISSIONS.VIDEOS_WRITE);
+  const { session, error } = await authorize(PERMISSIONS.VIDEOS_WRITE);
   if (error) return error;
+
+  const companyId = session.user.companyId;
+  if (!companyId) {
+    return NextResponse.json({ error: "No company assigned" }, { status: 403 });
+  }
 
   const { id } = await params;
 
-  // Soft delete
-  try {
-    await prisma.video.update({
-      where: { id },
-      data: { active: false },
-    });
-    return NextResponse.json({ ok: true });
-  } catch {
-    return NextResponse.json({ error: "Ошибка удаления" }, { status: 500 });
+  // Verify video belongs to the same company
+  const video = await prisma.video.findUnique({ where: { id } });
+  if (!video || video.companyId !== companyId) {
+    return NextResponse.json({ error: "Відео не знайдено" }, { status: 404 });
   }
+
+  // Soft delete
+  await prisma.video.update({
+    where: { id },
+    data: { active: false },
+  });
+  return NextResponse.json({ ok: true });
 }

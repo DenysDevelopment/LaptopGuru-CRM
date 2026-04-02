@@ -5,11 +5,16 @@ import { extractYoutubeId, fetchVideoInfo } from "@/lib/youtube";
 import { PERMISSIONS } from "@shorterlink/shared";
 
 export async function GET() {
-  const { error } = await authorize(PERMISSIONS.VIDEOS_READ);
+  const { session, error } = await authorize(PERMISSIONS.VIDEOS_READ);
   if (error) return error;
 
+  const companyId = session.user.companyId;
+  if (!companyId) {
+    return NextResponse.json({ error: "No company assigned" }, { status: 403 });
+  }
+
   const videos = await prisma.video.findMany({
-    where: { active: true },
+    where: { active: true, companyId },
     orderBy: { createdAt: "desc" },
   });
 
@@ -19,6 +24,11 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const { session, error } = await authorize(PERMISSIONS.VIDEOS_WRITE);
   if (error) return error;
+
+  const companyId = session.user.companyId;
+  if (!companyId) {
+    return NextResponse.json({ error: "No company assigned" }, { status: 403 });
+  }
 
   const { url } = await request.json();
   if (!url) {
@@ -30,13 +40,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Невірне YouTube посилання" }, { status: 400 });
   }
 
-  // Check if already exists
-  const existing = await prisma.video.findUnique({ where: { youtubeId } });
+  // Check if already exists for this company
+  const existing = await prisma.video.findUnique({
+    where: { youtubeId_companyId: { youtubeId, companyId } },
+  });
   if (existing) {
     if (!existing.active) {
       // Reactivate
       const video = await prisma.video.update({
-        where: { youtubeId },
+        where: { id: existing.id },
         data: { active: true },
       });
       return NextResponse.json(video);
@@ -54,6 +66,7 @@ export async function POST(request: NextRequest) {
       duration: info.duration,
       channelTitle: info.channelTitle,
       userId: session.user.id,
+      companyId,
     },
   });
 

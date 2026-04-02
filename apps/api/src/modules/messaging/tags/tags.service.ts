@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { ClsService } from 'nestjs-cls';
 
 @Injectable()
 export class TagsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cls: ClsService,
+  ) {}
 
   async findAll() {
     const tags = await this.prisma.tag.findMany({
@@ -32,7 +36,8 @@ export class TagsService {
   }
 
   async create(data: { name: string; color?: string }) {
-    return this.prisma.tag.create({ data });
+    const companyId = this.cls.get<string>('companyId');
+    return this.prisma.tag.create({ data: { ...data, companyId } });
   }
 
   async update(id: string, data: { name?: string; color?: string }) {

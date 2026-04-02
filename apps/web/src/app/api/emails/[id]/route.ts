@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
-import { PERMISSIONS } from "@shorterlink/shared";
+import { PERMISSIONS } from "@laptopguru-crm/shared";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await authorize(PERMISSIONS.EMAILS_READ);
+  const { session, error } = await authorize(PERMISSIONS.EMAILS_READ);
   if (error) return error;
 
   try {
@@ -30,6 +30,10 @@ export async function GET(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
+    if (email.companyId !== (session.user.companyId ?? "")) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
     // Build thread: all items with same customerEmail + productUrl
     let thread = null;
     if (email.customerEmail && email.productUrl) {
@@ -37,6 +41,7 @@ export async function GET(
         where: {
           customerEmail: email.customerEmail,
           productUrl: email.productUrl,
+          companyId: session.user.companyId ?? "",
           id: { not: email.id }, // exclude current
         },
         orderBy: { receivedAt: "asc" },
@@ -45,7 +50,7 @@ export async function GET(
       const allEmailIds = [email.id, ...relatedEmails.map((e) => e.id)];
 
       const relatedLandings = await prisma.landing.findMany({
-        where: { emailId: { in: allEmailIds } },
+        where: { emailId: { in: allEmailIds }, companyId: session.user.companyId ?? "" },
         include: {
           sentEmails: true,
           video: { select: { title: true, thumbnail: true } },
@@ -112,6 +117,12 @@ export async function PATCH(
   }
 
   try {
+    // Verify ownership before update
+    const existing = await prisma.incomingEmail.findUnique({ where: { id }, select: { companyId: true } });
+    if (!existing || existing.companyId !== (session.user.companyId ?? "")) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
     const email = await prisma.incomingEmail.update({
       where: { id },
       data,

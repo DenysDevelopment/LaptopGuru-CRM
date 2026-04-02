@@ -2,15 +2,20 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateTemplateDto, CreateTemplateVariableDto } from './dto/create-template.dto';
 import { UpdateTemplateDto } from './dto/update-template.dto';
+import { ClsService } from 'nestjs-cls';
+import { ChannelType, TemplateStatus } from '../../../generated/prisma/client';
 
 @Injectable()
 export class TemplatesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cls: ClsService,
+  ) {}
 
   async findAll(filters: { channelId?: string; status?: string; language?: string }) {
     const where = {
       ...(filters.channelId && { channelId: filters.channelId }),
-      ...(filters.status && { status: filters.status as string }),
+      ...(filters.status && { status: filters.status as TemplateStatus }),
       ...(filters.language && { language: filters.language }),
     };
 
@@ -59,7 +64,7 @@ export class TemplatesService {
     let channelId: string | null = dto.channelId || null;
     if (dto.channelType && !channelId) {
       const channel = await this.prisma.channel.findFirst({
-        where: { type: dto.channelType },
+        where: { type: dto.channelType as ChannelType },
         select: { id: true },
       });
       channelId = channel?.id || null;
@@ -71,6 +76,7 @@ export class TemplatesService {
       ...new Set(varMatches.map((m: string) => m.replace(/[{}]/g, ''))),
     ];
 
+    const companyId = this.cls.get<string>('companyId');
     const template = await this.prisma.template.create({
       data: {
         name: dto.name.trim(),
@@ -80,6 +86,7 @@ export class TemplatesService {
         externalId: dto.externalId,
         language: dto.language ?? 'pl',
         createdBy: userId,
+        companyId,
         variables:
           variableKeys.length > 0
             ? {
@@ -130,7 +137,7 @@ export class TemplatesService {
     if (dto.channelType !== undefined) {
       if (dto.channelType) {
         const channel = await this.prisma.channel.findFirst({
-          where: { type: dto.channelType },
+          where: { type: dto.channelType as ChannelType },
           select: { id: true },
         });
         data.channelId = channel?.id || null;

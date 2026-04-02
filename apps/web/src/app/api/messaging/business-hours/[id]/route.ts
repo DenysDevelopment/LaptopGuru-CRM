@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
-import { PERMISSIONS } from "@shorterlink/shared";
+import { PERMISSIONS } from "@laptopguru-crm/shared";
 
 const DAY_MAP: Record<string, string> = {
   MONDAY: "monday",
@@ -33,10 +33,17 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { error } = await authorize(PERMISSIONS.MESSAGING_HOURS_MANAGE);
+  const { session, error } = await authorize(PERMISSIONS.MESSAGING_HOURS_MANAGE);
   if (error) return error;
 
   const { id } = await params;
+
+  // Verify ownership
+  const schedule = await prisma.businessHoursSchedule.findUnique({ where: { id }, select: { companyId: true } });
+  if (!schedule || schedule.companyId !== (session.user.companyId ?? "")) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const body = await request.json();
   const { timezone, schedule: scheduleData } = body;
 

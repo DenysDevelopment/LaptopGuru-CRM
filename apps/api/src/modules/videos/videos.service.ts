@@ -7,6 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ClsService } from 'nestjs-cls';
 
 /* ------------------------------------------------------------------ */
 /*  YouTube helpers (ported from apps/web/src/lib/youtube.ts)          */
@@ -146,12 +147,16 @@ async function fetchVideoInfo(youtubeId: string): Promise<YouTubeVideoInfo> {
 export class VideosService {
   private readonly logger = new Logger(VideosService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cls: ClsService,
+  ) {}
 
-  /** List all active videos, newest first. */
+  /** List all active videos for current company, newest first. */
   async findAll() {
+    const companyId = this.cls.get<string>('companyId');
     return this.prisma.video.findMany({
-      where: { active: true },
+      where: { active: true, companyId },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -163,11 +168,15 @@ export class VideosService {
       throw new BadRequestException('Invalid YouTube URL');
     }
 
-    const existing = await this.prisma.video.findUnique({ where: { youtubeId } });
+    const companyId = this.cls.get<string>('companyId');
+
+    const existing = await this.prisma.video.findUnique({
+      where: { youtubeId_companyId: { youtubeId, companyId } },
+    });
     if (existing) {
       if (!existing.active) {
         return this.prisma.video.update({
-          where: { youtubeId },
+          where: { id: existing.id },
           data: { active: true },
         });
       }
@@ -184,21 +193,24 @@ export class VideosService {
         duration: info.duration,
         channelTitle: info.channelTitle,
         userId,
+        companyId,
       },
     });
   }
 
   /** Soft-delete a video by setting active to false. */
   async remove(id: string) {
-    try {
-      await this.prisma.video.update({
-        where: { id },
-        data: { active: false },
-      });
-      return { ok: true };
-    } catch {
+    const companyId = this.cls.get<string>('companyId');
+    const video = await this.prisma.video.findUnique({ where: { id } });
+    if (!video || video.companyId !== companyId) {
       throw new NotFoundException('Video not found');
     }
+
+    await this.prisma.video.update({
+      where: { id },
+      data: { active: false },
+    });
+    return { ok: true };
   }
 
   /** Sync all videos from the configured YouTube channel. */
@@ -212,15 +224,17 @@ export class VideosService {
       const videos = await fetchChannelVideos(handle);
       let imported = 0;
 
+      const companyId = this.cls.get<string>('companyId');
+
       for (const video of videos) {
         const existing = await this.prisma.video.findUnique({
-          where: { youtubeId: video.youtubeId },
+          where: { youtubeId_companyId: { youtubeId: video.youtubeId, companyId } },
         });
 
         if (existing) {
           if (!existing.active) {
             await this.prisma.video.update({
-              where: { youtubeId: video.youtubeId },
+              where: { id: existing.id },
               data: { active: true },
             });
             imported++;
@@ -236,6 +250,7 @@ export class VideosService {
             duration: video.duration,
             channelTitle: video.channelTitle,
             userId,
+            companyId,
           },
         });
         imported++;

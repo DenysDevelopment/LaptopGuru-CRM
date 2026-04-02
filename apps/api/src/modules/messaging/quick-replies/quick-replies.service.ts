@@ -5,10 +5,14 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { ClsService } from 'nestjs-cls';
 
 @Injectable()
 export class QuickRepliesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cls: ClsService,
+  ) {}
 
   async findAll() {
     const quickReplies = await this.prisma.msgQuickReply.findMany({
@@ -29,8 +33,9 @@ export class QuickRepliesService {
       throw new BadRequestException('shortcut, title, and body are required');
     }
 
-    const existing = await this.prisma.msgQuickReply.findUnique({
-      where: { shortcut: dto.shortcut.trim() },
+    const companyId = this.cls.get<string>('companyId');
+    const existing = await this.prisma.msgQuickReply.findFirst({
+      where: { shortcut: dto.shortcut.trim(), companyId },
     });
     if (existing) {
       throw new ConflictException(`Shortcut "${dto.shortcut}" already exists`);
@@ -42,6 +47,7 @@ export class QuickRepliesService {
         title: dto.title.trim(),
         body: dto.body.trim(),
         createdBy: userId,
+        companyId,
       },
     });
 
@@ -58,8 +64,9 @@ export class QuickRepliesService {
     await this.ensureExists(id);
 
     if (dto.shortcut !== undefined) {
-      const existing = await this.prisma.msgQuickReply.findUnique({
-        where: { shortcut: dto.shortcut.trim() },
+      const companyId = this.cls.get<string>('companyId');
+      const existing = await this.prisma.msgQuickReply.findFirst({
+        where: { shortcut: dto.shortcut.trim(), companyId },
       });
       if (existing && existing.id !== id) {
         throw new ConflictException(`Shortcut "${dto.shortcut}" already exists`);

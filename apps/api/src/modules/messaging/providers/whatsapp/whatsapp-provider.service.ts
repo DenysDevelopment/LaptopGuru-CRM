@@ -4,7 +4,7 @@ import {
   MessageContentType,
   MessageDeliveryStatus,
   MessageDirection,
-} from '../../../../generated/prisma';
+} from '../../../../generated/prisma/client';
 import {
   ChannelProvider,
   SendTextParams,
@@ -162,7 +162,7 @@ export class WhatsAppProviderService implements ChannelProvider {
     const message = value.messages[0];
     const contact = value.contacts?.[0];
 
-    let contentType = MessageContentType.TEXT;
+    let contentType: MessageContentType = MessageContentType.TEXT;
     let body: string | undefined;
     let mediaUrl: string | undefined;
     let mediaMimeType: string | undefined;

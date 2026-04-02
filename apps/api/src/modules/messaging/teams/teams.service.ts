@@ -6,10 +6,14 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateTeamDto, UpdateTeamDto, AddTeamMemberDto } from './dto/create-team.dto';
+import { ClsService } from 'nestjs-cls';
 
 @Injectable()
 export class TeamsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cls: ClsService,
+  ) {}
 
   async findAll() {
     const teams = await this.prisma.team.findMany({
@@ -70,10 +74,12 @@ export class TeamsService {
       throw new BadRequestException('name is required');
     }
 
+    const companyId = this.cls.get<string>('companyId');
     const team = await this.prisma.team.create({
       data: {
         name: dto.name.trim(),
         description: dto.description || null,
+        companyId,
       },
       include: {
         members: {

@@ -1,6 +1,6 @@
 import { IsString, IsOptional, IsEnum, IsArray, ValidateNested, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
-import { MessageContentType } from '../../../../generated/prisma';
+import { MessageContentType } from '../../../../generated/prisma/client';
 
 export class AttachmentDto {
   @IsString()

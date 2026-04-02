@@ -9,6 +9,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { ProviderRegistryService } from '../providers/provider-registry.service';
 import { CreateChannelDto, ChannelConfigItemDto } from './dto/create-channel.dto';
 import { UpdateChannelDto } from './dto/update-channel.dto';
+import { ClsService } from 'nestjs-cls';
 
 @Injectable()
 export class ChannelsService {
@@ -17,6 +18,7 @@ export class ChannelsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly providerRegistry: ProviderRegistryService,
+    private readonly cls: ClsService,
   ) {}
 
   async findAll() {
@@ -82,11 +84,13 @@ export class ChannelsService {
       );
     }
 
+    const companyId = this.cls.get<string>('companyId');
     const channel = await this.prisma.channel.create({
       data: {
         name: dto.name,
         type: dto.type,
         isActive: dto.isActive ?? true,
+        companyId,
         config: dto.config?.length
           ? {
               create: dto.config.map((c) => ({

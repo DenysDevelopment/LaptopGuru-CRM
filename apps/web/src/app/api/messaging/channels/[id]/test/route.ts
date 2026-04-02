@@ -7,8 +7,13 @@ export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { error } = await authorize(PERMISSIONS.MESSAGING_CHANNELS_WRITE);
+  const { session, error } = await authorize(PERMISSIONS.MESSAGING_CHANNELS_WRITE);
   if (error) return error;
+
+  const companyId = session.user.companyId;
+  if (!companyId) {
+    return NextResponse.json({ error: "No company assigned" }, { status: 403 });
+  }
 
   const { id } = await params;
 
@@ -17,7 +22,7 @@ export async function POST(
     include: { config: true },
   });
 
-  if (!channel) {
+  if (!channel || channel.companyId !== companyId) {
     return NextResponse.json({ error: "Channel not found" }, { status: 404 });
   }
 

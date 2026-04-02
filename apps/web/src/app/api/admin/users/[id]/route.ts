@@ -51,9 +51,14 @@ export async function PATCH(
     }
   }
 
-  // Verify target user exists
+  // Verify target user exists AND belongs to the same company
+  const companyId = session.user.companyId;
+  if (!companyId) {
+    return NextResponse.json({ error: "No company assigned" }, { status: 403 });
+  }
+
   const targetUser = await prisma.user.findUnique({ where: { id } });
-  if (!targetUser) {
+  if (!targetUser || targetUser.companyId !== companyId) {
     return NextResponse.json({ error: "Пользователь не найден" }, { status: 404 });
   }
 

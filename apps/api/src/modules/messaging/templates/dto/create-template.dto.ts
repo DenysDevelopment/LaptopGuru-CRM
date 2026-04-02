@@ -8,7 +8,7 @@ import {
   IsInt,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { TemplateStatus } from '../../../../generated/prisma';
+import { TemplateStatus } from '../../../../generated/prisma/client';
 
 export class CreateTemplateVariableDto {
   @IsString()

@@ -1,5 +1,5 @@
 import { IsOptional, IsEnum, IsString, MaxLength } from 'class-validator';
-import { ConversationStatus, ConversationPriority } from '../../../../generated/prisma';
+import { ConversationStatus, ConversationPriority } from '../../../../generated/prisma/client';
 
 export class UpdateConversationDto {
   @IsOptional()

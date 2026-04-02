@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
-import { PERMISSIONS } from "@shorterlink/shared";
+import { PERMISSIONS } from "@laptopguru-crm/shared";
 import { generateSlug, createShortLink } from "@/lib/links";
 import { sendEmail } from "@/lib/smtp";
 import { buildEmailHtml } from "@/lib/email-template";
@@ -44,7 +44,11 @@ export async function POST(
     },
   });
 
-  if (!conversation || !conversation.contact) {
+  if (!conversation || conversation.companyId !== (session.user.companyId ?? "")) {
+    return NextResponse.json({ error: "Разговор не найден" }, { status: 404 });
+  }
+
+  if (!conversation.contact) {
     return NextResponse.json({ error: "Разговор не найден" }, { status: 404 });
   }
 
@@ -60,7 +64,7 @@ export async function POST(
 
   // Get video
   const video = await prisma.video.findUnique({ where: { id: videoId } });
-  if (!video || !video.active) {
+  if (!video || !video.active || video.companyId !== (session.user.companyId ?? "")) {
     return NextResponse.json({ error: "Видео не найдено" }, { status: 400 });
   }
 
@@ -69,7 +73,7 @@ export async function POST(
   try {
     // 1. Create landing
     let slug = generateSlug();
-    while (await prisma.landing.findUnique({ where: { slug } })) {
+    while (await prisma.landing.findFirst({ where: { slug, companyId: session.user.companyId ?? "" } })) {
       slug = generateSlug();
     }
 
@@ -85,6 +89,7 @@ export async function POST(
         productName,
         language: lang,
         userId: session.user.id,
+        companyId: session.user.companyId ?? "",
       },
     });
 
@@ -118,6 +123,7 @@ export async function POST(
         landingId: landing.id,
         userId: session.user.id,
         status: "sent",
+        companyId: session.user.companyId ?? "",
       },
     });
 
@@ -131,6 +137,7 @@ export async function POST(
         body: `Видео-рецензия отправлена: ${video.title}\n${shortUrl}`,
         senderId: session.user.id,
         contactId: conversation.contactId,
+        companyId: session.user.companyId ?? "",
       },
     });
 

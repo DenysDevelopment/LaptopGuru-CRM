@@ -10,14 +10,18 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ListEmailsDto } from './dto/list-emails.dto';
 import { UpdateEmailDto } from './dto/update-email.dto';
 import { parseEmail } from './email-parser.util';
-import type { Prisma } from '../../generated/prisma';
+import type { Prisma } from '../../generated/prisma/client';
 import { paginate, paginatedResponse } from '../../common/dto/pagination.dto';
+import { ClsService } from 'nestjs-cls';
 
 @Injectable()
 export class EmailsService {
   private readonly logger = new Logger(EmailsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cls: ClsService,
+  ) {}
 
   /**
    * List IncomingEmail with filters, pagination, and search.
@@ -209,6 +213,7 @@ export class EmailsService {
           // Extract customer data from email body
           const extracted = parseEmail(body, subject);
 
+          const companyId = this.cls.get<string>('companyId');
           await this.prisma.incomingEmail.create({
             data: {
               messageId,
@@ -222,6 +227,7 @@ export class EmailsService {
               customerEmail: extracted.customerEmail,
               customerPhone: extracted.customerPhone,
               category: extracted.category,
+              companyId,
             },
           });
 

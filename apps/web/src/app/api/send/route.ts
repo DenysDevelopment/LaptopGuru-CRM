@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as nodemailer from "nodemailer";
 import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
-import { PERMISSIONS } from "@shorterlink/shared";
-import { generateSlug } from "@/lib/links";
-import { createShortLink } from "@/lib/links";
-import { sendEmail } from "@/lib/smtp";
+import { PERMISSIONS } from "@laptopguru-crm/shared";
+import { generateSlug, createShortLink } from "@/lib/links";
 import { buildEmailHtml } from "@/lib/email-template";
 import type { EmailLanguage } from "@/lib/email-template";
 import { VALID_LANGUAGES, SUBJECT_BY_LANG, TITLE_BY_LANG, FALLBACK_NAME } from "@/lib/constants/languages";
@@ -28,7 +27,7 @@ export async function POST(request: NextRequest) {
   const incomingEmail = await prisma.incomingEmail.findUnique({
     where: { id: emailId },
   });
-  if (!incomingEmail || !incomingEmail.customerEmail) {
+  if (!incomingEmail || !incomingEmail.customerEmail || incomingEmail.companyId !== (session.user.companyId ?? "")) {
     return NextResponse.json(
       { error: "Заявка не найдена или нет email клиента" },
       { status: 400 }
@@ -39,7 +38,7 @@ export async function POST(request: NextRequest) {
   const video = await prisma.video.findUnique({
     where: { id: videoId },
   });
-  if (!video || !video.active) {
+  if (!video || !video.active || video.companyId !== (session.user.companyId ?? "")) {
     return NextResponse.json({ error: "Видео не найдено" }, { status: 400 });
   }
 
@@ -48,7 +47,7 @@ export async function POST(request: NextRequest) {
   try {
     // 1. Create landing page
     let slug = generateSlug();
-    while (await prisma.landing.findUnique({ where: { slug } })) {
+    while (await prisma.landing.findFirst({ where: { slug, companyId: session.user.companyId ?? "" } })) {
       slug = generateSlug();
     }
 
@@ -65,6 +64,7 @@ export async function POST(request: NextRequest) {
         language: lang,
         emailId: incomingEmail.id,
         userId: session.user.id,
+        companyId: session.user.companyId ?? "",
       },
     });
 
@@ -85,11 +85,46 @@ export async function POST(request: NextRequest) {
 
     const subject = SUBJECT_BY_LANG[lang](video.title);
 
+    // Get company's EMAIL channel SMTP config
+    const emailChannel = await prisma.channel.findFirst({
+      where: { type: "EMAIL", isActive: true, companyId: session.user.companyId ?? "" },
+      include: { config: true },
+    });
+
+    if (!emailChannel) {
+      return NextResponse.json(
+        { error: "Не настроен EMAIL-канал. Настройте SMTP в Настройки → Каналы." },
+        { status: 400 }
+      );
+    }
+
+    const cfg = Object.fromEntries(emailChannel.config.map((c) => [c.key, c.value]));
+    const smtpHost = cfg.smtp_host;
+    const smtpPort = cfg.smtp_port || "465";
+    const smtpUser = cfg.smtp_user;
+    const smtpPass = cfg.smtp_password;
+    const smtpFrom = cfg.smtp_from || smtpUser;
+
+    if (!smtpHost || !smtpUser || !smtpPass) {
+      return NextResponse.json(
+        { error: "SMTP не полностью настроен. Проверьте Настройки → Каналы." },
+        { status: 400 }
+      );
+    }
+
     let status = "sent";
     let errorMessage: string | null = null;
 
     try {
-      await sendEmail({
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: Number(smtpPort),
+        secure: Number(smtpPort) === 465,
+        auth: { user: smtpUser, pass: smtpPass },
+      });
+
+      await transporter.sendMail({
+        from: `"${emailChannel.name}" <${smtpFrom}>`,
         to: incomingEmail.customerEmail,
         subject,
         html,
@@ -108,6 +143,7 @@ export async function POST(request: NextRequest) {
         userId: session.user.id,
         status,
         errorMessage,
+        companyId: session.user.companyId ?? "",
       },
     });
 

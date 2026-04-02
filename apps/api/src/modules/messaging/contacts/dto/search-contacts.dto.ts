@@ -1,6 +1,6 @@
 import { IsOptional, IsString, IsEnum, IsInt, Min, Max, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ChannelType } from '../../../../generated/prisma';
+import { ChannelType } from '../../../../generated/prisma/client';
 
 export class SearchContactsDto {
   @IsOptional()

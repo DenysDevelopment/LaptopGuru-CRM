@@ -7,7 +7,7 @@ import {
   MinLength,
   MaxLength,
 } from 'class-validator';
-import { AutoReplyTrigger } from '../../../../generated/prisma';
+import { AutoReplyTrigger } from '../../../../generated/prisma/client';
 
 export class CreateAutoReplyDto {
   @IsOptional()

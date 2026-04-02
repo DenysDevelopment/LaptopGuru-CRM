@@ -4,7 +4,7 @@ import {
   ConversationStatus,
   ConversationPriority,
   ChannelType,
-} from '../../../../generated/prisma';
+} from '../../../../generated/prisma/client';
 
 export class ListConversationsDto {
   @IsOptional()

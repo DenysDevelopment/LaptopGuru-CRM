@@ -66,6 +66,7 @@ export async function POST(request: NextRequest) {
       channelId,
       isActive: true,
       createdBy: session.user!.id,
+      companyId: session.user!.companyId ?? "",
     },
     include: {
       channel: { select: { type: true } },

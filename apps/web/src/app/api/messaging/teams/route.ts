@@ -35,7 +35,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const { error } = await authorize(PERMISSIONS.MESSAGING_TEAMS_MANAGE);
+  const { session, error } = await authorize(PERMISSIONS.MESSAGING_TEAMS_MANAGE);
   if (error) return error;
 
   const body = await request.json();
@@ -49,6 +49,7 @@ export async function POST(request: NextRequest) {
     data: {
       name: name.trim(),
       description: description || null,
+      companyId: session.user!.companyId ?? "",
     },
     include: {
       members: {

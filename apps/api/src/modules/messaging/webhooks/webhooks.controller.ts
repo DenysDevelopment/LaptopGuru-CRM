@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
-import { ChannelType } from '../../../generated/prisma';
+import { ChannelType } from '../../../generated/prisma/client';
 import { WebhooksService } from './webhooks.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import * as crypto from 'crypto';

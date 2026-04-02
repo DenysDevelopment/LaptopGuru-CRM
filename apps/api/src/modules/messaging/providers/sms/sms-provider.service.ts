@@ -4,7 +4,7 @@ import {
   MessageContentType,
   MessageDeliveryStatus,
   MessageDirection,
-} from '../../../../generated/prisma';
+} from '../../../../generated/prisma/client';
 import {
   ChannelProvider,
   SendTextParams,
@@ -152,7 +152,7 @@ export class SmsProviderService implements ChannelProvider {
     const data = Object.fromEntries(params.entries());
 
     const numMedia = parseInt(data['NumMedia'] ?? '0', 10);
-    let contentType = MessageContentType.TEXT;
+    let contentType: MessageContentType = MessageContentType.TEXT;
     let mediaUrl: string | undefined;
     let mediaMimeType: string | undefined;
 

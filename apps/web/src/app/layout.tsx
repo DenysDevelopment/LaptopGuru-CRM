@@ -8,7 +8,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-	title: 'shorterLINK — laptopguru.pl',
+	title: 'CRM - LaptopGuru',
 	// description: "Внутренний инструмент для обработки заявок и отправки email с видеообзорами",
 };
 

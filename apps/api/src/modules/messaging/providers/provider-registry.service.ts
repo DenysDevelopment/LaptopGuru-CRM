@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ChannelType } from '../../../generated/prisma';
+import { ChannelType } from '../../../generated/prisma/client';
 import { ChannelProvider } from './provider.interface';
 
 @Injectable()

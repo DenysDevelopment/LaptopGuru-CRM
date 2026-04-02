@@ -11,7 +11,7 @@ export async function POST(
 ) {
   const { slug } = await params;
 
-  const landing = await prisma.landing.findUnique({ where: { slug }, select: { id: true } });
+  const landing = await prisma.landing.findFirst({ where: { slug }, select: { id: true, companyId: true } });
   if (!landing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await request.json().catch(() => ({}));
@@ -25,6 +25,7 @@ export async function POST(
   const visit = await prisma.landingVisit.create({
     data: {
       landingId: landing.id,
+      companyId: landing.companyId,
       sessionId: body.sessionId || crypto.randomUUID(),
 
       // Network & Geo

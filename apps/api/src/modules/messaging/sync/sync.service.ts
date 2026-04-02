@@ -126,14 +126,12 @@ export class SyncService {
           const actualName = leadData.customerName || senderName;
 
           // Find or create contact
-          let contactChannel = await this.prisma.contactChannel.findUnique({
+          let contactChannel = await this.prisma.contactChannel.findFirst({
             where: {
-              channelType_identifier: {
-                channelType: 'EMAIL',
-                identifier: actualEmail,
-              },
+              channelType: 'EMAIL',
+              identifier: actualEmail,
+              companyId: channel.companyId,
             },
-            include: { contact: true },
           });
 
           if (!contactChannel) {
@@ -142,11 +140,13 @@ export class SyncService {
                 displayName: actualName,
                 firstName: actualName.split(' ')[0] || null,
                 lastName: actualName.split(' ').slice(1).join(' ') || null,
+                companyId: channel.companyId,
                 channels: {
                   create: {
                     channelType: 'EMAIL',
                     identifier: actualEmail,
                     displayName: actualName,
+                    companyId: channel.companyId,
                   },
                 },
                 ...(leadData.category === 'lead'
@@ -184,19 +184,17 @@ export class SyncService {
               },
             });
 
-            contactChannel = await this.prisma.contactChannel.findUnique({
+            contactChannel = await this.prisma.contactChannel.findFirst({
               where: {
-                channelType_identifier: {
-                  channelType: 'EMAIL',
-                  identifier: actualEmail,
-                },
+                channelType: 'EMAIL',
+                identifier: actualEmail,
+                companyId: channel.companyId,
               },
-              include: { contact: true },
             });
             if (!contactChannel) continue;
           }
 
-          const contact = contactChannel.contact;
+          const contact = await this.prisma.contact.findUniqueOrThrow({ where: { id: contactChannel.contactId } });
 
           // Thread lookup
           const threadId = parsed.references
@@ -237,6 +235,7 @@ export class SyncService {
                 status: 'NEW',
                 priority: 'NORMAL',
                 externalId: threadId || messageId,
+                companyId: channel.companyId,
               },
             });
           }
@@ -253,6 +252,7 @@ export class SyncService {
               body: body.slice(0, 10000),
               externalId: messageId,
               contactId: contact.id,
+              companyId: channel.companyId,
             },
           });
 

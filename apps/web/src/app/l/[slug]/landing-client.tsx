@@ -24,7 +24,7 @@ const t = {
   pl: {
     badge: "Osobista recenzja dla Ciebie",
     greeting: "Witamy",
-    intro: "Przygotowaliśmy recenzję wideo specjalnie dla Ciebie",
+    intro: "Nasz ekspert przygotował recenzję wideo specjalnie dla Ciebie — obejrzyj i podejmij najlepszą decyzję!",
     benefit1Title: "Recenzja eksperta",
     benefit1Desc: "Nasi specjaliści szczegółowo sprawdzili ten produkt",
     benefit2Title: "Uczciwe porównanie",
@@ -32,6 +32,9 @@ const t = {
     benefit3Title: "Najlepsza cena",
     benefit3Desc: "Gwarantujemy najkorzystniejszą ofertę",
     ctaSub: "Gwarancja 12 mies. · Darmowa dostawa · Zwrot 30 dni",
+    trustWarranty: "Gwarancja 12 miesięcy",
+    trustDelivery: "Darmowa dostawa pojutrze",
+    trustReturn: "Zwrot w ciągu 30 dni",
     ctaUrgency: "Oferta ograniczona czasowo",
     ctaProof: "osób ogląda teraz",
     ctaFree: "Darmowa dostawa",
@@ -47,7 +50,7 @@ const t = {
   uk: {
     badge: "Персональний огляд для вас",
     greeting: "Вітаємо",
-    intro: "Ми підготували відеоогляд спеціально для вас",
+    intro: "Наш експерт підготував відео-огляд спеціально для вас — перегляньте та зробіть найкращий вибір!",
     benefit1Title: "Експертний огляд",
     benefit1Desc: "Наші спеціалісти детально перевірили цей продукт",
     benefit2Title: "Чесне порівняння",
@@ -55,6 +58,9 @@ const t = {
     benefit3Title: "Найкраща ціна",
     benefit3Desc: "Гарантуємо найвигіднішу пропозицію",
     ctaSub: "Гарантія 12 міс. · Безкоштовна доставка · Повернення 30 днів",
+    trustWarranty: "Гарантія 12 місяців",
+    trustDelivery: "Безкоштовна доставка післязавтра",
+    trustReturn: "Повернення протягом 30 днів",
     ctaUrgency: "Пропозиція обмежена в часі",
     ctaProof: "осіб дивляться зараз",
     ctaFree: "Безкоштовна доставка",
@@ -70,7 +76,7 @@ const t = {
   ru: {
     badge: "Персональный обзор для вас",
     greeting: "Здравствуйте",
-    intro: "Мы подготовили видеообзор специально для вас",
+    intro: "Наш эксперт подготовил видеообзор специально для вас — посмотрите и примите лучшее решение!",
     benefit1Title: "Экспертный обзор",
     benefit1Desc: "Наши специалисты детально проверили этот продукт",
     benefit2Title: "Честное сравнение",
@@ -78,6 +84,9 @@ const t = {
     benefit3Title: "Лучшая цена",
     benefit3Desc: "Гарантируем самое выгодное предложение",
     ctaSub: "Гарантия 12 мес. · Бесплатная доставка · Возврат 30 дней",
+    trustWarranty: "Гарантия 12 месяцев",
+    trustDelivery: "Бесплатная доставка послезавтра",
+    trustReturn: "Возврат в течение 30 дней",
     ctaUrgency: "Предложение ограничено по времени",
     ctaProof: "чел. смотрят сейчас",
     ctaFree: "Бесплатная доставка",
@@ -93,7 +102,7 @@ const t = {
   en: {
     badge: "Personal review for you",
     greeting: "Hello",
-    intro: "We've prepared a video review especially for you",
+    intro: "Our expert has prepared a video review especially for you — watch it and make the best decision!",
     benefit1Title: "Expert review",
     benefit1Desc: "Our specialists have thoroughly tested this product",
     benefit2Title: "Honest comparison",
@@ -101,6 +110,9 @@ const t = {
     benefit3Title: "Best price",
     benefit3Desc: "We guarantee the most competitive offer",
     ctaSub: "12-month warranty · Free delivery · 30-day returns",
+    trustWarranty: "12-month warranty",
+    trustDelivery: "Free delivery tomorrow",
+    trustReturn: "30-day returns",
     ctaUrgency: "Limited time offer",
     ctaProof: "people viewing now",
     ctaFree: "Free delivery",
@@ -137,13 +149,29 @@ interface Props {
 function parseSpecs(productName: string | null) {
   if (!productName) return null;
 
-  const parts = productName.split("/").map((p) => p.trim());
+  // Clean video title prefixes and hashtags/id suffixes
+  const cleaned = productName
+    .replace(/^(Wideorecenzja|Recenzja|Review)\s+/i, "")
+    .replace(/\s+id:\d+.*$/i, "");
+
+  const parts = cleaned.split("/").map((p) => p.trim());
   if (parts.length < 3) return null;
 
-  const model = parts[0] || null;
-  const cpu = parts.find((p) => /i[3579]|ryzen|m[12]|apple|celeron|pentium|xeon|amd/i.test(p)) || null;
-  const ram = parts.find((p) => /^\d+\s*GB$/i.test(p)) || null;
-  const storage = parts.find((p) => /^\d+\s*(GB|TB)$/i.test(p) && p !== ram) || null;
+  // If model part contains CPU info (e.g. "Dell Latitude 5500 i5-8gen"), split them
+  const cpuPattern = /\b(i[3579]-?\w+|ryzen\s*\w+|m[12]\s*\w+|celeron\s*\w+|pentium\s*\w+|xeon\s*\w+|amd\s*\w+)/i;
+  let model = parts[0] || null;
+  let cpu = parts.find((p, i) => i > 0 && cpuPattern.test(p)) || null;
+
+  if (!cpu && model && cpuPattern.test(model)) {
+    const match = model.match(cpuPattern);
+    if (match) {
+      cpu = model.substring(match.index!).trim();
+      model = model.substring(0, match.index!).trim();
+    }
+  }
+  if (!cpu) cpu = parts.find((p) => cpuPattern.test(p)) || null;
+  const ram = parts.find((p) => /^\d+\s*GB(\s*RAM)?$/i.test(p)) || null;
+  const storage = parts.find((p) => /^\d+\s*(GB|TB)(\s*SSD|\s*HDD|\s*NVMe)?$/i.test(p) && p !== ram) || null;
   const gpu = parts.find((p) => /radeon|geforce|nvidia|gtx|rtx|intel\s*(hd|iris|uhd)|pro\s*\d{3}/i.test(p)) || null;
   const display = parts.find((p) => /^\d{1,2}(\.\d+)?(")?$/i.test(p)) || null;
 
@@ -155,7 +183,7 @@ function parseSpecs(productName: string | null) {
 export function LandingClient({ landing, video }: Props) {
   const lang = landing.language;
   const tr = t[lang] || t.pl;
-  const specs = parseSpecs(landing.productName);
+  const specs = parseSpecs(landing.productName) || parseSpecs(video.title);
 
   const visitIdRef = useRef<string | null>(null);
   const startTimeRef = useRef<number>(null);
@@ -660,8 +688,9 @@ export function LandingClient({ landing, video }: Props) {
   return (
     <div className={`min-h-screen bg-gray-50 ${lato.className}`}>
       {/* Hero */}
-      <div className="bg-gradient-to-br from-[#fb7830] to-[#fbbf24] pb-20 pt-10 px-4">
+      <div className="bg-gradient-to-br from-[#fb7830] to-[#fbbf24] pb-20 pt-8 px-4">
         <div className="max-w-3xl mx-auto text-center">
+          <Image src="/LG_logo2.webp" alt="Laptop Guru" width={100} height={33} className="mx-auto mb-4 brightness-0 invert w-auto h-auto" />
           <h1 className="text-3xl sm:text-4xl font-bold text-white mb-3">
             {tr.greeting}{landing.customerName ? `, ${landing.customerName}` : ""}!
           </h1>
@@ -676,7 +705,7 @@ export function LandingClient({ landing, video }: Props) {
         <div className="relative aspect-video rounded-2xl overflow-hidden shadow-2xl bg-gray-900">
           <iframe
             id="yt-player"
-            src={`https://www.youtube.com/embed/${video.youtubeId}?rel=0&enablejsapi=1&origin=${typeof window !== "undefined" ? window.location.origin : ""}`}
+            src={`https://www.youtube.com/embed/${video.youtubeId}?rel=0&enablejsapi=1`}
             title={video.title}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
@@ -689,10 +718,28 @@ export function LandingClient({ landing, video }: Props) {
       <main className="max-w-3xl mx-auto px-4 py-10">
         {/* Personal note */}
         {landing.personalNote && (
-          <div className="bg-orange-50 border-l-4 border-[#fb7830] rounded-r-lg p-4 mb-10 italic text-gray-700">
+          <div className="bg-orange-50 border-l-4 border-[#fb7830] rounded-r-lg p-4 mb-6 italic text-gray-700">
             {landing.personalNote}
           </div>
         )}
+
+        {/* Trust badges */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col items-center text-center flex-1">
+              <img src="https://www.laptopguru.pl/cdn/shop/files/gg2.png?v=1767364526&width=400" alt="" className="h-10 mb-2" />
+              <span className="text-xs sm:text-sm text-gray-600 font-medium leading-tight">{tr.trustWarranty}</span>
+            </div>
+            <div className="flex flex-col items-center text-center flex-1">
+              <img src="https://www.laptopguru.pl/cdn/shop/files/dd1.png?v=1767364860&width=400" alt="" className="h-10 mb-2" />
+              <span className="text-xs sm:text-sm text-gray-600 font-medium leading-tight">{tr.trustDelivery}</span>
+            </div>
+            <div className="flex flex-col items-center text-center flex-1">
+              <img src="https://www.laptopguru.pl/cdn/shop/files/vv1.png?v=1767365084&width=400" alt="" className="h-10 mb-2" />
+              <span className="text-xs sm:text-sm text-gray-600 font-medium leading-tight">{tr.trustReturn}</span>
+            </div>
+          </div>
+        </div>
 
         {/* Product specs */}
         {specs && (
@@ -726,7 +773,6 @@ export function LandingClient({ landing, video }: Props) {
           </div>
         )}
 
-
       </main>
 
       {/* Fixed bottom CTA */}
@@ -741,13 +787,13 @@ export function LandingClient({ landing, video }: Props) {
                 <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
                 <span className="relative">{landing.buyButtonText}</span>
             </button>
+            <p className="text-xs text-gray-400 text-center mt-2">{tr.ctaSub}</p>
           </div>
         </div>
       )}
 
       {/* Footer */}
-      <footer className="bg-gray-900 py-8 text-center pb-32">
-        <Image src="/LG_logo2.webp" alt="Laptop Guru" width={200} height={66} className="mx-auto mb-2 brightness-0 invert w-auto h-auto" />
+      <footer className="bg-gray-900 py-8 text-center">
         <p className="text-sm text-white/40">
           © {new Date().getFullYear()} laptopguru.pl — {tr.copyright}
         </p>

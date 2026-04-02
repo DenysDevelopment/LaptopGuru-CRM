@@ -8,6 +8,7 @@ import * as nodemailer from 'nodemailer';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { SendMessageDto } from './dto/send-message.dto';
 import { ListMessagesDto } from './dto/list-messages.dto';
+import { ClsService } from 'nestjs-cls';
 
 function escapeHtml(str: string): string {
   return str
@@ -22,7 +23,10 @@ function escapeHtml(str: string): string {
 export class MessagesService {
   private readonly logger = new Logger(MessagesService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cls: ClsService,
+  ) {}
 
   async findByConversation(conversationId: string, query: ListMessagesDto) {
     const page = query.page ?? 1;
@@ -115,6 +119,7 @@ export class MessagesService {
     }
 
     // Create the message record
+    const companyId = this.cls.get<string>('companyId');
     const message = await this.prisma.message.create({
       data: {
         conversationId,
@@ -124,6 +129,7 @@ export class MessagesService {
         body: dto.body,
         senderId,
         contactId: conversation.contactId,
+        companyId,
       },
     });
 

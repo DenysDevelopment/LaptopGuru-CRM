@@ -12,13 +12,17 @@ export function generateShortCode(): string {
 export async function createShortLink(landingId: string): Promise<string> {
   let code = generateShortCode();
 
+  // Fetch landing to get companyId
+  const landing = await prisma.landing.findUnique({ where: { id: landingId }, select: { companyId: true } });
+  const companyId = landing?.companyId ?? "";
+
   // Ensure uniqueness
   while (await prisma.shortLink.findUnique({ where: { code } })) {
     code = generateShortCode();
   }
 
   await prisma.shortLink.create({
-    data: { code, landingId },
+    data: { code, landingId, companyId },
   });
 
   return code;

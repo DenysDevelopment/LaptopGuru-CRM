@@ -1,5 +1,5 @@
 import { IsString, IsOptional, IsEnum, MinLength } from 'class-validator';
-import { TeamRole } from '../../../../generated/prisma';
+import { TeamRole } from '../../../../generated/prisma/client';
 
 export class CreateTeamDto {
   @IsString()

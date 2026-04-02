@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtUser } from '../../common/decorators/current-user.decorator';
+import { ClsService } from 'nestjs-cls';
 
 interface CreateQuickLinkDto {
   slug: string;
@@ -17,7 +18,10 @@ interface CreateQuickLinkDto {
 
 @Injectable()
 export class QuickLinksService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cls: ClsService,
+  ) {}
 
   async findAll() {
     return this.prisma.quickLink.findMany({
@@ -71,7 +75,8 @@ export class QuickLinksService {
     }
 
     // Check uniqueness
-    const existing = await this.prisma.quickLink.findUnique({ where: { slug } });
+    const companyId = this.cls.get<string>('companyId');
+    const existing = await this.prisma.quickLink.findFirst({ where: { slug, companyId } });
     if (existing) {
       throw new ConflictException('This slug is already taken');
     }
@@ -82,6 +87,7 @@ export class QuickLinksService {
         targetUrl,
         name: name || null,
         userId,
+        companyId,
       },
     });
   }

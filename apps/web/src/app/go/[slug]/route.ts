@@ -24,7 +24,7 @@ export async function GET(
     return NextResponse.json({ error: "Invalid slug" }, { status: 400 });
   }
 
-  const link = await prisma.quickLink.findUnique({ where: { slug } });
+  const link = await prisma.quickLink.findFirst({ where: { slug } });
   if (!link) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -53,6 +53,7 @@ export async function GET(
       await prisma.quickLinkVisit.create({
         data: {
           quickLinkId: link.id,
+          companyId: link.companyId,
           ip, country, city,
           userAgent: ua.slice(0, 500),
           ...parsed,

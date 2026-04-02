@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
-import { PERMISSIONS } from "@shorterlink/shared";
+import { PERMISSIONS } from "@laptopguru-crm/shared";
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { error } = await authorize(PERMISSIONS.MESSAGING_CONVERSATIONS_READ);
+  const { session, error } = await authorize(PERMISSIONS.MESSAGING_CONVERSATIONS_READ);
   if (error) return error;
 
   const { id } = await params;
@@ -40,7 +40,7 @@ export async function GET(
     },
   });
 
-  if (!conversation) {
+  if (!conversation || conversation.companyId !== (session.user.companyId ?? "")) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -85,11 +85,19 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { error } = await authorize(PERMISSIONS.MESSAGING_CONVERSATIONS_WRITE);
+  const { session, error } = await authorize(PERMISSIONS.MESSAGING_CONVERSATIONS_WRITE);
   if (error) return error;
 
   const { id } = await params;
   const body = await request.json();
+
+  const existing = await prisma.conversation.findUnique({
+    where: { id },
+    select: { companyId: true },
+  });
+  if (!existing || existing.companyId !== (session.user.companyId ?? "")) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
   const data: Record<string, unknown> = {};
   if (body.status) data.status = body.status;

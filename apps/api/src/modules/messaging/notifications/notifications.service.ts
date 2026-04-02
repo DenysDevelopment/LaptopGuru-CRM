@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { NotificationType } from '../../../generated/prisma';
+import { NotificationType } from '../../../generated/prisma/client';
 import { NotificationsGateway } from './notifications.gateway';
+import { ClsService } from 'nestjs-cls';
 
 @Injectable()
 export class NotificationsService {
@@ -10,6 +11,7 @@ export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly gateway: NotificationsGateway,
+    private readonly cls: ClsService,
   ) {}
 
   async emitNewMessage(conversationId: string, messageId: string) {
@@ -113,6 +115,7 @@ export class NotificationsService {
     conversationId?: string;
     messageId?: string;
   }) {
+    const companyId = this.cls.get<string>('companyId');
     const notification = await this.prisma.notification.create({
       data: {
         userId: params.userId,
@@ -121,6 +124,7 @@ export class NotificationsService {
         body: params.body,
         conversationId: params.conversationId,
         messageId: params.messageId,
+        companyId,
       },
     });
 

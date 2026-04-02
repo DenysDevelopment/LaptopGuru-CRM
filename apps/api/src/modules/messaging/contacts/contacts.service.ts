@@ -3,10 +3,14 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateContactDto, ContactChannelDto } from './dto/create-contact.dto';
 import { UpdateContactDto } from './dto/update-contact.dto';
 import { SearchContactsDto } from './dto/search-contacts.dto';
+import { ClsService } from 'nestjs-cls';
 
 @Injectable()
 export class ContactsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cls: ClsService,
+  ) {}
 
   async findAll(query: SearchContactsDto) {
     const page = Math.max(1, query.page ?? 1);
@@ -141,6 +145,7 @@ export class ContactsService {
   }
 
   async create(dto: CreateContactDto) {
+    const companyId = this.cls.get<string>('companyId');
     return this.prisma.contact.create({
       data: {
         displayName: dto.displayName,
@@ -150,6 +155,7 @@ export class ContactsService {
         company: dto.company,
         jobTitle: dto.jobTitle,
         notes: dto.notes,
+        companyId,
         channels: dto.channels?.length
           ? {
               create: dto.channels.map((ch) => ({
@@ -157,6 +163,7 @@ export class ContactsService {
                 identifier: ch.identifier,
                 isPrimary: ch.isPrimary ?? false,
                 displayName: ch.displayName,
+                companyId,
               })),
             }
           : undefined,
@@ -184,6 +191,7 @@ export class ContactsService {
 
   async addChannel(contactId: string, dto: ContactChannelDto) {
     await this.ensureExists(contactId);
+    const companyId = this.cls.get<string>('companyId');
     return this.prisma.contactChannel.create({
       data: {
         contactId,
@@ -191,6 +199,7 @@ export class ContactsService {
         identifier: dto.identifier,
         isPrimary: dto.isPrimary ?? false,
         displayName: dto.displayName,
+        companyId,
       },
     });
   }
@@ -228,12 +237,10 @@ export class ContactsService {
 
       // Move channels from source to target (skip duplicates)
       for (const ch of source.channels) {
-        const existing = await tx.contactChannel.findUnique({
+        const existing = await tx.contactChannel.findFirst({
           where: {
-            channelType_identifier: {
-              channelType: ch.channelType,
-              identifier: ch.identifier,
-            },
+            channelType: ch.channelType,
+            identifier: ch.identifier,
           },
         });
         if (!existing || existing.contactId === sourceId) {

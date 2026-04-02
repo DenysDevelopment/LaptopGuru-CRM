@@ -2,7 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { ChannelType, WebhookEventStatus } from '../../../generated/prisma';
+import { ChannelType, WebhookEventStatus } from '../../../generated/prisma/client';
+import { ClsService } from 'nestjs-cls';
 
 @Injectable()
 export class WebhooksService {
@@ -11,6 +12,7 @@ export class WebhooksService {
   constructor(
     private readonly prisma: PrismaService,
     @InjectQueue('inbound-messages') private readonly inboundQueue: Queue,
+    private readonly cls: ClsService,
   ) {}
 
   async processWebhook(
@@ -18,6 +20,7 @@ export class WebhooksService {
     rawPayload: string,
     externalId?: string,
   ): Promise<{ webhookEventId: string }> {
+    const companyId = this.cls.get<string>('companyId');
     const webhookEvent = await this.prisma.webhookEvent.create({
       data: {
         channelType,
@@ -25,6 +28,7 @@ export class WebhooksService {
         payload: rawPayload,
         status: WebhookEventStatus.PENDING,
         attempts: 0,
+        companyId,
       },
     });
 

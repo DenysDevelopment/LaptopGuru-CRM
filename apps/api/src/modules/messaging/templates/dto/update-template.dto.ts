@@ -1,5 +1,5 @@
 import { IsString, IsOptional, IsEnum, MinLength } from 'class-validator';
-import { TemplateStatus } from '../../../../generated/prisma';
+import { TemplateStatus } from '../../../../generated/prisma/client';
 
 export class UpdateTemplateDto {
   @IsOptional()

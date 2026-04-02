@@ -18,7 +18,8 @@
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
     "prepare": "husky",
-    "clean": "turbo run clean && rm -rf node_modules/.cache"
+    "clean": "turbo run clean && rm -rf node_modules/.cache",
+    "db:seed": "npx tsx prisma/seed.ts"
   },
   "lint-staged": {
     "apps/web/src/**/*.{ts,tsx}": [

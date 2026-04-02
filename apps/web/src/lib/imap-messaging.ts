@@ -102,14 +102,12 @@ async function syncSingleChannel(
         const actualEmail = leadData.customerEmail || senderEmail;
         const actualName = leadData.customerName || senderName;
 
-        let contactChannel = await prisma.contactChannel.findUnique({
+        let contactChannel = await prisma.contactChannel.findFirst({
           where: {
-            channelType_identifier: {
-              channelType: "EMAIL",
-              identifier: actualEmail,
-            },
+            channelType: "EMAIL",
+            identifier: actualEmail,
+            companyId: channel!.companyId,
           },
-          include: { contact: true },
         });
 
         if (!contactChannel) {
@@ -118,11 +116,13 @@ async function syncSingleChannel(
               displayName: actualName,
               firstName: actualName.split(" ")[0] || null,
               lastName: actualName.split(" ").slice(1).join(" ") || null,
+              companyId: channel!.companyId,
               channels: {
                 create: {
                   channelType: "EMAIL",
                   identifier: actualEmail,
                   displayName: actualName,
+                  companyId: channel!.companyId,
                 },
               },
               ...(leadData.category === "lead" ? {
@@ -136,19 +136,17 @@ async function syncSingleChannel(
               } : {}),
             },
           });
-          contactChannel = await prisma.contactChannel.findUnique({
+          contactChannel = await prisma.contactChannel.findFirst({
             where: {
-              channelType_identifier: {
-                channelType: "EMAIL",
-                identifier: actualEmail,
-              },
+              channelType: "EMAIL",
+              identifier: actualEmail,
+              companyId: channel!.companyId,
             },
-            include: { contact: true },
           });
           if (!contactChannel) continue;
         }
 
-        const contact = contactChannel.contact;
+        const contact = await prisma.contact.findUniqueOrThrow({ where: { id: contactChannel.contactId } });
 
         const threadId = parsed.references
           ? Array.isArray(parsed.references)
@@ -183,11 +181,12 @@ async function syncSingleChannel(
           conversation = await prisma.conversation.create({
             data: {
               contactId: contact.id,
-              channelId: channel.id,
+              channelId: channel!.id,
               subject,
               status: "NEW",
               priority: "NORMAL",
               externalId: threadId || messageId,
+              companyId: channel!.companyId,
             },
           });
         }
@@ -197,12 +196,13 @@ async function syncSingleChannel(
         const message = await prisma.message.create({
           data: {
             conversationId: conversation.id,
-            channelId: channel.id,
+            channelId: channel!.id,
             direction: "INBOUND",
             contentType: hasAttachments ? "FILE" : "TEXT",
             body: body.slice(0, 10000),
             externalId: messageId,
             contactId: contact.id,
+            companyId: channel!.companyId,
           },
         });
 

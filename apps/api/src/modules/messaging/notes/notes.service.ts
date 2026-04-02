@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { ClsService } from 'nestjs-cls';
 
 @Injectable()
 export class NotesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cls: ClsService,
+  ) {}
 
   async findByConversation(conversationId: string) {
     const conversation = await this.prisma.conversation.findUnique({
@@ -30,11 +34,13 @@ export class NotesService {
       throw new NotFoundException(`Conversation ${conversationId} not found`);
     }
 
+    const companyId = this.cls.get<string>('companyId');
     return this.prisma.internalNote.create({
       data: {
         conversationId,
         authorId,
         body,
+        companyId,
       },
       include: {
         author: { select: { id: true, name: true, email: true } },

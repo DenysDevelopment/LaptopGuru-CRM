@@ -12,7 +12,7 @@ export async function GET(
 
   const { slug } = await params;
 
-  const landing = await prisma.landing.findUnique({
+  const landing = await prisma.landing.findFirst({
     where: { slug },
     include: {
       video: { select: { title: true, thumbnail: true } },

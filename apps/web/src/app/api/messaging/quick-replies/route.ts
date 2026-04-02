@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
       title: title.trim(),
       body: qrBody.trim(),
       createdBy: session.user!.id,
+      companyId: session.user!.companyId ?? "",
     },
   });
 

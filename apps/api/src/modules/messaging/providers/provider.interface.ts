@@ -3,7 +3,7 @@ import {
   MessageContentType,
   MessageDeliveryStatus,
   MessageDirection,
-} from '../../../generated/prisma';
+} from '../../../generated/prisma/client';
 
 export interface SendTextParams {
   channelType: ChannelType;

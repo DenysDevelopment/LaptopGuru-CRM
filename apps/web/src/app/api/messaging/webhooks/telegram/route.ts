@@ -93,14 +93,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Find or create contact
-    let contactChannel = await prisma.contactChannel.findUnique({
+    let contactChannel = await prisma.contactChannel.findFirst({
       where: {
-        channelType_identifier: {
-          channelType: "TELEGRAM",
-          identifier: chatId,
-        },
+        channelType: "TELEGRAM",
+        identifier: chatId,
+        companyId: channel.companyId,
       },
-      include: { contact: true },
     });
 
     const botToken = channel.config.find((c) => c.key === "bot_token")?.value;
@@ -111,11 +109,13 @@ export async function POST(request: NextRequest) {
           displayName: senderName,
           firstName: msg.from?.first_name || null,
           lastName: msg.from?.last_name || null,
+          companyId: channel.companyId,
           channels: {
             create: {
               channelType: "TELEGRAM",
               identifier: chatId,
               displayName: msg.from?.username ? `@${msg.from.username}` : null,
+              companyId: channel.companyId,
             },
           },
         },
@@ -132,30 +132,31 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      contactChannel = await prisma.contactChannel.findUnique({
+      contactChannel = await prisma.contactChannel.findFirst({
         where: {
-          channelType_identifier: {
-            channelType: "TELEGRAM",
-            identifier: chatId,
-          },
+          channelType: "TELEGRAM",
+          identifier: chatId,
+          companyId: channel.companyId,
         },
-        include: { contact: true },
       });
       if (!contactChannel) {
         return NextResponse.json({ ok: true });
       }
-    } else if (!contactChannel.contact.avatarUrl && botToken && msg.from?.id) {
+    } else {
       // Update avatar for existing contact without one
-      const avatarUrl = await fetchTelegramAvatar(botToken, msg.from.id, contactChannel.contact.id);
-      if (avatarUrl) {
-        await prisma.contact.update({
-          where: { id: contactChannel.contact.id },
-          data: { avatarUrl },
-        });
+      const existingContact = await prisma.contact.findUnique({ where: { id: contactChannel.contactId } });
+      if (existingContact && !existingContact.avatarUrl && botToken && msg.from?.id) {
+        const avatarUrl = await fetchTelegramAvatar(botToken, msg.from.id, existingContact.id);
+        if (avatarUrl) {
+          await prisma.contact.update({
+            where: { id: existingContact.id },
+            data: { avatarUrl },
+          });
+        }
       }
     }
 
-    const contact = contactChannel.contact;
+    const contact = await prisma.contact.findUniqueOrThrow({ where: { id: contactChannel.contactId } });
 
     // Find or create conversation
     let conversation = await prisma.conversation.findFirst({
@@ -175,6 +176,7 @@ export async function POST(request: NextRequest) {
           status: "NEW",
           priority: "NORMAL",
           externalId: chatId,
+          companyId: channel.companyId,
         },
       });
     }
@@ -198,6 +200,7 @@ export async function POST(request: NextRequest) {
         body: text || null,
         externalId: String(msg.message_id),
         contactId: contact.id,
+        companyId: channel.companyId,
         ...(msg.location
           ? {
               geolocation: {
