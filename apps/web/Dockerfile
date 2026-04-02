@@ -10,7 +10,11 @@ COPY apps/web/package.json apps/web/
 COPY packages/shared/package.json packages/shared/
 COPY packages/api-client/package.json packages/api-client/
 RUN npm ci --legacy-peer-deps --workspace=@laptopguru-crm/web --workspace=@laptopguru-crm/shared --ignore-scripts && \
-    npm rebuild
+    # Verify/install native musl binaries for alpine
+    node -e "try{require('lightningcss-linux-x64-musl')}catch(e){process.exit(1)}" || \
+      npm install --no-save lightningcss-linux-x64-musl && \
+    node -e "try{require('@tailwindcss/oxide-linux-x64-musl')}catch(e){process.exit(1)}" || \
+      npm install --no-save @tailwindcss/oxide-linux-x64-musl
 
 # Generate Prisma client
 FROM base AS prisma
