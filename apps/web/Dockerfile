@@ -3,14 +3,13 @@ FROM node:22-alpine AS base
 # Install dependencies (from monorepo root context)
 FROM base AS deps
 WORKDIR /app
+# libc6-compat needed for native musl bindings (lightningcss, tailwindcss-oxide)
+RUN apk add --no-cache libc6-compat
 COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/
 COPY packages/shared/package.json packages/shared/
 COPY packages/api-client/package.json packages/api-client/
-RUN npm ci --legacy-peer-deps --workspace=@laptopguru-crm/web --workspace=@laptopguru-crm/shared --ignore-scripts \
-    # Install platform-specific native binaries for alpine (musl)
-    && npm install --no-save lightningcss-linux-x64-musl || true \
-    && npm install --no-save @tailwindcss/oxide-linux-x64-musl || true
+RUN npm ci --legacy-peer-deps --workspace=@laptopguru-crm/web --workspace=@laptopguru-crm/shared
 
 # Generate Prisma client
 FROM base AS prisma
@@ -22,6 +21,7 @@ RUN npx prisma generate
 
 # Build the app
 FROM base AS builder
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 ARG NEXT_PUBLIC_BUILD_VERSION=dev
 ENV NEXT_PUBLIC_BUILD_VERSION=$NEXT_PUBLIC_BUILD_VERSION
