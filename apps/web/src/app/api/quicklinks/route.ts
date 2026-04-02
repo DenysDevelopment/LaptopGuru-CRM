@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
-import { PERMISSIONS } from "@shorterlink/shared";
+import { PERMISSIONS } from "@laptopguru-crm/shared";
 
 // GET — list all quick links
 export async function GET() {
-  const { error } = await authorize(PERMISSIONS.QUICKLINKS_READ);
+  const { session, error } = await authorize(PERMISSIONS.QUICKLINKS_READ);
   if (error) return error;
 
   const links = await prisma.quickLink.findMany({
+    where: { companyId: session.user.companyId ?? "" },
     orderBy: { createdAt: "desc" },
     include: {
       _count: { select: { visits: true } },
@@ -95,7 +96,7 @@ export async function DELETE(request: NextRequest) {
 
   // Verify ownership (admin can delete any, user only their own)
   const link = await prisma.quickLink.findUnique({ where: { id } });
-  if (!link) {
+  if (!link || link.companyId !== (session.user.companyId ?? "")) {
     return NextResponse.json({ error: "Ссылка не найдена" }, { status: 404 });
   }
   if (session.user.role !== "ADMIN" && link.userId !== session.user.id) {

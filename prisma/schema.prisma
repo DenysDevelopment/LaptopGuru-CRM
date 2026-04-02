@@ -24,9 +24,13 @@ model Company {
   slug        String   @unique
   logo        String?
   description String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive       Boolean  @default(true)
+  enabledModules String[] @default(["emails", "videos", "links", "quicklinks", "send", "messaging", "analytics"])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  youtubeChannelHandle  String?
+  youtubeLastSyncAt     DateTime?
 
   users              User[]
   landings           Landing[]
@@ -43,7 +47,6 @@ model Company {
   tags               Tag[]
   templates          Template[]
   msgQuickReplies    MsgQuickReply[]
-  autoReplyRules     AutoReplyRule[]
   teams              Team[]
   businessHours      BusinessHoursSchedule[]
   notifications      Notification[]
@@ -89,7 +92,6 @@ model User {
   notifications              Notification[]              @relation("UserNotifications")
   createdTemplates           Template[]                  @relation("TemplateCreator")
   createdQuickReplies        MsgQuickReply[]             @relation("QuickReplyCreator")
-  createdAutoRules           AutoReplyRule[]             @relation("AutoReplyCreator")
   teamMemberships            TeamMember[]                @relation("TeamMembership")
 
   @@index([companyId])
@@ -470,11 +472,6 @@ enum NotificationType {
   CONVERSATION_CLOSED
 }
 
-enum AutoReplyTrigger {
-  FIRST_MESSAGE
-  OUTSIDE_BUSINESS_HOURS
-  KEYWORD_MATCH
-}
 
 enum WebhookEventStatus {
   PENDING
@@ -608,7 +605,6 @@ model Channel {
   conversations  Conversation[]
   messages       Message[]
   templates      Template[]
-  autoRules      AutoReplyRule[]
   incomingEmails IncomingEmail[]
 
   @@index([type])
@@ -880,30 +876,6 @@ model MsgQuickReply {
   @@index([companyId])
 }
 
-// --- Auto-Reply Rules ---
-
-model AutoReplyRule {
-  id           String           @id @default(cuid())
-  channelId    String?
-  channel      Channel?         @relation(fields: [channelId], references: [id])
-  trigger      AutoReplyTrigger
-  keyword      String?
-  responseBody String
-  isActive     Boolean          @default(true)
-  priority     Int              @default(0)
-  createdBy    String
-  createdByUser User            @relation("AutoReplyCreator", fields: [createdBy], references: [id])
-  companyId    String
-  company      Company          @relation(fields: [companyId], references: [id])
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
-
-  @@index([channelId])
-  @@index([trigger])
-  @@index([isActive])
-  @@index([companyId])
-}
-
 // --- Teams ---
 
 model Team {
@@ -1059,7 +1031,7 @@ model AnalyticsMessageDaily {
   companyId   String
   company     Company          @relation(fields: [companyId], references: [id])
 
-  @@unique([date, channelType, direction])
+  @@unique([companyId, date, channelType, direction])
   @@index([date])
   @@index([date, channelType])
   @@index([companyId])
@@ -1074,7 +1046,7 @@ model AnalyticsConversationDaily {
   companyId   String
   company     Company            @relation(fields: [companyId], references: [id])
 
-  @@unique([date, channelType, status])
+  @@unique([companyId, date, channelType, status])
   @@index([date])
   @@index([date, channelType])
   @@index([companyId])
@@ -1092,7 +1064,7 @@ model AnalyticsResponseTime {
   companyId        String
   company          Company     @relation(fields: [companyId], references: [id])
 
-  @@unique([date, userId, channelType])
+  @@unique([companyId, date, userId, channelType])
   @@index([date])
   @@index([userId])
   @@index([date, channelType])

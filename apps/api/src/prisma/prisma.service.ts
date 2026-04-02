@@ -155,7 +155,6 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get template() { return this.client.template; }
   get templateVariable() { return this.client.templateVariable; }
   get msgQuickReply() { return this.client.msgQuickReply; }
-  get autoReplyRule() { return this.client.autoReplyRule; }
   get team() { return this.client.team; }
   get teamMember() { return this.client.teamMember; }
   get businessHoursSchedule() { return this.client.businessHoursSchedule; }
@@ -175,7 +174,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.rawClient_.$queryRaw(query, ...values);
   }
 
-  async $transaction(fn: Parameters<typeof this.rawClient_.$transaction>[0]) {
-    return this.rawClient_.$transaction(fn as never);
+  async $transaction(fn: Parameters<typeof this.client.$transaction>[0]) {
+    return (this.client as unknown as PrismaClient).$transaction(fn as never);
   }
 }

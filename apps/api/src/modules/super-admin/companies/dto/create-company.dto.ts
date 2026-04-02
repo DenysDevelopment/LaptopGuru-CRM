@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, MinLength, MaxLength, Matches } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsArray, IsUrl, MinLength, MaxLength, Matches } from 'class-validator';
 
 export class CreateCompanyDto {
   @IsString()
@@ -19,7 +19,8 @@ export class CreateCompanyDto {
   description?: string;
 
   @IsOptional()
-  @IsString()
+  @IsUrl()
+  @MaxLength(500)
   logo?: string;
 
   @IsString()
@@ -28,9 +29,15 @@ export class CreateCompanyDto {
 
   @IsString()
   @MinLength(8)
+  @MaxLength(128)
   adminPassword: string;
 
   @IsOptional()
   @IsString()
   adminName?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  enabledModules?: string[];
 }

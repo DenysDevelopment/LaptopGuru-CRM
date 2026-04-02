@@ -217,6 +217,15 @@ export class LandingsService {
 
     if (Object.keys(safeData).length === 0) return { ok: true };
 
+    // Verify visit exists before updating (public endpoint, no auth)
+    const existing = await this.prisma.raw.landingVisit.findUnique({
+      where: { id: visitId },
+      select: { id: true },
+    });
+    if (!existing) {
+      throw new BadRequestException('Invalid visitId');
+    }
+
     await this.prisma.raw.landingVisit.update({
       where: { id: visitId },
       data: safeData,

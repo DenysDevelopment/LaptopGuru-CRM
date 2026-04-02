@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
-import { PERMISSIONS } from "@shorterlink/shared";
+import { PERMISSIONS } from "@laptopguru-crm/shared";
 
 export async function POST(request: NextRequest) {
   const { session, error } = await authorize(PERMISSIONS.MESSAGING_NOTES_WRITE);
@@ -15,6 +15,15 @@ export async function POST(request: NextRequest) {
       { error: "conversationId and body are required" },
       { status: 400 },
     );
+  }
+
+  // Verify conversation belongs to caller's company
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { companyId: true },
+  });
+  if (!conversation || conversation.companyId !== (session.user!.companyId ?? "")) {
+    return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
   }
 
   const note = await prisma.internalNote.create({

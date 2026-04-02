@@ -4,11 +4,10 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
+import * as nodemailer from 'nodemailer';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ClsService } from 'nestjs-cls';
-import { generateSlug } from '../../common/utils/links';
-import { generateShortCode } from '../../common/utils/links';
-import { sendEmail } from '../../common/utils/smtp';
+import { generateSlug, generateShortCode } from '../../common/utils/links';
 import { buildEmailHtml } from '../../common/utils/email-template';
 import type { EmailLanguage } from '../../common/utils/email-template';
 import {
@@ -110,11 +109,40 @@ export class SendService {
 
       const subject = SUBJECT_BY_LANG[lang](video.title);
 
+      // Get company's EMAIL channel SMTP config
+      const emailChannel = await this.prisma.channel.findFirst({
+        where: { type: 'EMAIL', isActive: true, companyId },
+        include: { config: true },
+      });
+
+      if (!emailChannel) {
+        throw new BadRequestException('No active EMAIL channel configured for this company. Set up SMTP in Settings → Channels.');
+      }
+
+      const cfg = Object.fromEntries(emailChannel.config.map((c) => [c.key, c.value]));
+      const smtpHost = cfg.smtp_host;
+      const smtpPort = cfg.smtp_port || '465';
+      const smtpUser = cfg.smtp_user;
+      const smtpPass = cfg.smtp_password;
+      const smtpFrom = cfg.smtp_from || smtpUser;
+
+      if (!smtpHost || !smtpUser || !smtpPass) {
+        throw new BadRequestException('SMTP not fully configured for this company. Check Settings → Channels.');
+      }
+
       let status = 'sent';
       let errorMessage: string | null = null;
 
       try {
-        await sendEmail({
+        const transporter = nodemailer.createTransport({
+          host: smtpHost,
+          port: Number(smtpPort),
+          secure: Number(smtpPort) === 465,
+          auth: { user: smtpUser, pass: smtpPass },
+        });
+
+        await transporter.sendMail({
+          from: `"${emailChannel.name}" <${smtpFrom}>`,
           to: incomingEmail.customerEmail,
           subject,
           html,

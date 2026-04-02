@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Delete,
+  Patch,
   Body,
   Param,
   UseGuards,
@@ -13,7 +14,9 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { CurrentUser, JwtUser } from '../../common/decorators/current-user.decorator';
 import { VideosService } from './videos.service';
+import { PERMISSIONS } from '@laptopguru-crm/shared';
 import { AddVideoDto } from './dto/add-video.dto';
+import { UpdateYoutubeChannelDto } from './dto/update-youtube-channel.dto';
 
 @ApiTags('Videos')
 @ApiBearerAuth()
@@ -23,26 +26,44 @@ export class VideosController {
   constructor(private readonly videosService: VideosService) {}
 
   @Get()
-  @RequirePermissions('videos:read')
+  @RequirePermissions(PERMISSIONS.VIDEOS_READ)
   findAll() {
     return this.videosService.findAll();
   }
 
   @Post()
-  @RequirePermissions('videos:write')
+  @RequirePermissions(PERMISSIONS.VIDEOS_WRITE)
   addVideo(@Body() dto: AddVideoDto, @CurrentUser() user: JwtUser) {
     return this.videosService.addVideo(dto.url, user.id);
   }
 
-  @Delete(':id')
-  @RequirePermissions('videos:write')
-  remove(@Param('id') id: string) {
-    return this.videosService.remove(id);
-  }
-
   @Post('sync')
-  @RequirePermissions('videos:write')
+  @RequirePermissions(PERMISSIONS.VIDEOS_WRITE)
   sync(@CurrentUser() user: JwtUser) {
     return this.videosService.syncFromChannel(user.id);
+  }
+
+  @Get('youtube-channel')
+  @RequirePermissions(PERMISSIONS.VIDEOS_READ)
+  getYoutubeChannel() {
+    return this.videosService.getYoutubeChannel();
+  }
+
+  @Patch('youtube-channel')
+  @RequirePermissions(PERMISSIONS.VIDEOS_WRITE)
+  updateYoutubeChannel(@Body() dto: UpdateYoutubeChannelDto) {
+    return this.videosService.updateYoutubeChannel(dto.handle);
+  }
+
+  @Delete('youtube-channel')
+  @RequirePermissions(PERMISSIONS.VIDEOS_WRITE)
+  removeYoutubeChannel() {
+    return this.videosService.removeYoutubeChannel();
+  }
+
+  @Delete(':id')
+  @RequirePermissions(PERMISSIONS.VIDEOS_WRITE)
+  remove(@Param('id') id: string) {
+    return this.videosService.remove(id);
   }
 }

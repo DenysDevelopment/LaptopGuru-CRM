@@ -1,16 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
-import { PERMISSIONS } from "@shorterlink/shared";
+import { PERMISSIONS } from "@laptopguru-crm/shared";
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { error } = await authorize(PERMISSIONS.MESSAGING_TEMPLATES_WRITE);
+  const { session, error } = await authorize(PERMISSIONS.MESSAGING_TEMPLATES_WRITE);
   if (error) return error;
 
   const { id } = await params;
+
+  const existing = await prisma.template.findUnique({ where: { id } });
+  if (!existing || existing.companyId !== (session.user.companyId ?? "")) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const body = await request.json();
 
   const data: Record<string, unknown> = {};
@@ -19,7 +25,7 @@ export async function PATCH(
   if (body.channelType !== undefined) {
     if (body.channelType) {
       const channel = await prisma.channel.findFirst({
-        where: { type: body.channelType },
+        where: { type: body.channelType, companyId: session.user.companyId ?? "" },
         select: { id: true },
       });
       data.channelId = channel?.id || null;

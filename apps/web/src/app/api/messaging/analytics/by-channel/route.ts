@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
-import { PERMISSIONS } from "@shorterlink/shared";
+import { PERMISSIONS } from "@laptopguru-crm/shared";
 
 export async function GET(request: NextRequest) {
-  const { error } = await authorize(PERMISSIONS.MESSAGING_ANALYTICS_READ);
+  const { session, error } = await authorize(PERMISSIONS.MESSAGING_ANALYTICS_READ);
   if (error) return error;
+
+  const companyId = session.user.companyId ?? "";
 
   const url = request.nextUrl;
   const from = url.searchParams.get("from");
@@ -21,21 +23,21 @@ export async function GET(request: NextRequest) {
   // Get conversation counts per channel type
   const convByChannel = await prisma.analyticsConversationDaily.groupBy({
     by: ["channelType"],
-    where: hasDateFilter ? { date: dateFilter } : {},
+    where: { companyId, ...(hasDateFilter ? { date: dateFilter } : {}) },
     _sum: { count: true },
   });
 
   // Get message counts per channel type
   const msgByChannel = await prisma.analyticsMessageDaily.groupBy({
     by: ["channelType"],
-    where: hasDateFilter ? { date: dateFilter } : {},
+    where: { companyId, ...(hasDateFilter ? { date: dateFilter } : {}) },
     _sum: { count: true },
   });
 
   // Get avg response time per channel type
   const rtByChannel = await prisma.analyticsResponseTime.groupBy({
     by: ["channelType"],
-    where: hasDateFilter ? { date: dateFilter } : {},
+    where: { companyId, ...(hasDateFilter ? { date: dateFilter } : {}) },
     _avg: { avgResponseMs: true },
   });
 

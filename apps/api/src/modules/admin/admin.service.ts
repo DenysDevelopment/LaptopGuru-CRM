@@ -8,7 +8,7 @@ import {
 import { hash } from 'bcryptjs';
 import { ClsService } from 'nestjs-cls';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ALL_PERMISSIONS } from '@shorterlink/shared';
+import { ALL_PERMISSIONS } from '@laptopguru-crm/shared';
 
 @Injectable()
 export class AdminService {
@@ -79,8 +79,11 @@ export class AdminService {
   // GET /admin/users
   async findAllUsers() {
     const companyId = this.cls.get<string | null>('companyId');
+    if (!companyId) {
+      throw new BadRequestException('No company context');
+    }
     return this.prisma.raw.user.findMany({
-      where: companyId ? { companyId } : {},
+      where: { companyId },
       select: {
         id: true,
         email: true,
@@ -198,7 +201,7 @@ export class AdminService {
     }
 
     const companyId = this.cls.get<string | null>('companyId');
-    if (companyId && targetUser.companyId !== companyId) {
+    if (!companyId || targetUser.companyId !== companyId) {
       throw new NotFoundException('User not found');
     }
 
