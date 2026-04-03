@@ -29,8 +29,23 @@ COPY apps/api ./apps/api
 COPY packages ./packages
 RUN npm run build --workspace=@laptopguru-crm/shared && \
     npm run build --workspace=@laptopguru-crm/api && \
-    echo "=== Checking dist/generated ===" && \
-    head -3 /app/apps/api/dist/generated/prisma/client.js
+    # Fix Prisma ESM/CJS issues in compiled output: \
+    # 1. Remove import.meta.url (ESM-only) and replace with __dirname \
+    # 2. Remove .ts extensions from require() calls \
+    node -e " \
+      const fs = require('fs'); \
+      const dir = '/app/apps/api/dist/generated/prisma'; \
+      function fix(f) { \
+        let c = fs.readFileSync(f, 'utf8'); \
+        c = c.replace(/globalThis\[.*?__dirname.*?\].*?import\.meta\.url.*?;/g, ''); \
+        c = c.replace(/require\(\"node:url\"\);?\n?/g, ''); \
+        c = c.replace(/\.ts\"\)/g, '\")'); \
+        c = c.replace(/\.ts'\)/g, \"')\"); \
+        fs.writeFileSync(f, c); \
+      } \
+      fs.readdirSync(dir).filter(f=>f.endsWith('.js')).forEach(f=>fix(dir+'/'+f)); \
+      console.log('Prisma CJS fix applied'); \
+    "
 
 # Production image
 FROM base AS runner
