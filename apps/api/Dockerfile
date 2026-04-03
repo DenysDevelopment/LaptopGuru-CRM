@@ -30,20 +30,19 @@ COPY packages ./packages
 RUN npm run build --workspace=@laptopguru-crm/shared && \
     npm run build --workspace=@laptopguru-crm/api && \
     # Fix Prisma ESM/CJS issues in compiled output: \
-    # 1. Remove import.meta.url (ESM-only) and replace with __dirname \
+    # 1. Remove lines with import.meta.url and node:url (ESM-only) \
     # 2. Remove .ts extensions from require() calls \
+    # 3. Set __dirname via CJS-compatible method \
     node -e " \
       const fs = require('fs'); \
+      const path = require('path'); \
       const dir = '/app/apps/api/dist/generated/prisma'; \
       function fix(f) { \
-        let c = fs.readFileSync(f, 'utf8'); \
-        c = c.replace(/globalThis\[.*?__dirname.*?\].*?import\.meta\.url.*?;/g, ''); \
-        c = c.replace(/require\(\"node:url\"\);?\n?/g, ''); \
-        c = c.replace(/\.ts\"\)/g, '\")'); \
-        c = c.replace(/\.ts'\)/g, \"')\"); \
-        fs.writeFileSync(f, c); \
+        const lines = fs.readFileSync(f, 'utf8').split('\n'); \
+        const fixed = lines.filter(l => !l.includes('import.meta.url') && !l.includes('require(\"node:url\")') && !l.includes(\"require('node:url')\")).map(l => l.replace(/\.ts\"\)/g, '\")').replace(/\.ts'\)/g, \"')\")); \
+        fs.writeFileSync(f, fixed.join('\n')); \
       } \
-      fs.readdirSync(dir).filter(f=>f.endsWith('.js')).forEach(f=>fix(dir+'/'+f)); \
+      fs.readdirSync(dir).filter(f=>f.endsWith('.js')).forEach(f=>fix(path.join(dir,f))); \
       console.log('Prisma CJS fix applied'); \
     "
 
