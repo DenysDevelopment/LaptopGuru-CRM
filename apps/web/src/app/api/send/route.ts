@@ -42,7 +42,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Видео не найдено" }, { status: 400 });
   }
 
-  const appUrl = process.env.APP_URL || "http://localhost:3000";
+  const appUrl =
+    process.env.APP_URL && !process.env.APP_URL.includes('localhost')
+      ? process.env.APP_URL
+      : request.nextUrl.origin;
 
   try {
     // 1. Create landing page

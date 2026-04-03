@@ -1,4 +1,45 @@
 services:
   app:
-    image: ghcr.io/denysdevelopment/shorter-email-laptopguru:latest
+    restart: always
+    volumes:
+      - uploads:/app/public/uploads
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - AUTH_SECRET=${AUTH_SECRET}
+      - AUTH_URL=${AUTH_URL}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - IMAP_HOST=${IMAP_HOST}
+      - IMAP_PORT=${IMAP_PORT}
+      - IMAP_USER=${IMAP_USER}
+      - IMAP_PASSWORD=${IMAP_PASSWORD}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_FROM=${SMTP_FROM}
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
+      - YOUTUBE_CHANNEL_HANDLE=${YOUTUBE_CHANNEL_HANDLE}
+      - APP_URL=${APP_URL}
+      - INVITE_CODE=${INVITE_CODE}
+      - HOSTNAME=0.0.0.0
+      - JWT_SECRET=${JWT_SECRET}
+  api:
+    image: ghcr.io/denysdevelopment/shorter-email-laptopguru-api:latest
     build: !reset null
+    restart: always
+    environment:
+      - CORS_ORIGIN=https://crm.laptopguru.link
+      - DATABASE_URL=${DATABASE_URL}
+      - IMAP_HOST=${IMAP_HOST}
+      - IMAP_PORT=${IMAP_PORT}
+      - IMAP_USER=${IMAP_USER}
+      - IMAP_PASSWORD=${IMAP_PASSWORD}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_FROM=${SMTP_FROM}
+      - JWT_SECRET=${JWT_SECRET}
+volumes:
+  uploads:

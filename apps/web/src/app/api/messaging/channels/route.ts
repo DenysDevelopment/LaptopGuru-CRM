@@ -134,7 +134,10 @@ export async function POST(request: NextRequest) {
   if (type === "TELEGRAM") {
     const botToken = config?.find((c: { key: string }) => c.key === "bot_token")?.value;
     if (botToken) {
-      const appUrl = process.env.APP_URL || "";
+        const appUrl =
+          process.env.APP_URL && !process.env.APP_URL.includes('localhost')
+            ? process.env.APP_URL
+            : request.nextUrl.origin;
       const webhookUrl = `${appUrl}/api/messaging/webhooks/telegram`;
       const webhookSecret = crypto.randomUUID().replace(/-/g, "");
       try {
