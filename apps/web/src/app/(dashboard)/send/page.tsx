@@ -16,7 +16,6 @@ export default function SendPage() {
   const [selectedEmail, setSelectedEmail] = useState("");
   const [selectedVideo, setSelectedVideo] = useState("");
   const [personalNote, setPersonalNote] = useState("");
-  const [buyButtonText, setBuyButtonText] = useState("Kup teraz");
   const [language, setLanguage] = useState<"pl" | "uk" | "ru" | "en">("pl");
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ shortLink: { url: string }; landing: { url: string }; sentEmail: { status: string } } | null>(null);
@@ -50,7 +49,6 @@ export default function SendPage() {
           emailId: selectedEmail,
           videoId: selectedVideo,
           personalNote: personalNote || undefined,
-          buyButtonText,
           language,
         }),
       });
@@ -108,11 +106,9 @@ export default function SendPage() {
               selectedEmail={selectedEmailData}
               language={language}
               personalNote={personalNote}
-              buyButtonText={buyButtonText}
               sending={sending}
               onLanguageChange={setLanguage}
               onNoteChange={setPersonalNote}
-              onButtonTextChange={setBuyButtonText}
               onSend={handleSend}
             />
           )}

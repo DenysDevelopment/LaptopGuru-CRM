@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
   if (error) return error;
 
   const body = await request.json();
-  const { emailId, videoId, personalNote, buyButtonText, language } = body;
+  const { emailId, videoId, personalNote, language } = body;
   const lang: EmailLanguage = VALID_LANGUAGES.includes(language) ? language : "pl";
 
   if (!emailId || !videoId) {
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
         title: TITLE_BY_LANG[lang](video.title),
         videoId: video.id,
         productUrl: incomingEmail.productUrl || "",
-        buyButtonText: buyButtonText || "Kup teraz",
+        buyButtonText: ({ pl: "Sprawdź ofertę", uk: "Переглянути пропозицію", ru: "Смотреть предложение", en: "View offer" })[lang] || "Sprawdź ofertę",
         personalNote: personalNote || null,
         customerName: incomingEmail.customerName || null,
         productName: incomingEmail.productName || null,

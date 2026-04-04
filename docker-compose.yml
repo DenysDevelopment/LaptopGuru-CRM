@@ -9,7 +9,7 @@ services:
     volumes:
       - uploads:/app/public/uploads
     environment:
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-shorterlink}:${POSTGRES_PASSWORD:-shorterlink_prod}@db:5432/shorterlink
       - AUTH_SECRET=${AUTH_SECRET}
       - AUTH_URL=${AUTH_URL}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
@@ -50,7 +50,7 @@ services:
       - "4000:4000"
     environment:
       - PORT=4000
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-shorterlink}:${POSTGRES_PASSWORD:-shorterlink_prod}@db:5432/shorterlink
       - JWT_SECRET=${JWT_SECRET}
       - CORS_ORIGIN=${APP_URL:-http://localhost:3000}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
