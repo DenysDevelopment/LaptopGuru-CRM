@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
@@ -49,8 +50,8 @@ export class ChannelsController {
 
   @Delete(':id')
   @RequirePermissions('messaging:channels:write')
-  remove(@Param('id') id: string) {
-    return this.channelsService.remove(id);
+  remove(@Param('id') id: string, @Query('deleteData') deleteData?: string) {
+    return this.channelsService.remove(id, deleteData === 'true');
   }
 
   @Post(':id/test')

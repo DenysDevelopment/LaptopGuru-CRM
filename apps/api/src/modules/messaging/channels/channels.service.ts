@@ -176,10 +176,31 @@ export class ChannelsService {
     };
   }
 
-  async remove(id: string) {
-    await this.ensureExists(id);
-    await this.prisma.channelConfig.deleteMany({ where: { channelId: id } });
-    return this.prisma.channel.delete({ where: { id } });
+  async remove(id: string, deleteData = false) {
+    const channel = await this.ensureExists(id);
+
+    if (deleteData) {
+      // Delete channel WITH all messages and conversations
+      return this.prisma.$transaction([
+        this.prisma.message.deleteMany({ where: { channelId: id } }),
+        this.prisma.conversation.deleteMany({ where: { channelId: id } }),
+        this.prisma.template.updateMany({ where: { channelId: id }, data: { channelId: null } }),
+        this.prisma.channelConfig.deleteMany({ where: { channelId: id } }),
+        this.prisma.incomingEmail.updateMany({ where: { channelId: id }, data: { channelId: null } }),
+        this.prisma.channel.delete({ where: { id } }),
+      ]);
+    }
+
+    // Soft-delete: deactivate channel, keep messages/conversations
+    await this.prisma.$transaction([
+      this.prisma.template.updateMany({ where: { channelId: id }, data: { channelId: null } }),
+      this.prisma.channelConfig.deleteMany({ where: { channelId: id } }),
+      this.prisma.incomingEmail.updateMany({ where: { channelId: id }, data: { channelId: null } }),
+    ]);
+    return this.prisma.channel.update({
+      where: { id },
+      data: { isActive: false, name: `[Удалён] ${channel.name}` },
+    });
   }
 
   async upsertConfig(channelId: string, items: ChannelConfigItemDto[]) {

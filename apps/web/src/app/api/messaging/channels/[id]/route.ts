@@ -50,7 +50,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { session, error } = await authorize(PERMISSIONS.MESSAGING_CHANNELS_WRITE);
@@ -62,6 +62,8 @@ export async function DELETE(
   }
 
   const { id } = await params;
+  const { searchParams } = new URL(request.url);
+  const deleteData = searchParams.get("deleteData") === "true";
 
   // Verify channel belongs to the same company
   const existing = await prisma.channel.findUnique({ where: { id } });
@@ -69,9 +71,27 @@ export async function DELETE(
     return NextResponse.json({ error: "Channel not found" }, { status: 404 });
   }
 
-  // Delete config first, then channel
-  await prisma.channelConfig.deleteMany({ where: { channelId: id } });
-  await prisma.channel.delete({ where: { id } });
+  if (deleteData) {
+    // Delete channel WITH all messages and conversations
+    await prisma.$transaction([
+      prisma.message.deleteMany({ where: { channelId: id } }),
+      prisma.conversation.deleteMany({ where: { channelId: id } }),
+      prisma.template.updateMany({ where: { channelId: id }, data: { channelId: null } }),
+      prisma.channelConfig.deleteMany({ where: { channelId: id } }),
+      prisma.incomingEmail.updateMany({ where: { channelId: id }, data: { channelId: null } }),
+      prisma.channel.delete({ where: { id } }),
+    ]);
+  } else {
+    // Delete only channel, keep messages/conversations (unlink references)
+    await prisma.$transaction([
+      prisma.message.updateMany({ where: { channelId: id }, data: { channelId: id } }), // keep as-is, handled by schema
+      prisma.template.updateMany({ where: { channelId: id }, data: { channelId: null } }),
+      prisma.channelConfig.deleteMany({ where: { channelId: id } }),
+      prisma.incomingEmail.updateMany({ where: { channelId: id }, data: { channelId: null } }),
+    ]);
+    // Soft-delete: just deactivate the channel instead of hard-deleting (FK still referenced)
+    await prisma.channel.update({ where: { id }, data: { isActive: false, name: `[Удалён] ${existing.name}` } });
+  }
 
   return NextResponse.json({ ok: true });
 }

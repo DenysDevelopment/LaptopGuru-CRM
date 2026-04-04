@@ -154,13 +154,27 @@ export default function ChannelsSettingsPage() {
 	};
 
 	const deleteChannel = async (channelId: string) => {
-		if (!confirm('Удалить канал? Это действие нельзя отменить.')) return;
+		const choice = prompt(
+			'Удалить канал?\n\n' +
+			'1 — Отключить канал (сообщения и разговоры останутся)\n' +
+			'2 — Удалить канал и ВСЕ данные (сообщения, разговоры)\n\n' +
+			'Введите 1 или 2 (или отмена):',
+		);
+		if (choice !== '1' && choice !== '2') return;
+
+		const deleteData = choice === '2';
+		if (deleteData && !confirm('Вы уверены? ВСЕ сообщения и разговоры этого канала будут удалены безвозвратно.')) return;
+
 		try {
-			const res = await fetch(`/api/messaging/channels/${channelId}`, {
+			const res = await fetch(`/api/messaging/channels/${channelId}?deleteData=${deleteData}`, {
 				method: 'DELETE',
 			});
 			if (res.ok) {
-				setChannels((prev) => prev.filter((ch) => ch.id !== channelId));
+				if (deleteData) {
+					setChannels((prev) => prev.filter((ch) => ch.id !== channelId));
+				} else {
+					fetchChannels(); // refresh to show updated name/status
+				}
 			} else {
 				alert('Ошибка удаления');
 			}
