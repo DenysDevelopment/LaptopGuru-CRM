@@ -25,29 +25,33 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         return token;
       }
 
-      // Subsequent requests: refresh from DB
-      const fresh = await prisma.user.findUnique({
-        where: { id: token.id as string },
-        select: {
-          role: true,
-          permissions: true,
-          companyId: true,
-          tokenVersion: true,
-          company: { select: { name: true, enabledModules: true } },
-        },
-      });
+      // Subsequent requests: refresh from DB (keep stale token on transient errors)
+      try {
+        const fresh = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: {
+            role: true,
+            permissions: true,
+            companyId: true,
+            tokenVersion: true,
+            company: { select: { name: true, enabledModules: true } },
+          },
+        });
 
-      // User deleted — force sign-out
-      if (!fresh) {
-        return {} as typeof token;
+        // User deleted — force sign-out
+        if (!fresh) {
+          return {} as typeof token;
+        }
+
+        token.role = fresh.role;
+        token.permissions = fresh.permissions;
+        token.companyId = fresh.companyId;
+        token.companyName = fresh.company?.name ?? null;
+        token.enabledModules = fresh.company?.enabledModules ?? [];
+        token.tokenVersion = fresh.tokenVersion;
+      } catch {
+        // DB unavailable — keep existing token data instead of wiping it
       }
-
-      token.role = fresh.role;
-      token.permissions = fresh.permissions;
-      token.companyId = fresh.companyId;
-      token.companyName = fresh.company?.name ?? null;
-      token.enabledModules = fresh.company?.enabledModules ?? [];
-      token.tokenVersion = fresh.tokenVersion;
 
       return token;
     },
