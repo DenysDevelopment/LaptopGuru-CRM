@@ -181,25 +181,25 @@ export class ChannelsService {
 
     if (deleteData) {
       // Delete channel WITH all messages and conversations
-      return this.prisma.$transaction([
-        this.prisma.message.deleteMany({ where: { channelId: id } }),
-        this.prisma.conversation.deleteMany({ where: { channelId: id } }),
-        this.prisma.template.updateMany({ where: { channelId: id }, data: { channelId: null } }),
-        this.prisma.channelConfig.deleteMany({ where: { channelId: id } }),
-        this.prisma.incomingEmail.updateMany({ where: { channelId: id }, data: { channelId: null } }),
-        this.prisma.channel.delete({ where: { id } }),
-      ]);
+      return this.prisma.$transaction(async (tx) => {
+        await tx.message.deleteMany({ where: { channelId: id } });
+        await tx.conversation.deleteMany({ where: { channelId: id } });
+        await tx.template.updateMany({ where: { channelId: id }, data: { channelId: null } });
+        await tx.channelConfig.deleteMany({ where: { channelId: id } });
+        await tx.incomingEmail.updateMany({ where: { channelId: id }, data: { channelId: null } });
+        await tx.channel.delete({ where: { id } });
+      });
     }
 
     // Soft-delete: deactivate channel, keep messages/conversations
-    await this.prisma.$transaction([
-      this.prisma.template.updateMany({ where: { channelId: id }, data: { channelId: null } }),
-      this.prisma.channelConfig.deleteMany({ where: { channelId: id } }),
-      this.prisma.incomingEmail.updateMany({ where: { channelId: id }, data: { channelId: null } }),
-    ]);
-    return this.prisma.channel.update({
-      where: { id },
-      data: { isActive: false, name: `[Удалён] ${channel.name}` },
+    return this.prisma.$transaction(async (tx) => {
+      await tx.template.updateMany({ where: { channelId: id }, data: { channelId: null } });
+      await tx.channelConfig.deleteMany({ where: { channelId: id } });
+      await tx.incomingEmail.updateMany({ where: { channelId: id }, data: { channelId: null } });
+      await tx.channel.update({
+        where: { id },
+        data: { isActive: false, name: `[Удалён] ${channel.name}` },
+      });
     });
   }
 
