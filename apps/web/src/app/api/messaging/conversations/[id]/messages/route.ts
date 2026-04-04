@@ -173,10 +173,10 @@ export async function POST(
         });
         if (contactChannel) {
           const nodemailer = await import("nodemailer");
-          const smtpHost = configMap.smtp_host || configMap.smtpHost;
-          const smtpPort = Number(configMap.smtp_port || configMap.smtpPort || "465");
-          const smtpUser = configMap.smtp_user || configMap.username;
-          const smtpPass = configMap.smtp_password || configMap.password;
+          const smtpHost = configMap.smtp_host;
+          const smtpPort = Number(configMap.smtp_port || "465");
+          const smtpUser = configMap.smtp_user;
+          const smtpPass = configMap.smtp_password;
           const smtpFrom = configMap.smtp_from || smtpUser;
 
           const transporter = nodemailer.default.createTransport({

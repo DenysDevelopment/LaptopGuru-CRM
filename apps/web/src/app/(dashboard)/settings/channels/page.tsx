@@ -21,20 +21,20 @@ const CHANNEL_TYPES = [
 ];
 
 const EMAIL_DEFAULTS: Record<string, string> = {
-	imapHost: 'imap.hostinger.com',
-	imapPort: '993',
-	smtpHost: 'smtp.hostinger.com',
-	smtpPort: '465',
+	imap_host: 'imap.hostinger.com',
+	imap_port: '993',
+	smtp_host: 'smtp.hostinger.com',
+	smtp_port: '465',
 };
 
 const CONFIG_FIELDS: Record<string, { key: string; label: string; type: string }[]> = {
 	EMAIL: [
-		{ key: 'imapHost', label: 'IMAP Хост', type: 'text' },
-		{ key: 'imapPort', label: 'IMAP Порт', type: 'text' },
-		{ key: 'smtpHost', label: 'SMTP Хост', type: 'text' },
-		{ key: 'smtpPort', label: 'SMTP Порт', type: 'text' },
-		{ key: 'username', label: 'Логин', type: 'text' },
-		{ key: 'password', label: 'Пароль', type: 'password' },
+		{ key: 'imap_host', label: 'IMAP Хост', type: 'text' },
+		{ key: 'imap_port', label: 'IMAP Порт', type: 'text' },
+		{ key: 'smtp_host', label: 'SMTP Хост', type: 'text' },
+		{ key: 'smtp_port', label: 'SMTP Порт', type: 'text' },
+		{ key: 'imap_user', label: 'Логин', type: 'text' },
+		{ key: 'imap_password', label: 'Пароль', type: 'password' },
 	],
 	TELEGRAM: [
 		{ key: 'bot_token', label: 'Bot Token (от @BotFather)', type: 'password' },
@@ -104,13 +104,21 @@ export default function ChannelsSettingsPage() {
 		if (!newChannelName.trim() || saving) return;
 		setSaving(true);
 		try {
+			// For EMAIL channels, duplicate imap credentials as smtp if not set separately
+			const finalConfig = { ...newChannelConfig };
+			if (newChannelType === 'EMAIL') {
+				if (!finalConfig.smtp_user) finalConfig.smtp_user = finalConfig.imap_user || '';
+				if (!finalConfig.smtp_password) finalConfig.smtp_password = finalConfig.imap_password || '';
+				if (!finalConfig.smtp_from) finalConfig.smtp_from = finalConfig.imap_user || '';
+			}
+
 			const res = await fetch('/api/messaging/channels', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					type: newChannelType,
 					name: newChannelName.trim(),
-					config: Object.entries(newChannelConfig)
+					config: Object.entries(finalConfig)
 						.filter(([, v]) => v)
 						.map(([key, value]) => ({
 							key,

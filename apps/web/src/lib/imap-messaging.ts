@@ -41,10 +41,10 @@ async function syncSingleChannel(
 ): Promise<number> {
   const config = Object.fromEntries(channel.config.map((c) => [c.key, c.value]));
 
-  const imapHost = config.imap_host || config.imapHost;
-  const imapPort = config.imap_port || config.imapPort || "993";
-  const imapUser = config.imap_user || config.username || config.imapUser;
-  const imapPass = config.imap_password || config.password || config.imapPassword;
+  const imapHost = config.imap_host;
+  const imapPort = config.imap_port || "993";
+  const imapUser = config.imap_user;
+  const imapPass = config.imap_password;
 
   if (!imapHost || !imapUser || !imapPass) {
     console.warn(`[Email Sync] IMAP config incomplete for channel "${channel.name}"`);

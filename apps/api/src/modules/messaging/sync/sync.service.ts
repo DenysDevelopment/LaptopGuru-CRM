@@ -57,11 +57,10 @@ export class SyncService {
       channel.config.map((c) => [c.key, c.value]),
     );
 
-    const imapHost = config.imap_host || config.imapHost;
-    const imapPort = config.imap_port || config.imapPort || '993';
-    const imapUser = config.imap_user || config.username || config.imapUser;
-    const imapPass =
-      config.imap_password || config.password || config.imapPassword;
+    const imapHost = config.imap_host;
+    const imapPort = config.imap_port || '993';
+    const imapUser = config.imap_user;
+    const imapPass = config.imap_password;
 
     if (!imapHost || !imapUser || !imapPass) {
       this.logger.warn(
