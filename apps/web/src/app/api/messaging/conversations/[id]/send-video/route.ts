@@ -23,7 +23,7 @@ export async function POST(
 
   const { id } = await params;
   const body = await request.json();
-  const { videoId, personalNote, buyButtonText, language } = body;
+  const { videoId, personalNote, language } = body;
   const lang: EmailLanguage = VALID_LANGUAGES.includes(language) ? language : "pl";
 
   if (!videoId) {
@@ -83,7 +83,7 @@ export async function POST(
         title: TITLE_BY_LANG[lang](video.title),
         videoId: video.id,
         productUrl,
-        buyButtonText: buyButtonText || "Kup teraz",
+        buyButtonText: ({ pl: "Sprawdź ofertę", uk: "Переглянути пропозицію", ru: "Смотреть предложение", en: "View offer" })[lang] || "Sprawdź ofertę",
         personalNote: personalNote || null,
         customerName,
         productName,

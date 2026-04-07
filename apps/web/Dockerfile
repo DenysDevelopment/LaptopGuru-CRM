@@ -9,13 +9,13 @@ COPY apps/web/package.json apps/web/
 COPY packages/shared/package.json packages/shared/
 COPY packages/api-client/package.json packages/api-client/
 # Remove husky prepare script (not needed in Docker), then install all deps
+# Force-install musl native binaries — npm ci skips them when lockfile was generated on macOS
 RUN node -e "const p=require('./package.json');delete p.scripts.prepare;require('fs').writeFileSync('package.json',JSON.stringify(p,null,2))" && \
     npm ci --legacy-peer-deps && \
-    # Force-install musl native binaries (npm skips them on glibc buildx runners)
-    npm install --no-save --force lightningcss-linux-x64-musl @tailwindcss/oxide-linux-x64-musl && \
-    # Debug: verify binaries are found
-    node -e "console.log('lightningcss:',require.resolve('lightningcss-linux-x64-musl'))" && \
-    node -e "console.log('oxide:',require.resolve('@tailwindcss/oxide-linux-x64-musl'))"
+    ARCH=$(uname -m | sed 's/aarch64/arm64/' | sed 's/x86_64/x64/') && \
+    npm install --no-save --force \
+      lightningcss-linux-${ARCH}-musl \
+      @tailwindcss/oxide-linux-${ARCH}-musl
 
 # Generate Prisma client
 FROM base AS prisma
@@ -55,7 +55,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/
 # Install sharp for Alpine (musl) image optimization
 # Use a temp dir to avoid npm pruning standalone node_modules
 RUN mkdir /tmp/sharp-install && cd /tmp/sharp-install && \
-    npm init -y && npm install --os=linux --libc=musl --cpu=x64 sharp && \
+    npm init -y && npm install sharp && \
     cp -r node_modules/sharp /app/node_modules/sharp && \
     rm -rf /tmp/sharp-install
 
