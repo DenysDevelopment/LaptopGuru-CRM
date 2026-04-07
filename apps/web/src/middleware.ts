@@ -12,7 +12,7 @@ export const config = {
      * - _next/image (image optimization)
      * - favicon.ico, sitemap.xml, robots.txt
      * - public assets (images, etc.)
-     * - api/auth (NextAuth endpoints)
+     * - api/, /l/ (landings), /r/ (short links)
      */
     "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|api/|l/|r/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
