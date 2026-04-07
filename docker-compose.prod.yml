@@ -1,5 +1,7 @@
 services:
   app:
+    image: ghcr.io/denysdevelopment/shorter-email-laptopguru:latest
+    build: !reset null
     restart: always
     volumes:
       - uploads:/app/public/uploads
