@@ -135,6 +135,9 @@ export function SendVideoModal({ conversationId, onClose, onSent }: SendVideoMod
 								{ value: 'uk', label: 'UA' },
 								{ value: 'ru', label: 'RU' },
 								{ value: 'en', label: 'EN' },
+								{ value: 'lt', label: 'LT' },
+								{ value: 'et', label: 'ET' },
+								{ value: 'lv', label: 'LV' },
 							].map((lang) => (
 								<button
 									key={lang.value}
