@@ -108,8 +108,6 @@ export function buildEmailHtml(data: EmailTemplateData): string {
     language = 'pl',
   } = data;
   const t = translations[language];
-  const appUrl = process.env.APP_URL || 'http://localhost:3000';
-  const logoUrl = `${appUrl}/LG_logo2.webp`;
 
   const noteBlock = personalNote
     ? `<tr><td style="padding: 0 24px 24px;">
@@ -135,8 +133,8 @@ export function buildEmailHtml(data: EmailTemplateData): string {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width: 560px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
 
   <!-- Header -->
-  <tr><td style="background: linear-gradient(135deg, #fb7830 0%, #f59e0b 100%); padding: 32px; text-align: center;">
-    <img src="${logoUrl}" alt="Laptop Guru" style="height: 56px; margin: 0 auto 10px; display: block; filter: brightness(0) invert(1);" />
+  <tr><td style="background-color: #fb7830; padding: 32px; text-align: center;">
+    <h1 style="margin: 0 0 10px; font-size: 28px; font-weight: bold; color: #ffffff; letter-spacing: 1px;">🎯 Laptop Guru</h1>
     <p style="margin: 0; color: rgba(255,255,255,0.85); font-size: 11px; text-transform: uppercase; letter-spacing: 2px; font-weight: 600;">${t.badge}</p>
   </td></tr>
 
@@ -153,18 +151,15 @@ export function buildEmailHtml(data: EmailTemplateData): string {
   ${noteBlock}
 
   <!-- Video preview -->
-  <tr><td style="padding: 0 24px 8px;">
-    <a href="${escapeHtml(landingUrl)}" style="display: block; text-decoration: none; position: relative;">
-      <img src="${escapeHtml(thumbnail)}" alt="${escapeHtml(videoTitle)}" style="width: 100%; border-radius: 12px; display: block;" />
-    </a>
-  </td></tr>
   <tr><td style="padding: 0 24px 24px;">
-    <p style="margin: 0; color: #333; font-size: 15px; font-weight: 600; line-height: 1.4;">${escapeHtml(videoTitle)}</p>
+    <a href="${escapeHtml(landingUrl)}" style="display: block; text-decoration: none; position: relative;">
+      <img src="${escapeHtml(thumbnail)}" alt="Video review" style="width: 100%; border-radius: 12px; display: block;" />
+    </a>
   </td></tr>
 
   <!-- CTA -->
   <tr><td style="padding: 0 24px 32px;" align="center">
-    <a href="${escapeHtml(landingUrl)}" style="display: inline-block; background: linear-gradient(135deg, #fb7830 0%, #e56a25 100%); color: #ffffff; font-size: 18px; font-weight: bold; text-decoration: none; padding: 16px 48px; border-radius: 12px; box-shadow: 0 4px 16px rgba(251,120,48,0.35); letter-spacing: 0.5px;">
+    <a href="${escapeHtml(landingUrl)}" style="display: inline-block; background-color: #fb7830; color: #ffffff; font-size: 18px; font-weight: bold; text-decoration: none; padding: 16px 48px; border-radius: 12px; letter-spacing: 0.5px;">
       ${t.cta}
     </a>
   </td></tr>
@@ -182,7 +177,7 @@ export function buildEmailHtml(data: EmailTemplateData): string {
 
   <!-- Footer -->
   <tr><td style="background-color: #1f2937; padding: 24px; text-align: center;">
-    <img src="${logoUrl}" alt="Laptop Guru" style="height: 40px; margin: 0 auto 8px; display: block; filter: brightness(0) invert(1); opacity: 0.7;" />
+    <p style="margin: 0 0 8px; font-size: 18px; font-weight: bold; color: rgba(255,255,255,0.6); letter-spacing: 1px;">Laptop Guru</p>
     <p style="margin: 0; color: rgba(255,255,255,0.4); font-size: 12px;">
       &copy; laptopguru.pl &mdash; ${t.copyright}
     </p>

@@ -1321,11 +1321,6 @@ export function LandingClient({ landing, video }: Props) {
 									/>
 								</div>
 							</div>
-							<div data-animate data-animate-delay='1' className='px-6 pb-5'>
-								<p className='text-[14px] font-medium text-[#444] leading-snug m-0'>
-									{video.title}
-								</p>
-							</div>
 						</div>
 					</div>
 
