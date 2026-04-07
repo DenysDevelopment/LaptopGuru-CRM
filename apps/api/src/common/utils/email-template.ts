@@ -101,7 +101,6 @@ export type EmailLanguage = 'pl' | 'uk' | 'ru' | 'en' | 'lt' | 'et' | 'lv';
 export function buildEmailHtml(data: EmailTemplateData): string {
   const {
     customerName,
-    videoTitle,
     thumbnail,
     landingUrl,
     personalNote,

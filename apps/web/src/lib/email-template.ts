@@ -147,7 +147,7 @@ export function buildEmailHtml(data: EmailTemplateData): string {
     </p>
   </td></tr>
 
-  \${noteBlock}
+  ${noteBlock}
 
   <!-- Video preview -->
   <tr><td style="padding: 0 24px 24px;">

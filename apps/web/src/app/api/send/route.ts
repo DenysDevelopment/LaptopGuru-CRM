@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
         title: TITLE_BY_LANG[lang](video.title),
         videoId: video.id,
         productUrl: incomingEmail.productUrl || "",
-        buyButtonText: ({ pl: "Sprawdź ofertę", uk: "Переглянути пропозицію", ru: "Смотреть предложение", en: "View offer" })[lang] || "Sprawdź ofertę",
+        buyButtonText: ({ pl: "Sprawdź ofertę", uk: "Переглянути пропозицію", ru: "Смотреть предложение", en: "View offer", lt: "Peržiūrėti pasiūlymą", et: "Vaata pakkumist", lv: "Skatīt piedāvājumu" } as Record<string, string>)[lang] || "Sprawdź ofertę",
         personalNote: personalNote || null,
         customerName: incomingEmail.customerName || null,
         productName: incomingEmail.productName || null,
