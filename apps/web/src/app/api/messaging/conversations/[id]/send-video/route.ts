@@ -83,7 +83,7 @@ export async function POST(
         title: TITLE_BY_LANG[lang](video.title),
         videoId: video.id,
         productUrl,
-        buyButtonText: ({ pl: "Sprawdź ofertę", uk: "Переглянути пропозицію", ru: "Смотреть предложение", en: "View offer" })[lang] || "Sprawdź ofertę",
+        buyButtonText: ({ pl: "Sprawdź ofertę", uk: "Переглянути пропозицію", ru: "Смотреть предложение", en: "View offer", lt: "Peržiūrėti pasiūlymą", et: "Vaata pakkumist", lv: "Skatīt piedāvājumu" })[lang] || "Sprawdź ofertę",
         personalNote: personalNote || null,
         customerName,
         productName,
