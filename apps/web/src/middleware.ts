@@ -14,6 +14,6 @@ export const config = {
      * - public assets (images, etc.)
      * - api/auth (NextAuth endpoints)
      */
-    "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|api/|l/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|api/|l/|r/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
