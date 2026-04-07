@@ -70,8 +70,9 @@ export function EmailPreview({ email, video, language, personalNote }: EmailPrev
           )}
 
           <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-100 mb-3">
-            <Image src={video.thumbnail} alt="Video review" fill className="object-cover" sizes="300px" />
+            <Image src={video.thumbnail} alt={video.title} fill className="object-cover" sizes="300px" />
           </div>
+          <p className="font-medium text-gray-800 mb-3">{video.title}</p>
 
           <div className="text-center">
             <span className="inline-block bg-[#fb7830] text-white px-6 py-2 rounded-lg font-bold text-[11px]">

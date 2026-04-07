@@ -101,6 +101,7 @@ export type EmailLanguage = 'pl' | 'uk' | 'ru' | 'en' | 'lt' | 'et' | 'lv';
 export function buildEmailHtml(data: EmailTemplateData): string {
 	const {
 		customerName,
+		videoTitle,
 		thumbnail,
 		landingUrl,
 		personalNote,
@@ -152,10 +153,13 @@ export function buildEmailHtml(data: EmailTemplateData): string {
   ${noteBlock}
 
   <!-- Video preview -->
-  <tr><td style="padding: 0 24px 24px;">
+  <tr><td style="padding: 0 24px 8px;">
     <a href="${escapeHtml(landingUrl)}" style="display: block; text-decoration: none; position: relative;">
-      <img src="${escapeHtml(thumbnail)}" alt="Video review" style="width: 100%; border-radius: 12px; display: block;" />
+      <img src="${escapeHtml(thumbnail)}" alt="${escapeHtml(videoTitle)}" style="width: 100%; border-radius: 12px; display: block;" />
     </a>
+  </td></tr>
+  <tr><td style="padding: 0 24px 24px;">
+    <p style="margin: 0; color: #333; font-size: 15px; font-weight: 600; line-height: 1.4;">${escapeHtml(videoTitle)}</p>
   </td></tr>
 
   <!-- CTA -->
