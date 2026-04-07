@@ -4,10 +4,10 @@ import type { IncomingEmail } from "@/types";
 
 interface SendSettingsProps {
   selectedEmail: IncomingEmail | undefined;
-  language: "pl" | "uk" | "ru" | "en";
+  language: "pl" | "uk" | "ru" | "en" | "lt" | "et" | "lv";
   personalNote: string;
   sending: boolean;
-  onLanguageChange: (lang: "pl" | "uk" | "ru" | "en") => void;
+  onLanguageChange: (lang: "pl" | "uk" | "ru" | "en" | "lt" | "et" | "lv") => void;
   onNoteChange: (note: string) => void;
   onSend: () => void;
 }
@@ -32,13 +32,16 @@ export function SendSettings({
         <label className="block text-sm font-medium text-gray-700 mb-1">Язык письма и лендинга</label>
         <select
           value={language}
-          onChange={(e) => onLanguageChange(e.target.value as "pl" | "uk" | "ru" | "en")}
+          onChange={(e) => onLanguageChange(e.target.value as "pl" | "uk" | "ru" | "en" | "lt" | "et" | "lv")}
           className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm text-gray-900 focus:border-brand focus:ring-2 focus:ring-brand-muted outline-none transition-colors"
         >
           <option value="pl">Polski</option>
           <option value="uk">Українська</option>
           <option value="ru">Русский</option>
           <option value="en">English</option>
+          <option value="lt">Lietuvių</option>
+          <option value="et">Eesti</option>
+          <option value="lv">Latviešu</option>
         </select>
       </div>
 

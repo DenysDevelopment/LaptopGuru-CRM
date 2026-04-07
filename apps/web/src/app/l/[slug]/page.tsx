@@ -53,7 +53,7 @@ export default async function LandingPage({ params }: Props) {
     data: { views: { increment: 1 } },
   });
 
-  const lang = (landing.language || "pl") as "pl" | "uk" | "ru" | "en";
+  const lang = (landing.language || "pl") as "pl" | "uk" | "ru" | "en" | "lt" | "et" | "lv";
 
   return (
     <LandingClient

@@ -16,7 +16,7 @@ export default function SendPage() {
   const [selectedEmail, setSelectedEmail] = useState("");
   const [selectedVideo, setSelectedVideo] = useState("");
   const [personalNote, setPersonalNote] = useState("");
-  const [language, setLanguage] = useState<"pl" | "uk" | "ru" | "en">("pl");
+  const [language, setLanguage] = useState<"pl" | "uk" | "ru" | "en" | "lt" | "et" | "lv">("pl");
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ shortLink: { url: string }; landing: { url: string }; sentEmail: { status: string } } | null>(null);
   const [error, setError] = useState("");

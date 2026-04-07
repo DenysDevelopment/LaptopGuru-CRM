@@ -4,7 +4,7 @@ interface EmailTemplateData {
   thumbnail: string;
   landingUrl: string;
   personalNote?: string;
-  language?: 'pl' | 'uk' | 'ru' | 'en';
+  language?: EmailLanguage;
 }
 
 const BENEFIT_ICONS = {
@@ -61,9 +61,42 @@ const translations = {
     benefit3Title: 'Return within 30 days',
     copyright: 'Expert laptop reviews',
   },
+  lt: {
+    badge: 'ASMENINĖ VAIZDO APŽVALGA',
+    greeting: 'Sveiki',
+    intro:
+      'Mūsų ekspertas paruošė vaizdo apžvalgą specialiai jums — pažiūrėkite ir priimkite geriausią sprendimą!',
+    cta: '▶ Žiūrėti apžvalgą',
+    benefit1Title: '12 mėnesių garantija',
+    benefit2Title: 'Nemokamas pristatymas poryt',
+    benefit3Title: 'Grąžinimas per 30 dienų',
+    copyright: 'Ekspertų nešiojamųjų kompiuterių apžvalgos',
+  },
+  et: {
+    badge: 'ISIKLIK VIDEOÜLEVAADE',
+    greeting: 'Tere',
+    intro:
+      'Meie ekspert on koostanud videoülevaate spetsiaalselt teile — vaadake ja tehke parim valik!',
+    cta: '▶ Vaata ülevaadet',
+    benefit1Title: '12 kuu garantii',
+    benefit2Title: 'Tasuta kohaletoimetamine ülehomme',
+    benefit3Title: 'Tagastamine 30 päeva jooksul',
+    copyright: 'Ekspertide sülearvutite ülevaated',
+  },
+  lv: {
+    badge: 'PERSONĪGS VIDEO APSKATS',
+    greeting: 'Sveiki',
+    intro:
+      'Mūsu eksperts ir sagatavojis video apskatu speciāli jums — noskatieties un pieņemiet labāko lēmumu!',
+    cta: '▶ Skatīt apskatu',
+    benefit1Title: '12 mēnešu garantija',
+    benefit2Title: 'Bezmaksas piegāde parīt',
+    benefit3Title: 'Atgriešana 30 dienu laikā',
+    copyright: 'Ekspertu klēpjdatoru apskati',
+  },
 };
 
-export type EmailLanguage = 'pl' | 'uk' | 'ru' | 'en';
+export type EmailLanguage = 'pl' | 'uk' | 'ru' | 'en' | 'lt' | 'et' | 'lv';
 
 export function buildEmailHtml(data: EmailTemplateData): string {
   const {

@@ -3,21 +3,24 @@
 import Image from "next/image";
 import type { IncomingEmail, Video } from "@/types";
 
-const greetings = { pl: "Witamy", uk: "Вітаємо", ru: "Здравствуйте", en: "Hello" };
-const fallbackNames = { pl: "Kliencie", uk: "Клієнт", ru: "Клиент", en: "Customer" };
-const badges = { pl: "Osobista recenzja wideo", uk: "Персональний відео-огляд", ru: "Персональный видеообзор", en: "Personal video review" };
+const greetings = { pl: "Witamy", uk: "Вітаємо", ru: "Здравствуйте", en: "Hello", lt: "Sveiki", et: "Tere", lv: "Sveiki" };
+const fallbackNames = { pl: "Kliencie", uk: "Клієнт", ru: "Клиент", en: "Customer", lt: "Kliente", et: "Klient", lv: "Klient" };
+const badges = { pl: "Osobista recenzja wideo", uk: "Персональний відео-огляд", ru: "Персональный видеообзор", en: "Personal video review", lt: "Asmeninis vaizdo apžvalga", et: "Isiklik videoülevaade", lv: "Personīgs video apskats" };
 const intros = {
   pl: "Nasz ekspert przygotował recenzję wideo specjalnie dla Ciebie",
   uk: "Наш експерт підготував відео-огляд спеціально для вас",
   ru: "Наш эксперт подготовил видеообзор специально для вас",
   en: "Our expert has prepared a video review especially for you",
+  lt: "Mūsų ekspertas paruošė vaizdo apžvalgą specialiai jums",
+  et: "Meie ekspert on koostanud videoülevaate spetsiaalselt teile",
+  lv: "Mūsu eksperts ir sagatavojis video apskatu speciāli jums",
 };
-const ctas = { pl: "Obejrzyj recenzję", uk: "Дивитися огляд", ru: "Смотреть обзор", en: "Watch review" };
+const ctas = { pl: "Obejrzyj recenzję", uk: "Дивитися огляд", ru: "Смотреть обзор", en: "Watch review", lt: "Žiūrėti apžvalgą", et: "Vaata ülevaadet", lv: "Skatīt apskatu" };
 
 interface EmailPreviewProps {
   email: IncomingEmail | undefined;
   video: Video | undefined;
-  language: "pl" | "uk" | "ru" | "en";
+  language: "pl" | "uk" | "ru" | "en" | "lt" | "et" | "lv";
   personalNote: string;
 }
 
