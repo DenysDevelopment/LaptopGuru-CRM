@@ -107,7 +107,7 @@ export async function POST(
       language: lang,
     });
 
-    const emailSubject = SUBJECT_BY_LANG[lang](video.title);
+    const emailSubject = SUBJECT_BY_LANG[lang];
 
     await sendEmail({
       to: customerEmail,

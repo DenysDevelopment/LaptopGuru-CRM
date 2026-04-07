@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
       language: lang,
     });
 
-    const subject = SUBJECT_BY_LANG[lang](video.title);
+    const subject = SUBJECT_BY_LANG[lang];
 
     // Get company's EMAIL channel SMTP config
     const emailChannel = await prisma.channel.findFirst({

@@ -2,14 +2,14 @@ import type { EmailLanguage } from "@/lib/email-template";
 
 export const VALID_LANGUAGES: EmailLanguage[] = ["pl", "uk", "ru", "en", "lt", "et", "lv"];
 
-export const SUBJECT_BY_LANG: Record<EmailLanguage, (title: string) => string> = {
-  pl: (title) => `Recenzja wideo dla Ciebie — ${title}`,
-  uk: (title) => `Відеоогляд для вас — ${title}`,
-  ru: (title) => `Видеообзор для вас — ${title}`,
-  en: (title) => `Video review for you — ${title}`,
-  lt: (title) => `Vaizdo apžvalga jums — ${title}`,
-  et: (title) => `Videoülevaade teile — ${title}`,
-  lv: (title) => `Video apskats jums — ${title}`,
+export const SUBJECT_BY_LANG: Record<EmailLanguage, string> = {
+  pl: "Recenzja wideo przygotowana specjalnie dla Ciebie",
+  uk: "Відеоогляд підготовлений спеціально для вас",
+  ru: "Видеообзор подготовлен специально для вас",
+  en: "A video review prepared especially for you",
+  lt: "Vaizdo apžvalga paruošta specialiai jums",
+  et: "Videoülevaade koostatud spetsiaalselt teile",
+  lv: "Video apskats sagatavots speciāli jums",
 };
 
 export const TITLE_BY_LANG: Record<EmailLanguage, (title: string) => string> = {

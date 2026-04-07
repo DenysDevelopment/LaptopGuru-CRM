@@ -107,7 +107,7 @@ export class SendService {
         language: lang,
       });
 
-      const subject = SUBJECT_BY_LANG[lang](video.title);
+      const subject = SUBJECT_BY_LANG[lang];
 
       // Get company's EMAIL channel SMTP config
       const emailChannel = await this.prisma.channel.findFirst({
