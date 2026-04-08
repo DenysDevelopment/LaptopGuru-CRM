@@ -6,7 +6,8 @@ import { PERMISSIONS } from "@laptopguru-crm/shared";
 import { generateSlug, createShortLink } from "@/lib/links";
 import { buildEmailHtml } from "@/lib/email-template";
 import type { EmailLanguage } from "@/lib/email-template";
-import { VALID_LANGUAGES, SUBJECT_BY_LANG, TITLE_BY_LANG, FALLBACK_NAME } from "@/lib/constants/languages";
+import { VALID_LANGUAGES, SUBJECT_BY_LANG, TITLE_BY_LANG, FALLBACK_NAME, BUY_BUTTON_BY_LANG } from "@/lib/constants/languages";
+import { formatSmtpFrom } from "@/lib/smtp";
 
 export async function POST(request: NextRequest) {
   const { session, error } = await authorize(PERMISSIONS.SEND_EXECUTE);
@@ -23,7 +24,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Fetch the incoming email
   const incomingEmail = await prisma.incomingEmail.findUnique({
     where: { id: emailId },
   });
@@ -34,7 +34,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Fetch video
   const video = await prisma.video.findUnique({
     where: { id: videoId },
   });
@@ -48,7 +47,6 @@ export async function POST(request: NextRequest) {
       : request.nextUrl.origin;
 
   try {
-    // 1. Create landing page
     let slug = generateSlug();
     while (await prisma.landing.findFirst({ where: { slug, companyId: session.user.companyId ?? "" } })) {
       slug = generateSlug();
@@ -60,7 +58,7 @@ export async function POST(request: NextRequest) {
         title: TITLE_BY_LANG[lang](video.title),
         videoId: video.id,
         productUrl: incomingEmail.productUrl || "",
-        buyButtonText: ({ pl: "Sprawdź ofertę", uk: "Переглянути пропозицію", ru: "Смотреть предложение", en: "View offer", lt: "Peržiūrėti pasiūlymą", et: "Vaata pakkumist", lv: "Skatīt piedāvājumu" } as Record<string, string>)[lang] || "Sprawdź ofertę",
+        buyButtonText: BUY_BUTTON_BY_LANG[lang],
         personalNote: personalNote || null,
         customerName: incomingEmail.customerName || null,
         productName: incomingEmail.productName || null,
@@ -71,12 +69,10 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // 2. Create short link
     const shortCode = await createShortLink(landing.id);
     const shortUrl = `${appUrl}/r/${shortCode}`;
     const landingUrl = `${appUrl}/l/${slug}`;
 
-    // 3. Build and send email
     const html = buildEmailHtml({
       customerName: incomingEmail.customerName || FALLBACK_NAME[lang],
       videoTitle: video.title,
@@ -86,9 +82,11 @@ export async function POST(request: NextRequest) {
       language: lang,
     });
 
-    const subject = SUBJECT_BY_LANG[lang];
+    const subject = SUBJECT_BY_LANG[lang](
+      incomingEmail.customerName || undefined,
+      incomingEmail.productName || undefined,
+    );
 
-    // Get company's EMAIL channel SMTP config
     const emailChannel = await prisma.channel.findFirst({
       where: { type: "EMAIL", isActive: true, companyId: session.user.companyId ?? "" },
       include: { config: true },
@@ -127,7 +125,7 @@ export async function POST(request: NextRequest) {
       });
 
       await transporter.sendMail({
-        from: `"${emailChannel.name}" <${smtpFrom}>`,
+        from: formatSmtpFrom(cfg.smtp_display_name, smtpFrom),
         to: incomingEmail.customerEmail,
         subject,
         html,
@@ -137,7 +135,6 @@ export async function POST(request: NextRequest) {
       errorMessage = err instanceof Error ? err.message : "Send failed";
     }
 
-    // 4. Record sent email
     const sentEmail = await prisma.sentEmail.create({
       data: {
         to: incomingEmail.customerEmail,
@@ -150,7 +147,6 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // 5. Mark incoming email as processed
     await prisma.incomingEmail.update({
       where: { id: emailId },
       data: { processed: true, processedById: session.user.id },

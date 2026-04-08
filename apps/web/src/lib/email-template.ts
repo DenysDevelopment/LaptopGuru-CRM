@@ -136,7 +136,9 @@ export function buildEmailHtml(data: EmailTemplateData): string {
 
   <!-- Header -->
   <tr><td style="background-color: #fb7830; padding: 32px; text-align: center;">
-    <img src="${logoUrl}" alt="Laptop Guru" style="height: 56px; margin: 0 auto 10px; display: block;" />
+    <table role="presentation" style="margin: 0 auto 10px;"><tr><td style="width: 72px; height: 72px; border-radius: 50%; background-color: #ffffff; text-align: center; vertical-align: middle;">
+      <img src="${logoUrl}" alt="Laptop Guru" style="height: 48px;" />
+    </td></tr></table>
     <p style="margin: 0; color: rgba(255,255,255,0.85); font-size: 11px; text-transform: uppercase; letter-spacing: 2px; font-weight: 600;">${t.badge}</p>
   </td></tr>
 
@@ -182,7 +184,9 @@ export function buildEmailHtml(data: EmailTemplateData): string {
 
   <!-- Footer -->
   <tr><td style="background-color: #1f2937; padding: 24px; text-align: center;">
-    <img src="${logoUrl}" alt="Laptop Guru" style="height: 40px; margin: 0 auto 8px; display: block; opacity: 0.7;" />
+    <table role="presentation" style="margin: 0 auto 8px;"><tr><td style="width: 56px; height: 56px; border-radius: 50%; background-color: #ffffff; text-align: center; vertical-align: middle;">
+      <img src="${logoUrl}" alt="Laptop Guru" style="height: 36px;" />
+    </td></tr></table>
     <p style="margin: 0; color: rgba(255,255,255,0.4); font-size: 12px;">
       &copy; laptopguru.pl &mdash; ${t.copyright}
     </p>

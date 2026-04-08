@@ -15,7 +15,7 @@ export async function GET() {
 
   const videos = await prisma.video.findMany({
     where: { active: true, companyId },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
   });
 
   return NextResponse.json(videos);
@@ -65,6 +65,7 @@ export async function POST(request: NextRequest) {
       thumbnail: info.thumbnail,
       duration: info.duration,
       channelTitle: info.channelTitle,
+      publishedAt: info.publishedAt ? new Date(info.publishedAt) : null,
       userId: session.user.id,
       companyId,
     },

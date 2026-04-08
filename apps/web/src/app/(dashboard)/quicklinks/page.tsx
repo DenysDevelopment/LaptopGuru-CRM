@@ -35,7 +35,7 @@ export default function QuickLinksPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <Link2 className="w-6 h-6 text-brand" /> Редиректы
+          <Link2 className="w-6 h-6 text-brand" /> Короткие ссылки
         </h1>
         <CreateQuickLinkForm onCreated={loadLinks} />
       </div>

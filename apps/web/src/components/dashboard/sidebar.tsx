@@ -23,6 +23,7 @@ interface NavItem {
 	module?: string;
 	icon: React.ReactNode;
 	children?: NavChild[];
+	comingSoon?: boolean;
 }
 
 interface EmailChannel {
@@ -35,6 +36,7 @@ const navItems: NavItem[] = [
 	{
 		href: '/dashboard',
 		label: 'Dashboard',
+		comingSoon: true,
 		icon: (
 			<svg
 				className='w-5 h-5'
@@ -54,6 +56,7 @@ const navItems: NavItem[] = [
 		href: '/messaging',
 		label: 'Почта',
 		module: 'messaging',
+		comingSoon: true,
 		permission: PERMISSIONS.MESSAGING_INBOX_READ,
 		icon: (
 			<svg
@@ -76,7 +79,7 @@ const navItems: NavItem[] = [
 	},
 	{
 		href: '/emails',
-		label: 'Заявки и Видео',
+		label: 'Видеообзоры',
 		module: 'emails',
 		permission: PERMISSIONS.EMAILS_READ,
 		icon: (
@@ -94,15 +97,15 @@ const navItems: NavItem[] = [
 			</svg>
 		),
 		children: [
-			{ href: '/emails', label: 'Заявки', permission: PERMISSIONS.EMAILS_READ },
-			{ href: '/videos', label: 'Видео', permission: PERMISSIONS.VIDEOS_READ },
-			{ href: '/links', label: 'Ссылки', permission: PERMISSIONS.LINKS_READ },
-			{ href: '/sent', label: 'История', permission: PERMISSIONS.SENT_READ },
+			{ href: '/emails', label: 'Входящие', permission: PERMISSIONS.EMAILS_READ },
+			{ href: '/videos', label: 'Видеообзоры', permission: PERMISSIONS.VIDEOS_READ },
+			{ href: '/links', label: 'Лендинги', permission: PERMISSIONS.LINKS_READ },
+			{ href: '/sent', label: 'Отправленные', permission: PERMISSIONS.SENT_READ },
 		],
 	},
 	{
 		href: '/quicklinks',
-		label: 'Редиректы',
+		label: 'Короткие ссылки',
 		module: 'quicklinks',
 		permission: PERMISSIONS.QUICKLINKS_READ,
 		icon: (
@@ -122,7 +125,7 @@ const navItems: NavItem[] = [
 	},
 	{
 		href: '/settings/channels',
-		label: 'Настройки CRM',
+		label: 'Настройки',
 		module: 'messaging',
 		permission: PERMISSIONS.MESSAGING_CHANNELS_READ,
 		icon: (
@@ -248,7 +251,7 @@ export function Sidebar() {
 					{/* Logo */}
 					<div className='h-24 flex items-end pb-2 px-5 border-b border-gray-100'>
 						<Link href='/dashboard' className='flex flex-col items-center w-full'>
-							<Image src='/LG_logo2.webp' alt='LaptopGuru' width={180} height={72} className='h-16 w-auto object-contain' unoptimized />
+							<Image src='/LG_logo2.webp' alt='LaptopGuru' width={180} height={72} priority className='h-16 w-auto object-contain' unoptimized />
 							<div className='flex items-center gap-1.5 -mt-0.5'>
 								<div className='h-px w-6 bg-gradient-to-r from-transparent to-brand/40' />
 								<span className='text-[11px] font-black tracking-[0.3em] text-brand'>CRM</span>
@@ -278,6 +281,23 @@ export function Sidebar() {
 					{/* Navigation */}
 					<nav className='flex-1 px-3 py-2 space-y-1'>
 						{visibleItems.map(item => {
+							if (item.comingSoon) {
+								return (
+									<div key={item.href}>
+										<span
+											className='flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg text-gray-300 cursor-not-allowed select-none'>
+											<span className='text-gray-300'>
+												{item.icon}
+											</span>
+											<span className='flex-1'>{item.label}</span>
+											<span className='text-[10px] font-medium text-gray-400 bg-gray-100 rounded-full px-2 py-0.5'>
+												Скоро
+											</span>
+										</span>
+									</div>
+								);
+							}
+
 							const isActive =
 								item.href === '/dashboard'
 									? pathname === '/dashboard'
@@ -380,6 +400,17 @@ export function Sidebar() {
 			{/* Mobile bottom navigation */}
 			<nav className='md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200 flex justify-around px-2 py-1 safe-bottom'>
 				{visibleItems.slice(0, 5).map(item => {
+					if (item.comingSoon) {
+						return (
+							<span
+								key={item.href}
+								className='flex flex-col items-center gap-0.5 px-2 py-1.5 text-xs font-medium text-gray-300 cursor-not-allowed relative'>
+								{item.icon}
+								<span className='truncate max-w-[60px]'>{item.label}</span>
+							</span>
+						);
+					}
+
 					const isActive =
 						item.href === '/dashboard'
 							? pathname === '/dashboard'

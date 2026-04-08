@@ -3,6 +3,7 @@ import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
 import { PERMISSIONS } from "@laptopguru-crm/shared";
 import { emitMessagingEvent } from "@/lib/messaging-events";
+import { formatSmtpFrom } from "@/lib/smtp";
 
 function escapeHtml(str: string): string {
   return str
@@ -193,7 +194,7 @@ export async function POST(
           });
 
           const info = await transporter.sendMail({
-            from: smtpFrom,
+            from: formatSmtpFrom(configMap.smtp_display_name, smtpFrom),
             to: contactChannel.identifier,
             subject: conv?.subject ? `Re: ${conv.subject}` : "Сообщение от LaptopGuru",
             text: body.body,

@@ -4,6 +4,7 @@ export interface YouTubeVideoInfo {
   thumbnail: string;
   duration: string | null;
   channelTitle: string | null;
+  publishedAt: string | null;
 }
 
 export function extractYoutubeId(input: string): string | null {
@@ -73,6 +74,7 @@ async function fetchVideosBatch(ids: string[]): Promise<YouTubeVideoInfo[]> {
       `https://img.youtube.com/vi/${item.id}/hqdefault.jpg`,
     duration: item.contentDetails?.duration ? parseDuration(item.contentDetails.duration) : null,
     channelTitle: item.snippet.channelTitle || null,
+    publishedAt: item.snippet.publishedAt || null,
   }));
 }
 
@@ -135,5 +137,6 @@ export async function fetchVideoInfo(youtubeId: string): Promise<YouTubeVideoInf
       `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`,
     duration: contentDetails?.duration ? parseDuration(contentDetails.duration) : null,
     channelTitle: snippet.channelTitle || null,
+    publishedAt: snippet.publishedAt || null,
   };
 }

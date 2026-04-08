@@ -50,7 +50,7 @@ async function syncChannelEmails(config: ImapConfig): Promise<number> {
         if (!messageId) continue;
 
         const existing = await prisma.incomingEmail.findUnique({
-          where: { messageId },
+          where: { messageId_companyId: { messageId, companyId: config.companyId } },
         });
         if (existing) continue;
 
@@ -75,6 +75,7 @@ async function syncChannelEmails(config: ImapConfig): Promise<number> {
               customerName: extracted.customerName,
               customerEmail: extracted.customerEmail,
               customerPhone: extracted.customerPhone,
+              customerLang: extracted.customerLang,
               category: extracted.category,
               channelId: config.channelId,
               companyId: config.companyId,

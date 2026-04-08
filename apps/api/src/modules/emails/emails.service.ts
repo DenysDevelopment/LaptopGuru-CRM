@@ -191,13 +191,12 @@ export class EmailsService {
           uid: true,
         });
 
+        const companyId = this.cls.get<string>('companyId');
         for await (const msg of messages) {
           const messageId = msg.envelope?.messageId;
           if (!messageId) continue;
-
-          // Skip if already in DB
           const existing = await this.prisma.incomingEmail.findUnique({
-            where: { messageId },
+            where: { messageId_companyId: { messageId, companyId } },
           });
           if (existing) continue;
 
@@ -210,10 +209,8 @@ export class EmailsService {
             parsed.text ||
             '') as string;
 
-          // Extract customer data from email body
           const extracted = parseEmail(body, subject);
 
-          const companyId = this.cls.get<string>('companyId');
           await this.prisma.incomingEmail.create({
             data: {
               messageId,

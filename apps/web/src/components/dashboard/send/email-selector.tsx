@@ -39,10 +39,11 @@ export function EmailSelector({ emails, loading, selectedId, onSelect }: EmailSe
               }`}
             >
               <p className="text-sm font-medium text-gray-900 truncate">
-                {email.customerName || email.subject}
+                {email.customerName || email.customerEmail || email.subject}
               </p>
               <p className="text-xs text-gray-500 mt-0.5">
-                {email.customerEmail || "Нет email"} · {new Date(email.receivedAt).toLocaleDateString("ru-RU")}
+                {email.customerEmail && email.customerName ? email.customerEmail + " · " : ""}
+                {new Date(email.receivedAt).toLocaleDateString("ru-RU")}
               </p>
               {email.productName && (
                 <p className="text-xs text-gray-400 mt-0.5 truncate">{email.productName}</p>

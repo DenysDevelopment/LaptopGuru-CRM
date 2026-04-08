@@ -14,9 +14,12 @@ export default function VideosPage() {
   const [error, setError] = useState("");
 
   const fetchVideos = useCallback(async () => {
-    const res = await fetch("/api/videos");
-    const data = await res.json();
-    setVideos(data);
+    try {
+      const res = await fetch("/api/videos");
+      if (!res.ok) { setLoading(false); return; }
+      const data = await res.json();
+      setVideos(Array.isArray(data) ? data : []);
+    } catch { /* ignore */ }
     setLoading(false);
   }, []);
 

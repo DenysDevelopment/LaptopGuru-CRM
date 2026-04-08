@@ -31,7 +31,7 @@ export function SendResult({ result, onReset }: SendResultProps) {
         </div>
 
         <div>
-          <p className="text-xs text-gray-400 mb-1">Короткая ссылка</p>
+          <p className="text-xs text-gray-400 mb-1">Ссылка для отслеживания перехода</p>
           <CopyableLink url={result.shortLink.url} />
         </div>
 

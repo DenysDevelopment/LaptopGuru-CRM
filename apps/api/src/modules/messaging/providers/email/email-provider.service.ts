@@ -16,6 +16,14 @@ import {
   ParsedInboundMessage,
 } from '../provider.interface';
 
+const DEFAULT_DISPLAY_NAME = 'laptopguru.pl';
+
+function formatSmtpFrom(config: Record<string, string>): string {
+  const displayName = config['smtp_display_name'] || DEFAULT_DISPLAY_NAME;
+  const address = config['smtp_from'] ?? config['smtp_user'];
+  return `"${displayName}" <${address}>`;
+}
+
 @Injectable()
 export class EmailProviderService implements ChannelProvider {
   private readonly logger = new Logger(EmailProviderService.name);
@@ -27,7 +35,7 @@ export class EmailProviderService implements ChannelProvider {
 
     try {
       const info = await transporter.sendMail({
-        from: config['smtp_from'] ?? config['smtp_user'],
+        from: formatSmtpFrom(config),
         to: params.recipientId,
         subject: config['subject'] ?? 'New message',
         text: params.text,
@@ -64,7 +72,7 @@ export class EmailProviderService implements ChannelProvider {
 
     try {
       const info = await transporter.sendMail({
-        from: config['smtp_from'] ?? config['smtp_user'],
+        from: formatSmtpFrom(config),
         to: params.recipientId,
         subject: config['subject'] ?? 'New message',
         text: params.caption ?? '',

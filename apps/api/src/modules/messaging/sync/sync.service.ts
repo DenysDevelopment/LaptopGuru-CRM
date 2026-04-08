@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { parseEmail } from './email-parser.util';
+import { parseEmail } from '../../emails/email-parser.util';
 
 const UPLOADS_DIR = path.join(process.cwd(), 'public', 'uploads');
 const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024; // 25 MB
@@ -173,6 +173,14 @@ export class SyncService {
                                 {
                                   fieldName: 'phone',
                                   fieldValue: leadData.customerPhone,
+                                },
+                              ]
+                            : []),
+                          ...(leadData.customerLang
+                            ? [
+                                {
+                                  fieldName: 'lang',
+                                  fieldValue: leadData.customerLang,
                                 },
                               ]
                             : []),

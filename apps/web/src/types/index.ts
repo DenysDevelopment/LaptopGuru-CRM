@@ -10,6 +10,7 @@ export interface IncomingEmail {
   customerName: string | null;
   customerEmail: string | null;
   customerPhone: string | null;
+  customerLang: string | null;
   category: string;
   receivedAt: string;
   processed: boolean;

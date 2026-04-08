@@ -2,14 +2,14 @@ import type { EmailLanguage } from './email-template';
 
 export const VALID_LANGUAGES: EmailLanguage[] = ['pl', 'uk', 'ru', 'en', 'lt', 'et', 'lv'];
 
-export const SUBJECT_BY_LANG: Record<EmailLanguage, string> = {
-  pl: 'Recenzja wideo przygotowana specjalnie dla Ciebie',
-  uk: 'Відеоогляд підготовлений спеціально для вас',
-  ru: 'Видеообзор подготовлен специально для вас',
-  en: 'A video review prepared especially for you',
-  lt: 'Vaizdo apžvalga paruošta specialiai jums',
-  et: 'Videoülevaade koostatud spetsiaalselt teile',
-  lv: 'Video apskats sagatavots speciāli jums',
+export const SUBJECT_BY_LANG: Record<EmailLanguage, (name?: string, product?: string) => string> = {
+  pl: (name, product) => [name, product ? `recenzja wideo: ${product}` : 'recenzja wideo dla Ciebie'].filter(Boolean).join(' — '),
+  uk: (name, product) => [name, product ? `відеоогляд: ${product}` : 'відеоогляд для вас'].filter(Boolean).join(' — '),
+  ru: (name, product) => [name, product ? `видеообзор: ${product}` : 'видеообзор для вас'].filter(Boolean).join(' — '),
+  en: (name, product) => [name, product ? `video review: ${product}` : 'video review for you'].filter(Boolean).join(' — '),
+  lt: (name, product) => [name, product ? `vaizdo apžvalga: ${product}` : 'vaizdo apžvalga jums'].filter(Boolean).join(' — '),
+  et: (name, product) => [name, product ? `videoülevaade: ${product}` : 'videoülevaade teile'].filter(Boolean).join(' — '),
+  lv: (name, product) => [name, product ? `video apskats: ${product}` : 'video apskats jums'].filter(Boolean).join(' — '),
 };
 
 export const TITLE_BY_LANG: Record<EmailLanguage, (title: string) => string> = {
@@ -30,4 +30,14 @@ export const FALLBACK_NAME: Record<EmailLanguage, string> = {
   lt: 'Kliente',
   et: 'Klient',
   lv: 'Klient',
+};
+
+export const BUY_BUTTON_BY_LANG: Record<EmailLanguage, string> = {
+  pl: 'Sprawdź ofertę',
+  uk: 'Переглянути пропозицію',
+  ru: 'Смотреть предложение',
+  en: 'View offer',
+  lt: 'Peržiūrėti pasiūlymą',
+  et: 'Vaata pakkumist',
+  lv: 'Skatīt piedāvājumu',
 };

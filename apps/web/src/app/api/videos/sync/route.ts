@@ -32,12 +32,26 @@ export async function POST() {
       });
 
       if (existing) {
-        if (!existing.active) {
+        const newPublishedAt = video.publishedAt ? new Date(video.publishedAt) : existing.publishedAt;
+        const needsUpdate =
+          !existing.active ||
+          existing.title !== video.title ||
+          existing.thumbnail !== video.thumbnail ||
+          existing.duration !== video.duration ||
+          existing.publishedAt?.getTime() !== newPublishedAt?.getTime();
+
+        if (needsUpdate) {
           await prisma.video.update({
             where: { id: existing.id },
-            data: { active: true },
+            data: {
+              active: true,
+              title: video.title,
+              thumbnail: video.thumbnail,
+              duration: video.duration,
+              publishedAt: newPublishedAt,
+            },
           });
-          imported++;
+          if (!existing.active) imported++;
         }
         continue;
       }
@@ -49,6 +63,7 @@ export async function POST() {
           thumbnail: video.thumbnail,
           duration: video.duration,
           channelTitle: video.channelTitle,
+          publishedAt: video.publishedAt ? new Date(video.publishedAt) : null,
           userId: session.user.id,
           companyId,
         },

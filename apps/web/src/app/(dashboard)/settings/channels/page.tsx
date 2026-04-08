@@ -29,6 +29,7 @@ const EMAIL_DEFAULTS: Record<string, string> = {
 
 const CONFIG_FIELDS: Record<string, { key: string; label: string; type: string }[]> = {
 	EMAIL: [
+		{ key: 'smtp_display_name', label: 'Имя отправителя', type: 'text' },
 		{ key: 'imap_host', label: 'IMAP Хост', type: 'text' },
 		{ key: 'imap_port', label: 'IMAP Порт', type: 'text' },
 		{ key: 'smtp_host', label: 'SMTP Хост', type: 'text' },
@@ -142,6 +143,9 @@ export default function ChannelsSettingsPage() {
 				setNewChannelName('');
 				setNewChannelConfig({});
 				fetchChannels();
+				if (newChannelType === 'EMAIL') {
+					syncEmail();
+				}
 			} else {
 				const err = await res.json();
 				alert(err.error || 'Ошибка создания канала');
@@ -191,16 +195,8 @@ export default function ChannelsSettingsPage() {
 
 	const syncEmail = async () => {
 		try {
-			const res = await fetch('/api/emails/sync', { method: 'POST' });
-			if (res.ok) {
-				const data = await res.json();
-				alert(`Синхронизация завершена. Импортировано: ${data.imported ?? data.count ?? 0}`);
-			} else {
-				const err = await res.json();
-				alert(err.error || 'Ошибка синхронизации');
-			}
+			await fetch('/api/emails/sync', { method: 'POST' });
 		} catch {
-			alert('Ошибка синхронизации');
 		}
 	};
 

@@ -131,6 +131,7 @@ async function syncSingleChannel(
                     ...(leadData.productName ? [{ fieldName: "productName", fieldValue: leadData.productName }] : []),
                     ...(leadData.productUrl ? [{ fieldName: "productUrl", fieldValue: leadData.productUrl }] : []),
                     ...(leadData.customerPhone ? [{ fieldName: "phone", fieldValue: leadData.customerPhone }] : []),
+                    ...(leadData.customerLang ? [{ fieldName: "lang", fieldValue: leadData.customerLang }] : []),
                   ],
                 },
               } : {}),

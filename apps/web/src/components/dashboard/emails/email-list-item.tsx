@@ -21,23 +21,18 @@ export function EmailListItem({ email, onEdit, onArchive }: EmailListItemProps) 
               <span className="inline-block w-2 h-2 rounded-full bg-brand flex-shrink-0" />
             )}
             <h3 className="text-sm font-semibold text-gray-900 truncate">
-              {email.customerName || email.from}
+              {email.customerName || email.customerEmail || email.from}
             </h3>
-            <StatusBadge variant={email.category === "lead" ? "lead" : "other"}>
-              {email.category === "lead" ? "Заявка" : "Прочее"}
-            </StatusBadge>
             {email.processed && (
               <StatusBadge variant="processed">Обработана</StatusBadge>
             )}
           </div>
-          <p className="text-sm text-gray-600 truncate">{email.subject}</p>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-400">
-            {email.customerEmail && <span>{email.customerEmail}</span>}
-            {email.customerPhone && <span>{email.customerPhone}</span>}
-            {email.productUrl && (
-              <span className="truncate max-w-[200px]">{email.productUrl}</span>
-            )}
-            <span>{new Date(email.receivedAt).toLocaleDateString("ru-RU")}</span>
+          {email.productName && (
+            <p className="text-sm text-gray-600 truncate">{email.productName}</p>
+          )}
+          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-xs text-gray-400">
+            {email.customerName && email.customerEmail && <span>{email.customerEmail}</span>}
+            <span>{new Date(email.receivedAt).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">

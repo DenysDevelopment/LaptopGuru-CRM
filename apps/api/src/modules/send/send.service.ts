@@ -15,6 +15,7 @@ import {
   SUBJECT_BY_LANG,
   TITLE_BY_LANG,
   FALLBACK_NAME,
+  BUY_BUTTON_BY_LANG,
 } from '../../common/utils/languages';
 
 interface SendDto {
@@ -74,7 +75,7 @@ export class SendService {
           title: TITLE_BY_LANG[lang](video.title),
           videoId: video.id,
           productUrl: incomingEmail.productUrl || '',
-          buyButtonText: buyButtonText || 'Kup teraz',
+          buyButtonText: buyButtonText || BUY_BUTTON_BY_LANG[lang],
           personalNote: personalNote || null,
           customerName: incomingEmail.customerName || null,
           productName: incomingEmail.productName || null,
@@ -107,7 +108,10 @@ export class SendService {
         language: lang,
       });
 
-      const subject = SUBJECT_BY_LANG[lang];
+      const subject = SUBJECT_BY_LANG[lang](
+        incomingEmail.customerName || undefined,
+        incomingEmail.productName || undefined,
+      );
 
       // Get company's EMAIL channel SMTP config
       const emailChannel = await this.prisma.channel.findFirst({

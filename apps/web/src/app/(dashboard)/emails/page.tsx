@@ -78,9 +78,7 @@ function EmailsPageContent() {
 
       <EmailFilters
         filter={filter}
-        category={category}
         onFilterChange={setFilter}
-        onCategoryChange={setCategory}
       />
 
       {loading ? (

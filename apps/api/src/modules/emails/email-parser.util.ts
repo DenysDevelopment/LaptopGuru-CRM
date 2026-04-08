@@ -4,6 +4,7 @@ export interface ParsedEmailData {
   customerName: string | null;
   customerEmail: string | null;
   customerPhone: string | null;
+  customerLang: string | null;
   category: 'lead' | 'other';
 }
 
@@ -21,6 +22,7 @@ export function parseEmail(body: string, subject: string): ParsedEmailData {
     customerName: extractCustomerName(text),
     customerEmail: extractCustomerEmail(text),
     customerPhone: extractCustomerPhone(text),
+    customerLang: extractCustomerLang(text),
     category: detectCategory(body, text),
   };
 }
@@ -31,32 +33,12 @@ export function detectCategory(
 ): 'lead' | 'other' {
   const plain = text ?? stripHtml(html);
 
-  if (/laptopguru\.pl/i.test(html) || /laptopguru\.pl/i.test(plain))
-    return 'lead';
-
-  const hasName = /Name\s*[:：]/i.test(plain);
-  const hasEmail = /E-mail\s*[:：]/i.test(plain);
-  const hasProdukt = /Produkt\s*[:：]/i.test(plain);
-  if (hasName && hasEmail && hasProdukt) return 'lead';
-
-  if (
-    /(?:Produkt|товар|продукт|product)\s*[:：]/i.test(plain) &&
-    /(?:Link|ссылка|URL)\s*[:：]/i.test(plain)
-  )
-    return 'lead';
+  if (/source\s*[:：]\s*video_review/i.test(plain)) return 'lead';
 
   return 'other';
 }
 
 function extractProductUrl(html: string, text: string): string | null {
-  const hrefMatch = html.match(
-    /href=["']?(https?:\/\/[^"'\s]*laptopguru\.pl[^"'\s]*)/i,
-  );
-  if (hrefMatch) return hrefMatch[1];
-
-  const urlMatch = text.match(/(https?:\/\/[^\s]*laptopguru\.pl[^\s]*)/i);
-  if (urlMatch) return urlMatch[1];
-
   const linkField = text.match(/Link\s*[:：]\s*(https?:\/\/[^\s]+)/i);
   if (linkField) return linkField[1];
 
@@ -87,9 +69,9 @@ function extractProductName(text: string): string | null {
 
 function extractCustomerName(text: string): string | null {
   const patterns = [
-    /Name\s*[:：]\s*(.+?)(?:\s*E-mail\s*[:：]|Treść\s*[:：]|$)/i,
-    /(?:имя|ім['ʼ]?я|imię|ваше имя|ваше ім['ʼ]?я)\s*[:：]\s*(.+?)(?:\s*(?:E-mail|Email|Telefon|Phone)\s*[:：]|$)/i,
-    /(?:от|від|from)\s*[:：]\s*(.+?)(?:\s*(?:E-mail|Email)\s*[:：]|$)/i,
+    /Name\s*[:：]\s*(.+?)(?:\s*(?:E-?mail|Эл\.\s*почта|Ел\.\s*пошта|El\.\s*paštas|Treść|Body|Текст сообщения|Текст повідомлення)\s*[:：]|$)/i,
+    /(?:имя|ім['ʼ]?я|imię|ваше имя|ваше ім['ʼ]?я)\s*[:：]\s*(.+?)(?:\s*(?:E-mail|Email|Эл\.\s*почта|Ел\.\s*пошта|Telefon|Phone)\s*[:：]|$)/i,
+    /(?:от|від|from)\s*[:：]\s*(.+?)(?:\s*(?:E-mail|Email|Эл\.\s*почта|Ел\.\s*пошта)\s*[:：]|$)/i,
   ];
 
   for (const pattern of patterns) {
@@ -106,6 +88,7 @@ function extractCustomerName(text: string): string | null {
 function extractCustomerEmail(text: string): string | null {
   const patterns = [
     /E-mail\s*[:：]\s*([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/i,
+    /(?:Эл\.\s*почта|Ел\.\s*пошта)\s*[:：]\s*([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/i,
     /(?:email|почта|пошта|електронна)\s*[:：]\s*([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/i,
   ];
 
@@ -128,6 +111,11 @@ function extractCustomerEmail(text: string): string | null {
   }
 
   return null;
+}
+
+function extractCustomerLang(text: string): string | null {
+  const match = text.match(/lang\s*[:：]\s*([a-z]{2})/i);
+  return match ? match[1].toLowerCase() : null;
 }
 
 function extractCustomerPhone(text: string): string | null {

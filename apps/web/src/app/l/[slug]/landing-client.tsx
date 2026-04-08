@@ -1275,6 +1275,7 @@ export function LandingClient({ landing, video }: Props) {
 						alt='Laptop Guru'
 						width={200}
 						height={72}
+						priority
 						className='mx-auto mb-1.5 w-auto'
 						style={{ height: 72, filter: 'brightness(0) invert(1)' }}
 					/>

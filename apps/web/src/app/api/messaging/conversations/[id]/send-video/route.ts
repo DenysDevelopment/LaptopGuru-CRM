@@ -7,13 +7,8 @@ import { sendEmail } from "@/lib/smtp";
 import { buildEmailHtml } from "@/lib/email-template";
 import type { EmailLanguage } from "@/lib/email-template";
 import { emitMessagingEvent } from "@/lib/messaging-events";
-import { VALID_LANGUAGES, SUBJECT_BY_LANG, TITLE_BY_LANG, FALLBACK_NAME } from "@/lib/constants/languages";
+import { VALID_LANGUAGES, SUBJECT_BY_LANG, TITLE_BY_LANG, FALLBACK_NAME, BUY_BUTTON_BY_LANG } from "@/lib/constants/languages";
 
-/**
- * POST /api/messaging/conversations/:id/send-video
- * Send a video review email to the contact in this conversation.
- * Body: { videoId, personalNote?, buyButtonText?, language? }
- */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -30,7 +25,6 @@ export async function POST(
     return NextResponse.json({ error: "videoId обязателен" }, { status: 400 });
   }
 
-  // Get conversation with contact
   const conversation = await prisma.conversation.findUnique({
     where: { id },
     include: {
@@ -62,7 +56,6 @@ export async function POST(
   const productUrl = conversation.contact.customFields.find((f) => f.fieldName === "productUrl")?.fieldValue || "";
   const productName = conversation.contact.customFields.find((f) => f.fieldName === "productName")?.fieldValue || null;
 
-  // Get video
   const video = await prisma.video.findUnique({ where: { id: videoId } });
   if (!video || !video.active || video.companyId !== (session.user.companyId ?? "")) {
     return NextResponse.json({ error: "Видео не найдено" }, { status: 400 });
@@ -71,7 +64,6 @@ export async function POST(
   const appUrl = process.env.APP_URL || "http://localhost:3000";
 
   try {
-    // 1. Create landing
     let slug = generateSlug();
     while (await prisma.landing.findFirst({ where: { slug, companyId: session.user.companyId ?? "" } })) {
       slug = generateSlug();
@@ -83,7 +75,7 @@ export async function POST(
         title: TITLE_BY_LANG[lang](video.title),
         videoId: video.id,
         productUrl,
-        buyButtonText: ({ pl: "Sprawdź ofertę", uk: "Переглянути пропозицію", ru: "Смотреть предложение", en: "View offer", lt: "Peržiūrėti pasiūlymą", et: "Vaata pakkumist", lv: "Skatīt piedāvājumu" })[lang] || "Sprawdź ofertę",
+        buyButtonText: BUY_BUTTON_BY_LANG[lang],
         personalNote: personalNote || null,
         customerName,
         productName,
@@ -93,11 +85,9 @@ export async function POST(
       },
     });
 
-    // 2. Create short link
     const shortCode = await createShortLink(landing.id);
     const shortUrl = `${appUrl}/r/${shortCode}`;
 
-    // 3. Build and send email
     const html = buildEmailHtml({
       customerName: customerName || FALLBACK_NAME[lang],
       videoTitle: video.title,
@@ -107,7 +97,10 @@ export async function POST(
       language: lang,
     });
 
-    const emailSubject = SUBJECT_BY_LANG[lang];
+    const emailSubject = SUBJECT_BY_LANG[lang](
+      customerName || undefined,
+      productName || undefined,
+    );
 
     await sendEmail({
       to: customerEmail,
@@ -115,7 +108,6 @@ export async function POST(
       html,
     });
 
-    // 4. Record sent email
     await prisma.sentEmail.create({
       data: {
         to: customerEmail,
@@ -127,7 +119,6 @@ export async function POST(
       },
     });
 
-    // 5. Add outbound message to conversation
     const message = await prisma.message.create({
       data: {
         conversationId: id,
@@ -145,13 +136,11 @@ export async function POST(
       data: { messageId: message.id, status: "SENT" },
     });
 
-    // 6. Update conversation
     await prisma.conversation.update({
       where: { id },
       data: { lastMessageAt: new Date(), status: "WAITING_REPLY" },
     });
 
-    // 7. Emit SSE
     emitMessagingEvent({
       type: "new_message",
       conversationId: id,

@@ -37,10 +37,7 @@ export async function GET(request: NextRequest) {
     where.archived = false;
   }
 
-  // Category filter
-  if (category === "lead" || category === "other") {
-    where.category = category;
-  }
+  where.category = "lead";
 
   const [emails, total] = await Promise.all([
     prisma.incomingEmail.findMany({
