@@ -1464,41 +1464,20 @@ export function LandingClient({ landing, video }: Props) {
 					)}
 				</div>
 
-				{/* Footer — dark, email-style */}
-				<div
-					className='py-8 px-6 text-center'
-					style={{ backgroundColor: '#1f2937' }}>
-					<Image
-						src='/LG_logo2.webp'
-						alt='Laptop Guru'
-						width={200}
-						height={72}
-						className='mx-auto mb-2 w-auto'
-						style={{
-							height: 72,
-							filter: 'brightness(0) invert(1)',
-							opacity: 0.7,
-						}}
-					/>
-					<p className='text-xs m-0' style={{ color: 'rgba(255,255,255,0.4)' }}>
-						© {new Date().getFullYear()} laptopguru.pl — {tr.copyright}
-					</p>
-					<p
-						className='text-xs mt-3 m-0'
-						style={{ color: 'rgba(255,255,255,0.55)' }}>
+				<div className='py-2 text-center'>
+					<p className='text-xs mt-3 m-0' style={{ color: 'rgba(0,0,0,0.55)' }}>
 						Developed with 💛 by{' '}
 						<a
 							href='https://denysmaksymuck.pl'
 							target='_blank'
 							rel='noopener noreferrer'
-							className='text-white hover:underline'>
+							className='text-[#fb7830] hover:underline'>
 							Denys
 						</a>
 					</p>
 				</div>
 			</div>
 
-			{/* Fixed bottom CTA */}
 			{landing.productUrl && (
 				<div
 					className={`fixed bottom-0 inset-x-0 z-50 bg-white/95 backdrop-blur-md border-t border-gray-100 shadow-[0_-4px_24px_rgba(0,0,0,0.1)] ${showCta ? 'anim-slide-up' : 'opacity-0 translate-y-full'}`}>
@@ -1507,7 +1486,11 @@ export function LandingClient({ landing, video }: Props) {
 							onClick={handleBuyClick}
 							className='cursor-pointer group relative w-full bg-gradient-to-r from-[#fb7830] to-[#e56a25] hover:from-[#e56a25] hover:to-[#d45a15] text-white py-4 rounded-xl text-lg font-bold anim-border-glow hover:shadow-[0_6px_28px_rgba(251,120,48,0.5)] transition-all active:scale-[0.98] overflow-hidden'>
 							<span className='absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent' />
-							<span className='relative'>{tr.ctaButton}</span>
+							<span className='relative'>
+								{landing.type === 'allegro'
+									? 'Przejdź do oferty na Allegro'
+									: tr.ctaButton}
+							</span>
 						</button>
 					</div>
 				</div>
