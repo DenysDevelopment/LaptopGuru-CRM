@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
 import { PERMISSIONS } from "@laptopguru-crm/shared";
+import { templateSchema } from "@/lib/schemas/template";
+import { validateRequest } from "@/lib/validate-request";
 
 export async function GET() {
   const { session, error } = await authorize(PERMISSIONS.MESSAGING_TEMPLATES_READ);
@@ -36,15 +38,9 @@ export async function POST(request: NextRequest) {
   const { session, error } = await authorize(PERMISSIONS.MESSAGING_TEMPLATES_WRITE);
   if (error) return error;
 
-  const body = await request.json();
-  const { name, body: templateBody, channelType } = body;
-
-  if (!name?.trim() || !templateBody?.trim()) {
-    return NextResponse.json(
-      { error: "name and body are required" },
-      { status: 400 },
-    );
-  }
+  const validation = await validateRequest(request, templateSchema);
+  if (!validation.ok) return validation.response;
+  const { name, body: templateBody, channelType } = validation.data;
 
   // Find channel id by type if provided
   let channelId: string | null = null;
@@ -62,8 +58,8 @@ export async function POST(request: NextRequest) {
 
   const template = await prisma.template.create({
     data: {
-      name: name.trim(),
-      body: templateBody.trim(),
+      name,
+      body: templateBody,
       channelId,
       status: "DRAFT",
       createdBy: session.user!.id,

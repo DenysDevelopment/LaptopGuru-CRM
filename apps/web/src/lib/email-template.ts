@@ -18,7 +18,6 @@ const BENEFIT_ICONS = {
 
 const translations = {
 	pl: {
-		badge: 'OSOBISTA RECENZJA WIDEO',
 		greeting: 'Witamy',
 		intro:
 			'Nasz ekspert przygotował recenzję wideo specjalnie dla Ciebie — obejrzyj i podejmij najlepszą decyzję!',
@@ -26,10 +25,8 @@ const translations = {
 		benefit1Title: 'Gwarancja 12 miesięcy',
 		benefit2Title: 'Darmowa dostawa pojutrze',
 		benefit3Title: 'Zwrot w ciągu 30 dni',
-		copyright: 'Eksperckie recenzje laptopów',
 	},
 	uk: {
-		badge: 'ПЕРСОНАЛЬНИЙ ВІДЕО-ОГЛЯД',
 		greeting: 'Вітаємо',
 		intro:
 			'Наш експерт підготував відео-огляд спеціально для вас — перегляньте та зробіть найкращий вибір!',
@@ -37,10 +34,8 @@ const translations = {
 		benefit1Title: 'Гарантія 12 місяців',
 		benefit2Title: 'Безкоштовна доставка післязавтра',
 		benefit3Title: 'Повернення протягом 30 днів',
-		copyright: 'Експертні огляди ноутбуків',
 	},
 	ru: {
-		badge: 'ПЕРСОНАЛЬНЫЙ ВИДЕООБЗОР',
 		greeting: 'Здравствуйте',
 		intro:
 			'Наш эксперт подготовил видеообзор специально для вас — посмотрите и примите лучшее решение!',
@@ -48,10 +43,8 @@ const translations = {
 		benefit1Title: 'Гарантия 12 месяцев',
 		benefit2Title: 'Бесплатная доставка послезавтра',
 		benefit3Title: 'Возврат в течение 30 дней',
-		copyright: 'Экспертные обзоры ноутбуков',
 	},
 	en: {
-		badge: 'PERSONAL VIDEO REVIEW',
 		greeting: 'Hello',
 		intro:
 			'Our expert has prepared a video review especially for you — watch it and make the best decision!',
@@ -59,10 +52,8 @@ const translations = {
 		benefit1Title: '12-month warranty',
 		benefit2Title: 'Free delivery day after tomorrow',
 		benefit3Title: 'Return within 30 days',
-		copyright: 'Expert laptop reviews',
 	},
 	lt: {
-		badge: 'ASMENINĖ VAIZDO APŽVALGA',
 		greeting: 'Sveiki',
 		intro:
 			'Mūsų ekspertas paruošė vaizdo apžvalgą specialiai jums — pažiūrėkite ir priimkite geriausią sprendimą!',
@@ -70,10 +61,8 @@ const translations = {
 		benefit1Title: '12 mėnesių garantija',
 		benefit2Title: 'Nemokamas pristatymas poryt',
 		benefit3Title: 'Grąžinimas per 30 dienų',
-		copyright: 'Ekspertų nešiojamųjų kompiuterių apžvalgos',
 	},
 	et: {
-		badge: 'ISIKLIK VIDEOÜLEVAADE',
 		greeting: 'Tere',
 		intro:
 			'Meie ekspert on koostanud videoülevaate spetsiaalselt teile — vaadake ja tehke parim valik!',
@@ -81,10 +70,8 @@ const translations = {
 		benefit1Title: '12 kuu garantii',
 		benefit2Title: 'Tasuta kohaletoimetamine ülehomme',
 		benefit3Title: 'Tagastamine 30 päeva jooksul',
-		copyright: 'Ekspertide sülearvutite ülevaated',
 	},
 	lv: {
-		badge: 'PERSONĪGS VIDEO APSKATS',
 		greeting: 'Sveiki',
 		intro:
 			'Mūsu eksperts ir sagatavojis video apskatu speciāli jums — noskatieties un pieņemiet labāko lēmumu!',
@@ -92,7 +79,6 @@ const translations = {
 		benefit1Title: '12 mēnešu garantija',
 		benefit2Title: 'Bezmaksas piegāde parīt',
 		benefit3Title: 'Atgriešana 30 dienu laikā',
-		copyright: 'Ekspertu klēpjdatoru apskati',
 	},
 };
 
@@ -108,8 +94,6 @@ export function buildEmailHtml(data: EmailTemplateData): string {
 		language = 'pl',
 	} = data;
 	const t = translations[language];
-	const appUrl = process.env.APP_URL || 'http://localhost:3000';
-	const logoUrl = `${appUrl}/LG_logo2.webp`;
 
 	const noteBlock = personalNote
 		? `<tr><td style="padding: 0 24px 24px;">
@@ -133,14 +117,6 @@ export function buildEmailHtml(data: EmailTemplateData): string {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5;">
 <tr><td align="center" style="padding: 32px 16px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width: 560px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
-
-  <!-- Header -->
-  <tr><td style="background-color: #fb7830; padding: 32px; text-align: center;">
-    <table role="presentation" style="margin: 0 auto 10px;"><tr><td style="width: 72px; height: 72px; border-radius: 50%; background-color: #ffffff; text-align: center; vertical-align: middle;">
-      <img src="${logoUrl}" alt="Laptop Guru" style="height: 48px;" />
-    </td></tr></table>
-    <p style="margin: 0; color: rgba(255,255,255,0.85); font-size: 11px; text-transform: uppercase; letter-spacing: 2px; font-weight: 600;">${t.badge}</p>
-  </td></tr>
 
   <!-- Body -->
   <tr><td style="padding: 32px 24px 0;">
@@ -180,16 +156,6 @@ export function buildEmailHtml(data: EmailTemplateData): string {
         ${benefitCell(BENEFIT_ICONS.returns, t.benefit3Title)}
       </tr>
     </table>
-  </td></tr>
-
-  <!-- Footer -->
-  <tr><td style="background-color: #1f2937; padding: 24px; text-align: center;">
-    <table role="presentation" style="margin: 0 auto 8px;"><tr><td style="width: 56px; height: 56px; border-radius: 50%; background-color: #ffffff; text-align: center; vertical-align: middle;">
-      <img src="${logoUrl}" alt="Laptop Guru" style="height: 36px;" />
-    </td></tr></table>
-    <p style="margin: 0; color: rgba(255,255,255,0.4); font-size: 12px;">
-      &copy; laptopguru.pl &mdash; ${t.copyright}
-    </p>
   </td></tr>
 
 </table>

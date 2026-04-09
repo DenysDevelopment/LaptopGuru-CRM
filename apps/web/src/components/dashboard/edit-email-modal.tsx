@@ -1,93 +1,182 @@
 "use client";
 
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+
 import type { IncomingEmail } from "@/types";
+import { editEmailSchema, type EditEmailInput } from "@/lib/schemas/email";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 interface Props {
-  email: Pick<IncomingEmail, "id" | "customerName" | "customerEmail" | "customerPhone" | "productUrl" | "productName">;
+  email: Pick<
+    IncomingEmail,
+    "id" | "customerName" | "customerEmail" | "customerPhone" | "productUrl" | "productName"
+  >;
   onClose: () => void;
   onSaved: () => void;
 }
 
 export function EditEmailModal({ email, onClose, onSaved }: Props) {
-  const [customerName, setCustomerName] = useState(email.customerName || "");
-  const [customerEmail, setCustomerEmail] = useState(email.customerEmail || "");
-  const [customerPhone, setCustomerPhone] = useState(email.customerPhone || "");
-  const [productUrl, setProductUrl] = useState(email.productUrl || "");
-  const [productName, setProductName] = useState(email.productName || "");
-  const [saving, setSaving] = useState(false);
+  const [apiError, setApiError] = useState("");
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
+  const form = useForm<EditEmailInput>({
+    resolver: zodResolver(editEmailSchema),
+    mode: "onTouched",
+    defaultValues: {
+      customerName: email.customerName || "",
+      customerEmail: email.customerEmail || "",
+      customerPhone: email.customerPhone || "",
+      productName: email.productName || "",
+      productUrl: email.productUrl || "",
+    },
+  });
 
-    await fetch(`/api/emails/${email.id}`, {
+  async function onSubmit(data: EditEmailInput) {
+    setApiError("");
+    // Convert empty strings to null for the API
+    const payload = {
+      customerName: data.customerName || null,
+      customerEmail: data.customerEmail || null,
+      customerPhone: data.customerPhone || null,
+      productName: data.productName || null,
+      productUrl: data.productUrl || null,
+    };
+    const res = await fetch(`/api/emails/${email.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        customerName: customerName || null,
-        customerEmail: customerEmail || null,
-        customerPhone: customerPhone || null,
-        productUrl: productUrl || null,
-        productName: productName || null,
-      }),
+      body: JSON.stringify(payload),
     });
 
-    setSaving(false);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setApiError(body.error || "Ошибка сохранения");
+      return;
+    }
+
     onSaved();
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onClick={onClose}
+    >
       <div
         className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Редактировать заявку</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          Редактировать заявку
+        </h2>
 
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <Field label="Имя клиента" value={customerName} onChange={setCustomerName} />
-          <Field label="Email клиента" value={customerEmail} onChange={setCustomerEmail} type="email" />
-          <Field label="Телефон" value={customerPhone} onChange={setCustomerPhone} type="tel" />
-          <Field label="Название товара" value={productName} onChange={setProductName} />
-          <Field label="Ссылка на товар" value={productUrl} onChange={setProductUrl} type="url" />
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
+            {apiError && (
+              <div className="bg-red-50 text-red-600 text-sm rounded-lg px-3 py-2">
+                {apiError}
+              </div>
+            )}
 
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-            >
-              Отменить
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-brand hover:bg-brand-hover rounded-lg transition-colors disabled:opacity-50"
-            >
-              {saving ? "Сохранение..." : "Сохранить"}
-            </button>
-          </div>
-        </form>
+            <FormField
+              control={form.control}
+              name="customerName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Имя клиента</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value)} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="customerEmail"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email клиента</FormLabel>
+                  <FormControl>
+                    <Input type="email" {...field} value={field.value ?? ""} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="customerPhone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Телефон</FormLabel>
+                  <FormControl>
+                    <Input type="tel" {...field} value={field.value ?? ""} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="productName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Название товара</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value)} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="productUrl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Ссылка на товар</FormLabel>
+                  <FormControl>
+                    <Input type="url" {...field} value={field.value ?? ""} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                type="button"
+                onClick={onClose}
+                variant="outline"
+                className="flex-1"
+              >
+                Отменить
+              </Button>
+              <Button
+                type="submit"
+                disabled={form.formState.isSubmitting}
+                className="flex-1 bg-brand hover:bg-brand-hover text-white"
+              >
+                {form.formState.isSubmitting ? "Сохранение..." : "Сохранить"}
+              </Button>
+            </div>
+          </form>
+        </Form>
       </div>
-    </div>
-  );
-}
-
-function Field({
-  label, value, onChange, type = "text",
-}: {
-  label: string; value: string; onChange: (v: string) => void; type?: string;
-}) {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-brand focus:ring-2 focus:ring-brand-muted outline-none transition-colors"
-      />
     </div>
   );
 }

@@ -169,6 +169,7 @@ model Landing {
   customerName  String?
   productName   String?
   language      String    @default("pl")
+  type          String    @default("email") // "email" | "allegro"
   emailId       String?
   incomingEmail IncomingEmail? @relation(fields: [emailId], references: [id])
   views         Int       @default(0)

@@ -50,5 +50,8 @@ deploy_key
 deploy_key.pub
 *.key
 
+# credentials — never commit
+CREDENTIALS.md
+
 # uploads (attachments stored locally)
 apps/web/public/uploads/

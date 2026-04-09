@@ -1,7 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { normalizeListResponse } from '@/lib/utils/normalize-response';
+import { TemplateForm } from '@/components/dashboard/settings/template-form';
+import { Button } from '@/components/ui/button';
+import type { TemplateInput } from '@/lib/schemas/template';
 
 interface Template {
 	id: string;
@@ -21,17 +24,16 @@ const STATUS_BADGES: Record<string, { label: string; class: string }> = {
 	REJECTED: { label: 'Отклонён', class: 'bg-red-100 text-red-700' },
 };
 
+type ChannelType = 'EMAIL' | 'SMS' | 'WHATSAPP' | 'TELEGRAM';
+const VALID_CHANNEL_TYPES: ChannelType[] = ['EMAIL', 'SMS', 'WHATSAPP', 'TELEGRAM'];
+
 export default function TemplatesSettingsPage() {
 	const [templates, setTemplates] = useState<Template[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [showModal, setShowModal] = useState(false);
 	const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
-	const [name, setName] = useState('');
-	const [body, setBody] = useState('');
-	const [channelType, setChannelType] = useState('');
-	const [saving, setSaving] = useState(false);
 
-	const fetchTemplates = async () => {
+	const fetchTemplates = useCallback(async () => {
 		try {
 			const res = await fetch('/api/messaging/templates');
 			if (res.ok) {
@@ -40,61 +42,42 @@ export default function TemplatesSettingsPage() {
 			}
 		} catch { /* ignore */ }
 		setLoading(false);
-	};
+	}, []);
 
 	useEffect(() => {
 		// eslint-disable-next-line react-hooks/set-state-in-effect
 		fetchTemplates();
-	}, []);
+	}, [fetchTemplates]);
 
 	const openCreate = () => {
 		setEditingTemplate(null);
-		setName('');
-		setBody('');
-		setChannelType('');
 		setShowModal(true);
 	};
 
 	const openEdit = (t: Template) => {
 		setEditingTemplate(t);
-		setName(t.name);
-		setBody(t.body);
-		setChannelType(t.channelType || '');
 		setShowModal(true);
 	};
 
-	const handleSave = async () => {
-		if (!name.trim() || !body.trim() || saving) return;
-		setSaving(true);
-		try {
-			const url = editingTemplate
-				? `/api/messaging/templates/${editingTemplate.id}`
-				: '/api/messaging/templates';
-			const method = editingTemplate ? 'PATCH' : 'POST';
-			const res = await fetch(url, {
-				method,
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					name: name.trim(),
-					body: body.trim(),
-					channelType: channelType || null,
-				}),
-			});
-			if (res.ok) {
-				setShowModal(false);
-				fetchTemplates();
-			}
-		} catch { /* ignore */ }
-		setSaving(false);
+	const handleSave = async (data: TemplateInput) => {
+		const url = editingTemplate
+			? `/api/messaging/templates/${editingTemplate.id}`
+			: '/api/messaging/templates';
+		const method = editingTemplate ? 'PATCH' : 'POST';
+		const res = await fetch(url, {
+			method,
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				name: data.name,
+				body: data.body,
+				channelType: data.channelType || null,
+			}),
+		});
+		if (res.ok) {
+			setShowModal(false);
+			fetchTemplates();
+		}
 	};
-
-	// Extract variables like {{name}} from template body
-	const extractVariables = (text: string): string[] => {
-		const matches = text.match(/\{\{(\w+)\}\}/g) || [];
-		return [...new Set(matches.map((m) => m.replace(/[{}]/g, '')))];
-	};
-
-	const currentVars = extractVariables(body);
 
 	return (
 		<div>
@@ -105,14 +88,15 @@ export default function TemplatesSettingsPage() {
 						Шаблоны сообщений для каналов
 					</p>
 				</div>
-				<button
+				<Button
+					type='button'
 					onClick={openCreate}
-					className='inline-flex items-center gap-2 bg-brand hover:bg-brand-hover text-white font-medium px-4 py-2.5 rounded-lg transition-colors text-sm'>
+					className='bg-brand hover:bg-brand-hover text-white'>
 					<svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' strokeWidth={2} stroke='currentColor'>
 						<path strokeLinecap='round' strokeLinejoin='round' d='M12 4.5v15m7.5-7.5h-15' />
 					</svg>
 					Создать шаблон
-				</button>
+				</Button>
 			</div>
 
 			{loading ? (
@@ -164,80 +148,35 @@ export default function TemplatesSettingsPage() {
 			{/* Create/Edit modal */}
 			{showModal && (
 				<div className='fixed inset-0 z-50 flex items-center justify-center p-4'>
-					<div className='absolute inset-0 bg-black/40' onClick={() => setShowModal(false)} />
-					<div className='relative bg-white rounded-2xl shadow-xl max-w-lg w-full'>
+					<div
+						className='absolute inset-0 bg-black/40'
+						onClick={() => setShowModal(false)}
+					/>
+					<div className='relative bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto'>
 						<div className='p-6'>
 							<h2 className='text-lg font-bold text-gray-900 mb-4'>
 								{editingTemplate ? 'Редактировать шаблон' : 'Новый шаблон'}
 							</h2>
-
-							<div className='mb-4'>
-								<label className='block text-sm font-medium text-gray-700 mb-1'>Название</label>
-								<input
-									type='text'
-									value={name}
-									onChange={(e) => setName(e.target.value)}
-									placeholder='Приветственное сообщение'
-									className='w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand placeholder:text-gray-400'
-								/>
-							</div>
-
-							<div className='mb-4'>
-								<label className='block text-sm font-medium text-gray-700 mb-1'>Канал (необязательно)</label>
-								<select
-									value={channelType}
-									onChange={(e) => setChannelType(e.target.value)}
-									className='w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand'>
-									<option value=''>Все каналы</option>
-									<option value='EMAIL'>Email</option>
-									<option value='SMS'>SMS</option>
-									<option value='WHATSAPP'>WhatsApp</option>
-									<option value='TELEGRAM'>Telegram</option>
-								</select>
-							</div>
-
-							<div className='mb-4'>
-								<label className='block text-sm font-medium text-gray-700 mb-1'>
-									Текст шаблона
-								</label>
-								<textarea
-									value={body}
-									onChange={(e) => setBody(e.target.value)}
-									rows={5}
-									placeholder={'Здравствуйте, {{name}}!\n\nСпасибо за обращение...'}
-									className='w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand placeholder:text-gray-400 resize-none'
-								/>
-								<p className='text-xs text-gray-400 mt-1'>
-									Используйте {'{{переменная}}'} для вставки динамических данных
-								</p>
-							</div>
-
-							{currentVars.length > 0 && (
-								<div className='mb-4'>
-									<p className='text-xs font-medium text-gray-400 mb-1'>Переменные:</p>
-									<div className='flex flex-wrap gap-1'>
-										{currentVars.map((v) => (
-											<span key={v} className='text-xs font-mono text-brand bg-brand-light px-2 py-0.5 rounded'>
-												{`{{${v}}}`}
-											</span>
-										))}
-									</div>
-								</div>
-							)}
-
-							<div className='flex gap-3'>
-								<button
-									onClick={() => setShowModal(false)}
-									className='flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors'>
-									Отмена
-								</button>
-								<button
-									onClick={handleSave}
-									disabled={!name.trim() || !body.trim() || saving}
-									className='flex-1 px-4 py-2.5 text-sm font-medium text-white bg-brand hover:bg-brand-hover rounded-xl transition-colors disabled:opacity-50'>
-									{saving ? 'Сохранение...' : 'Сохранить'}
-								</button>
-							</div>
+							<TemplateForm
+								initialValue={
+									editingTemplate
+										? {
+												name: editingTemplate.name,
+												body: editingTemplate.body,
+												channelType:
+													editingTemplate.channelType &&
+													VALID_CHANNEL_TYPES.includes(
+														editingTemplate.channelType as ChannelType,
+													)
+														? (editingTemplate.channelType as ChannelType)
+														: null,
+											}
+										: undefined
+								}
+								submitLabel='Сохранить'
+								onSubmit={handleSave}
+								onCancel={() => setShowModal(false)}
+							/>
 						</div>
 					</div>
 				</div>

@@ -90,7 +90,8 @@ const t = {
 		badge: 'Мы подготовили кое-что специально для вас',
 		greeting: 'Привет',
 		greetingSuffix: 'у нас есть кое-что особенное!',
-		intro: 'Наш эксперт записал подробный обзор этого ноутбука. Посмотрите — это займет пару минут, но поможет сделать лучший выбор.',
+		intro:
+			'Наш эксперт записал подробный обзор этого ноутбука. Посмотрите — это займет пару минут, но поможет сделать лучший выбор.',
 		benefit1Title: 'Экспертный обзор',
 		benefit1Desc: 'Наши специалисты детально проверили этот продукт',
 		benefit2Title: 'Честное сравнение',
@@ -118,7 +119,8 @@ const t = {
 		badge: "We've prepared something special for you",
 		greeting: 'Hey',
 		greetingSuffix: "we've got something special for you!",
-		intro: "Our expert recorded a detailed review of this laptop. Watch it — it'll only take a moment, but it'll help you make the best choice.",
+		intro:
+			"Our expert recorded a detailed review of this laptop. Watch it — it'll only take a moment, but it'll help you make the best choice.",
 		benefit1Title: 'Expert review',
 		benefit1Desc: 'Our specialists have thoroughly tested this product',
 		benefit2Title: 'Honest comparison',
@@ -146,7 +148,8 @@ const t = {
 		badge: 'Paruošėme kažką specialiai jums',
 		greeting: 'Sveiki',
 		greetingSuffix: 'turime jums kažką ypatingo!',
-		intro: 'Mūsų ekspertas įrašė išsamią šio nešiojamojo kompiuterio apžvalgą. Pažiūrėkite — tai užtruks tik akimirką, bet padės priimti geriausią sprendimą.',
+		intro:
+			'Mūsų ekspertas įrašė išsamią šio nešiojamojo kompiuterio apžvalgą. Pažiūrėkite — tai užtruks tik akimirką, bet padės priimti geriausią sprendimą.',
 		benefit1Title: 'Eksperto apžvalga',
 		benefit1Desc: 'Mūsų specialistai išsamiai patikrino šį produktą',
 		benefit2Title: 'Sąžiningas palyginimas',
@@ -154,7 +157,8 @@ const t = {
 		benefit3Title: 'Geriausia kaina',
 		benefit3Desc: 'Garantuojame palankiausią pasiūlymą',
 		ctaButton: 'Peržiūrėti pasiūlymą',
-		ctaSub: '12 mėn. garantija · Nemokamas pristatymas · Grąžinimas per 30 dienų',
+		ctaSub:
+			'12 mėn. garantija · Nemokamas pristatymas · Grąžinimas per 30 dienų',
 		trustWarranty: '12 mėnesių garantija',
 		trustDelivery: 'Nemokamas pristatymas poryt',
 		trustReturn: 'Grąžinimas per 30 dienų',
@@ -174,7 +178,8 @@ const t = {
 		badge: 'Oleme teile midagi erilist ette valmistanud',
 		greeting: 'Tere',
 		greetingSuffix: 'meil on teile midagi erilist!',
-		intro: 'Meie ekspert salvestas selle sülearvuti üksikasjaliku ülevaate. Vaadake — see võtab vaid hetke, kuid aitab teha parima valiku.',
+		intro:
+			'Meie ekspert salvestas selle sülearvuti üksikasjaliku ülevaate. Vaadake — see võtab vaid hetke, kuid aitab teha parima valiku.',
 		benefit1Title: 'Eksperdi ülevaade',
 		benefit1Desc: 'Meie spetsialistid on seda toodet põhjalikult testinud',
 		benefit2Title: 'Aus võrdlus',
@@ -202,7 +207,8 @@ const t = {
 		badge: 'Esam sagatavojuši kaut ko īpašu tieši jums',
 		greeting: 'Sveiki',
 		greetingSuffix: 'mums jums ir kaut kas īpašs!',
-		intro: 'Mūsu eksperts ierakstīja detalizētu šī klēpjdatora apskatu. Noskatieties — tas aizņems tikai brīdi, bet palīdzēs pieņemt labāko lēmumu.',
+		intro:
+			'Mūsu eksperts ierakstīja detalizētu šī klēpjdatora apskatu. Noskatieties — tas aizņems tikai brīdi, bet palīdzēs pieņemt labāko lēmumu.',
 		benefit1Title: 'Eksperta apskats',
 		benefit1Desc: 'Mūsu speciālisti ir rūpīgi pārbaudījuši šo produktu',
 		benefit2Title: 'Godīgs salīdzinājums',
@@ -210,7 +216,8 @@ const t = {
 		benefit3Title: 'Labākā cena',
 		benefit3Desc: 'Garantējam visizdevīgāko piedāvājumu',
 		ctaButton: 'Skatīt piedāvājumu',
-		ctaSub: '12 mēnešu garantija · Bezmaksas piegāde · Atgriešana 30 dienu laikā',
+		ctaSub:
+			'12 mēnešu garantija · Bezmaksas piegāde · Atgriešana 30 dienu laikā',
 		trustWarranty: '12 mēnešu garantija',
 		trustDelivery: 'Bezmaksas piegāde parīt',
 		trustReturn: 'Atgriešana 30 dienu laikā',
@@ -239,6 +246,7 @@ interface Props {
 		customerName: string | null;
 		productName: string | null;
 		language: Lang;
+		type: string;
 	};
 	video: {
 		youtubeId: string;
@@ -1285,11 +1293,19 @@ export function LandingClient({ landing, video }: Props) {
 				<div>
 					{/* Hero card */}
 					<div className='max-w-3xl mx-auto px-4 sm:px-6 mt-6 mb-6'>
-						<div data-animate className='bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.08)] border border-gray-100 overflow-hidden'>
+						<div
+							data-animate
+							className='bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.08)] border border-gray-100 overflow-hidden'>
 							{/* Greeting */}
 							<div className='px-6 pt-6 pb-4'>
 								<p className='text-2xl sm:text-3xl font-bold text-[#222] leading-tight m-0 mb-3'>
-									{tr.greeting}{landing.customerName ? `, ${landing.customerName}` : ''}! <span className="inline-block animate-[wave_1.5s_ease-in-out_infinite]">&#128075;</span>
+									{tr.greeting}
+									{landing.customerName
+										? `, ${landing.customerName}`
+										: ''}!{' '}
+									<span className='inline-block animate-[wave_1.5s_ease-in-out_infinite]'>
+										&#128075;
+									</span>
 								</p>
 							</div>
 							{/* Intro text */}
@@ -1373,77 +1389,77 @@ export function LandingClient({ landing, video }: Props) {
 					</div>
 
 					{/* Specs */}
-					{specs && (
+					{specs && landing.type !== 'allegro' && (
 						<div data-animate className='max-w-3xl mx-auto px-4 sm:px-6 mb-6'>
-						  <div className='bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.08)] border border-gray-100 p-6'>
-							<h2 className='text-lg font-bold text-gray-900 mb-4 flex items-center gap-2'>
-								<svg
-									className='w-5 h-5 text-[#fb7830]'
-									fill='none'
-									viewBox='0 0 24 24'
-									stroke='currentColor'
-									strokeWidth={2}>
-									<path
-										strokeLinecap='round'
-										strokeLinejoin='round'
-										d='M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25h-13.5A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0V12a2.25 2.25 0 0 1-2.25 2.25h-13.5A2.25 2.25 0 0 1 3 12V5.25'
-									/>
-								</svg>
-								{tr.specsTitle}
-							</h2>
-							<div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
-								{specs.model && (
-									<SpecRow
-										icon={<Laptop className='w-5 h-5 text-[#fb7830]' />}
-										label={tr.specModel}
-										value={specs.model}
-										delay={1}
-									/>
-								)}
-								{specs.cpu && (
-									<SpecRow
-										icon={<Cpu className='w-5 h-5 text-[#fb7830]' />}
-										label={tr.specCpu}
-										value={specs.cpu}
-										delay={2}
-									/>
-								)}
-								{specs.ram && (
-									<SpecRow
-										icon={<MemoryStick className='w-5 h-5 text-[#fb7830]' />}
-										label={tr.specRam}
-										value={specs.ram}
-										delay={3}
-									/>
-								)}
-								{specs.storage && (
-									<SpecRow
-										icon={<HardDrive className='w-5 h-5 text-[#fb7830]' />}
-										label={tr.specStorage}
-										value={specs.storage}
-										delay={4}
-									/>
-								)}
-								{specs.gpu && (
-									<SpecRow
-										icon={<Monitor className='w-5 h-5 text-[#fb7830]' />}
-										label={tr.specGpu}
-										value={specs.gpu}
-										delay={5}
-									/>
-								)}
-								{specs.display && (
-									<SpecRow
-										icon={
-											<MonitorSmartphone className='w-5 h-5 text-[#fb7830]' />
-										}
-										label={tr.specDisplay}
-										value={specs.display}
-										delay={6}
-									/>
-								)}
+							<div className='bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.08)] border border-gray-100 p-6'>
+								<h2 className='text-lg font-bold text-gray-900 mb-4 flex items-center gap-2'>
+									<svg
+										className='w-5 h-5 text-[#fb7830]'
+										fill='none'
+										viewBox='0 0 24 24'
+										stroke='currentColor'
+										strokeWidth={2}>
+										<path
+											strokeLinecap='round'
+											strokeLinejoin='round'
+											d='M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25h-13.5A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0V12a2.25 2.25 0 0 1-2.25 2.25h-13.5A2.25 2.25 0 0 1 3 12V5.25'
+										/>
+									</svg>
+									{tr.specsTitle}
+								</h2>
+								<div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
+									{specs.model && (
+										<SpecRow
+											icon={<Laptop className='w-5 h-5 text-[#fb7830]' />}
+											label={tr.specModel}
+											value={specs.model}
+											delay={1}
+										/>
+									)}
+									{specs.cpu && (
+										<SpecRow
+											icon={<Cpu className='w-5 h-5 text-[#fb7830]' />}
+											label={tr.specCpu}
+											value={specs.cpu}
+											delay={2}
+										/>
+									)}
+									{specs.ram && (
+										<SpecRow
+											icon={<MemoryStick className='w-5 h-5 text-[#fb7830]' />}
+											label={tr.specRam}
+											value={specs.ram}
+											delay={3}
+										/>
+									)}
+									{specs.storage && (
+										<SpecRow
+											icon={<HardDrive className='w-5 h-5 text-[#fb7830]' />}
+											label={tr.specStorage}
+											value={specs.storage}
+											delay={4}
+										/>
+									)}
+									{specs.gpu && (
+										<SpecRow
+											icon={<Monitor className='w-5 h-5 text-[#fb7830]' />}
+											label={tr.specGpu}
+											value={specs.gpu}
+											delay={5}
+										/>
+									)}
+									{specs.display && (
+										<SpecRow
+											icon={
+												<MonitorSmartphone className='w-5 h-5 text-[#fb7830]' />
+											}
+											label={tr.specDisplay}
+											value={specs.display}
+											delay={6}
+										/>
+									)}
+								</div>
 							</div>
-						  </div>
 						</div>
 					)}
 				</div>
@@ -1470,7 +1486,14 @@ export function LandingClient({ landing, video }: Props) {
 					<p
 						className='text-xs mt-3 m-0'
 						style={{ color: 'rgba(255,255,255,0.55)' }}>
-						Developed with 💛 by Denys
+						Developed with 💛 by{' '}
+						<a
+							href='https://denysmaksymuck.pl'
+							target='_blank'
+							rel='noopener noreferrer'
+							className='text-white hover:underline'>
+							Denys
+						</a>
 					</p>
 				</div>
 			</div>

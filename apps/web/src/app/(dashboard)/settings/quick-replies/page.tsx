@@ -1,7 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { normalizeListResponse } from '@/lib/utils/normalize-response';
+import { QuickReplyForm } from '@/components/dashboard/settings/quick-reply-form';
+import { Button } from '@/components/ui/button';
+import type { QuickReplyInput } from '@/lib/schemas/quick-reply';
 
 interface QuickReply {
 	id: string;
@@ -16,12 +19,8 @@ export default function QuickRepliesSettingsPage() {
 	const [loading, setLoading] = useState(true);
 	const [showModal, setShowModal] = useState(false);
 	const [editingItem, setEditingItem] = useState<QuickReply | null>(null);
-	const [shortcut, setShortcut] = useState('');
-	const [title, setTitle] = useState('');
-	const [body, setBody] = useState('');
-	const [saving, setSaving] = useState(false);
 
-	const fetchItems = async () => {
+	const fetchItems = useCallback(async () => {
 		try {
 			const res = await fetch('/api/messaging/quick-replies');
 			if (res.ok) {
@@ -30,52 +29,37 @@ export default function QuickRepliesSettingsPage() {
 			}
 		} catch { /* ignore */ }
 		setLoading(false);
-	};
+	}, []);
 
 	useEffect(() => {
 		// eslint-disable-next-line react-hooks/set-state-in-effect
 		fetchItems();
-	}, []);
+	}, [fetchItems]);
 
 	const openCreate = () => {
 		setEditingItem(null);
-		setShortcut('');
-		setTitle('');
-		setBody('');
 		setShowModal(true);
 	};
 
 	const openEdit = (qr: QuickReply) => {
 		setEditingItem(qr);
-		setShortcut(qr.shortcut);
-		setTitle(qr.title);
-		setBody(qr.body);
 		setShowModal(true);
 	};
 
-	const handleSave = async () => {
-		if (!shortcut.trim() || !title.trim() || !body.trim() || saving) return;
-		setSaving(true);
-		try {
-			const url = editingItem
-				? `/api/messaging/quick-replies/${editingItem.id}`
-				: '/api/messaging/quick-replies';
-			const method = editingItem ? 'PATCH' : 'POST';
-			const res = await fetch(url, {
-				method,
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					shortcut: shortcut.trim(),
-					title: title.trim(),
-					body: body.trim(),
-				}),
-			});
-			if (res.ok) {
-				setShowModal(false);
-				fetchItems();
-			}
-		} catch { /* ignore */ }
-		setSaving(false);
+	const handleSave = async (data: QuickReplyInput) => {
+		const url = editingItem
+			? `/api/messaging/quick-replies/${editingItem.id}`
+			: '/api/messaging/quick-replies';
+		const method = editingItem ? 'PATCH' : 'POST';
+		const res = await fetch(url, {
+			method,
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(data),
+		});
+		if (res.ok) {
+			setShowModal(false);
+			fetchItems();
+		}
 	};
 
 	const handleDelete = async (id: string) => {
@@ -95,14 +79,15 @@ export default function QuickRepliesSettingsPage() {
 						Сокращения для частых ответов. Введите / в чате для вызова.
 					</p>
 				</div>
-				<button
+				<Button
+					type='button'
 					onClick={openCreate}
-					className='inline-flex items-center gap-2 bg-brand hover:bg-brand-hover text-white font-medium px-4 py-2.5 rounded-lg transition-colors text-sm'>
+					className='bg-brand hover:bg-brand-hover text-white'>
 					<svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' strokeWidth={2} stroke='currentColor'>
 						<path strokeLinecap='round' strokeLinejoin='round' d='M12 4.5v15m7.5-7.5h-15' />
 					</svg>
 					Создать
-				</button>
+				</Button>
 			</div>
 
 			{loading ? (
@@ -128,6 +113,7 @@ export default function QuickRepliesSettingsPage() {
 							</div>
 							<div className='flex gap-1 flex-shrink-0'>
 								<button
+									type='button'
 									onClick={() => openEdit(qr)}
 									className='p-1.5 text-gray-400 hover:text-gray-600 transition-colors rounded-lg hover:bg-gray-50'>
 									<svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' strokeWidth={1.5} stroke='currentColor'>
@@ -135,6 +121,7 @@ export default function QuickRepliesSettingsPage() {
 									</svg>
 								</button>
 								<button
+									type='button'
 									onClick={() => handleDelete(qr.id)}
 									className='p-1.5 text-gray-400 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50'>
 									<svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' strokeWidth={1.5} stroke='currentColor'>
@@ -150,61 +137,29 @@ export default function QuickRepliesSettingsPage() {
 			{/* Create/Edit modal */}
 			{showModal && (
 				<div className='fixed inset-0 z-50 flex items-center justify-center p-4'>
-					<div className='absolute inset-0 bg-black/40' onClick={() => setShowModal(false)} />
+					<div
+						className='absolute inset-0 bg-black/40'
+						onClick={() => setShowModal(false)}
+					/>
 					<div className='relative bg-white rounded-2xl shadow-xl max-w-lg w-full'>
 						<div className='p-6'>
 							<h2 className='text-lg font-bold text-gray-900 mb-4'>
 								{editingItem ? 'Редактировать' : 'Новый быстрый ответ'}
 							</h2>
-
-							<div className='mb-4'>
-								<label className='block text-sm font-medium text-gray-700 mb-1'>
-									Сокращение (без /)
-								</label>
-								<input
-									type='text'
-									value={shortcut}
-									onChange={(e) => setShortcut(e.target.value.replace(/\s/g, ''))}
-									placeholder='привет'
-									className='w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand placeholder:text-gray-400'
-								/>
-							</div>
-
-							<div className='mb-4'>
-								<label className='block text-sm font-medium text-gray-700 mb-1'>Заголовок</label>
-								<input
-									type='text'
-									value={title}
-									onChange={(e) => setTitle(e.target.value)}
-									placeholder='Приветствие'
-									className='w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand placeholder:text-gray-400'
-								/>
-							</div>
-
-							<div className='mb-4'>
-								<label className='block text-sm font-medium text-gray-700 mb-1'>Текст ответа</label>
-								<textarea
-									value={body}
-									onChange={(e) => setBody(e.target.value)}
-									rows={4}
-									placeholder='Здравствуйте! Чем могу помочь?'
-									className='w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand placeholder:text-gray-400 resize-none'
-								/>
-							</div>
-
-							<div className='flex gap-3'>
-								<button
-									onClick={() => setShowModal(false)}
-									className='flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors'>
-									Отмена
-								</button>
-								<button
-									onClick={handleSave}
-									disabled={!shortcut.trim() || !title.trim() || !body.trim() || saving}
-									className='flex-1 px-4 py-2.5 text-sm font-medium text-white bg-brand hover:bg-brand-hover rounded-xl transition-colors disabled:opacity-50'>
-									{saving ? 'Сохранение...' : 'Сохранить'}
-								</button>
-							</div>
+							<QuickReplyForm
+								initialValue={
+									editingItem
+										? {
+												shortcut: editingItem.shortcut,
+												title: editingItem.title,
+												body: editingItem.body,
+											}
+										: undefined
+								}
+								submitLabel='Сохранить'
+								onSubmit={handleSave}
+								onCancel={() => setShowModal(false)}
+							/>
 						</div>
 					</div>
 				</div>

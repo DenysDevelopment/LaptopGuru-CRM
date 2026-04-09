@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
 import { PERMISSIONS } from "@laptopguru-crm/shared";
+import { businessHoursSchema } from "@/lib/schemas/business-hours";
+import { validateRequest } from "@/lib/validate-request";
 
 const DAY_MAP: Record<string, string> = {
   MONDAY: "monday",
@@ -44,8 +46,9 @@ export async function PATCH(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const body = await request.json();
-  const { timezone, schedule: scheduleData } = body;
+  const validation = await validateRequest(request, businessHoursSchema);
+  if (!validation.ok) return validation.response;
+  const { timezone, schedule: scheduleData } = validation.data;
 
   // Update schedule metadata
   if (timezone) {

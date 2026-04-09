@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
 import { PERMISSIONS } from "@laptopguru-crm/shared";
+import { quickReplySchema } from "@/lib/schemas/quick-reply";
+import { validateRequest } from "@/lib/validate-request";
 
 export async function GET() {
   const { session, error } = await authorize(PERMISSIONS.MESSAGING_CONVERSATIONS_READ);
@@ -27,21 +29,15 @@ export async function POST(request: NextRequest) {
   const { session, error } = await authorize(PERMISSIONS.MESSAGING_TEMPLATES_WRITE);
   if (error) return error;
 
-  const body = await request.json();
-  const { shortcut, title, body: qrBody } = body;
-
-  if (!shortcut?.trim() || !title?.trim() || !qrBody?.trim()) {
-    return NextResponse.json(
-      { error: "shortcut, title, and body are required" },
-      { status: 400 },
-    );
-  }
+  const validation = await validateRequest(request, quickReplySchema);
+  if (!validation.ok) return validation.response;
+  const { shortcut, title, body: qrBody } = validation.data;
 
   const quickReply = await prisma.msgQuickReply.create({
     data: {
-      shortcut: shortcut.trim(),
-      title: title.trim(),
-      body: qrBody.trim(),
+      shortcut,
+      title,
+      body: qrBody,
       createdBy: session.user!.id,
       companyId: session.user!.companyId ?? "",
     },

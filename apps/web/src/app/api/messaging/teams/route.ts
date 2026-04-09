@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
 import { PERMISSIONS } from "@laptopguru-crm/shared";
+import { teamSchema } from "@/lib/schemas/team";
+import { validateRequest } from "@/lib/validate-request";
 
 export async function GET() {
   const { session, error } = await authorize(PERMISSIONS.MESSAGING_CONVERSATIONS_READ);
@@ -39,16 +41,13 @@ export async function POST(request: NextRequest) {
   const { session, error } = await authorize(PERMISSIONS.MESSAGING_TEAMS_MANAGE);
   if (error) return error;
 
-  const body = await request.json();
-  const { name, description } = body;
-
-  if (!name?.trim()) {
-    return NextResponse.json({ error: "name is required" }, { status: 400 });
-  }
+  const validation = await validateRequest(request, teamSchema);
+  if (!validation.ok) return validation.response;
+  const { name, description } = validation.data;
 
   const team = await prisma.team.create({
     data: {
-      name: name.trim(),
+      name,
       description: description || null,
       companyId: session.user!.companyId ?? "",
     },

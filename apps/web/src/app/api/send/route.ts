@@ -5,33 +5,36 @@ import { prisma } from "@/lib/db";
 import { PERMISSIONS } from "@laptopguru-crm/shared";
 import { generateSlug, createShortLink } from "@/lib/links";
 import { buildEmailHtml } from "@/lib/email-template";
-import type { EmailLanguage } from "@/lib/email-template";
-import { VALID_LANGUAGES, SUBJECT_BY_LANG, TITLE_BY_LANG, FALLBACK_NAME, BUY_BUTTON_BY_LANG } from "@/lib/constants/languages";
+import { SUBJECT_BY_LANG, TITLE_BY_LANG, FALLBACK_NAME, BUY_BUTTON_BY_LANG } from "@/lib/constants/languages";
 import { formatSmtpFrom } from "@/lib/smtp";
+import { sendSchema } from "@/lib/schemas/send";
+import { validateRequest } from "@/lib/validate-request";
 
 export async function POST(request: NextRequest) {
   const { session, error } = await authorize(PERMISSIONS.SEND_EXECUTE);
   if (error) return error;
 
-  const body = await request.json();
-  const { emailId, videoId, personalNote, language } = body;
-  const lang: EmailLanguage = VALID_LANGUAGES.includes(language) ? language : "pl";
+  const validation = await validateRequest(request, sendSchema);
+  if (!validation.ok) return validation.response;
 
-  if (!emailId || !videoId) {
-    return NextResponse.json(
-      { error: "emailId и videoId обязательны" },
-      { status: 400 }
-    );
-  }
+  const data = validation.data;
+  const { mode, videoId, language: lang } = data;
+  const emailId = data.mode === "email" ? data.emailId : undefined;
+  const personalNote = data.mode === "email" ? data.personalNote : undefined;
+  const manualProductUrl = data.mode === "allegro" ? data.productUrl : undefined;
 
-  const incomingEmail = await prisma.incomingEmail.findUnique({
-    where: { id: emailId },
-  });
-  if (!incomingEmail || !incomingEmail.customerEmail || incomingEmail.companyId !== (session.user.companyId ?? "")) {
-    return NextResponse.json(
-      { error: "Заявка не найдена или нет email клиента" },
-      { status: 400 }
-    );
+  const incomingEmail =
+    mode === "email"
+      ? await prisma.incomingEmail.findUnique({ where: { id: emailId! } })
+      : null;
+
+  if (mode === "email") {
+    if (!incomingEmail || !incomingEmail.customerEmail || incomingEmail.companyId !== (session.user.companyId ?? "")) {
+      return NextResponse.json(
+        { error: "Заявка не найдена или нет email клиента" },
+        { status: 400 }
+      );
+    }
   }
 
   const video = await prisma.video.findUnique({
@@ -57,13 +60,14 @@ export async function POST(request: NextRequest) {
         slug,
         title: TITLE_BY_LANG[lang](video.title),
         videoId: video.id,
-        productUrl: incomingEmail.productUrl || "",
+        productUrl: mode === "allegro" ? manualProductUrl! : (incomingEmail?.productUrl || ""),
         buyButtonText: BUY_BUTTON_BY_LANG[lang],
-        personalNote: personalNote || null,
-        customerName: incomingEmail.customerName || null,
-        productName: incomingEmail.productName || null,
+        personalNote: mode === "allegro" ? null : (personalNote || null),
+        customerName: mode === "allegro" ? null : (incomingEmail?.customerName || null),
+        productName: mode === "allegro" ? null : (incomingEmail?.productName || null),
         language: lang,
-        emailId: incomingEmail.id,
+        type: mode,
+        emailId: mode === "allegro" ? null : incomingEmail?.id,
         userId: session.user.id,
         companyId: session.user.companyId ?? "",
       },
@@ -73,8 +77,16 @@ export async function POST(request: NextRequest) {
     const shortUrl = `${appUrl}/r/${shortCode}`;
     const landingUrl = `${appUrl}/l/${slug}`;
 
+    if (mode === "allegro") {
+      return NextResponse.json({
+        landing: { id: landing.id, slug, url: landingUrl },
+        shortLink: { code: shortCode, url: shortUrl },
+      }, { status: 201 });
+    }
+
+    // Email mode: send email via SMTP
     const html = buildEmailHtml({
-      customerName: incomingEmail.customerName || FALLBACK_NAME[lang],
+      customerName: incomingEmail!.customerName || FALLBACK_NAME[lang],
       videoTitle: video.title,
       thumbnail: video.thumbnail,
       landingUrl: shortUrl,
@@ -83,8 +95,8 @@ export async function POST(request: NextRequest) {
     });
 
     const subject = SUBJECT_BY_LANG[lang](
-      incomingEmail.customerName || undefined,
-      incomingEmail.productName || undefined,
+      incomingEmail!.customerName || undefined,
+      incomingEmail!.productName || undefined,
     );
 
     const emailChannel = await prisma.channel.findFirst({
@@ -126,7 +138,7 @@ export async function POST(request: NextRequest) {
 
       await transporter.sendMail({
         from: formatSmtpFrom(cfg.smtp_display_name, smtpFrom),
-        to: incomingEmail.customerEmail,
+        to: incomingEmail!.customerEmail!,
         subject,
         html,
       });
@@ -137,7 +149,7 @@ export async function POST(request: NextRequest) {
 
     const sentEmail = await prisma.sentEmail.create({
       data: {
-        to: incomingEmail.customerEmail,
+        to: incomingEmail!.customerEmail!,
         subject,
         landingId: landing.id,
         userId: session.user.id,
@@ -148,7 +160,7 @@ export async function POST(request: NextRequest) {
     });
 
     await prisma.incomingEmail.update({
-      where: { id: emailId },
+      where: { id: emailId! },
       data: { processed: true, processedById: session.user.id },
     });
 

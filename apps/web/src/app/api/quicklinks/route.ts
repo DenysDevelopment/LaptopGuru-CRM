@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
 import { PERMISSIONS } from "@laptopguru-crm/shared";
+import { createQuickLinkSchema } from "@/lib/schemas/quicklink";
+import { validateRequest } from "@/lib/validate-request";
 
 // GET — list all quick links
 export async function GET() {
@@ -39,32 +41,9 @@ export async function POST(request: NextRequest) {
   const { session, error } = await authorize(PERMISSIONS.QUICKLINKS_WRITE);
   if (error) return error;
 
-  const body = await request.json();
-  const { slug, targetUrl, name } = body;
-
-  if (!slug || !targetUrl) {
-    return NextResponse.json({ error: "slug и targetUrl обязательны" }, { status: 400 });
-  }
-
-  // Validate slug — only lowercase letters, numbers, hyphens
-  if (!/^[a-z0-9\-]+$/.test(slug)) {
-    return NextResponse.json({ error: "slug может содержать только a-z, 0-9, -" }, { status: 400 });
-  }
-
-  // Validate slug length
-  if (slug.length > 50) {
-    return NextResponse.json({ error: "slug не может быть длиннее 50 символов" }, { status: 400 });
-  }
-
-  // Validate targetUrl format
-  try {
-    const parsedUrl = new URL(targetUrl);
-    if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-      return NextResponse.json({ error: "URL должен начинаться с http:// или https://" }, { status: 400 });
-    }
-  } catch {
-    return NextResponse.json({ error: "Некорректный URL" }, { status: 400 });
-  }
+  const validation = await validateRequest(request, createQuickLinkSchema);
+  if (!validation.ok) return validation.response;
+  const { slug, targetUrl, name } = validation.data;
 
   // Check if slug already exists
   const existing = await prisma.quickLink.findFirst({ where: { slug, companyId: session.user.companyId ?? "" } });

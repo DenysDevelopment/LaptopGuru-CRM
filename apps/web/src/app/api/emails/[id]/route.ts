@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
 import { PERMISSIONS } from "@laptopguru-crm/shared";
+import { patchEmailSchema } from "@/lib/schemas/email";
+import { validateRequest } from "@/lib/validate-request";
 
 export async function GET(
   request: NextRequest,
@@ -75,44 +77,18 @@ export async function PATCH(
   if (error) return error;
 
   const { id } = await params;
-  const body = await request.json();
 
-  const allowedFields = [
-    "customerName",
-    "customerEmail",
-    "customerPhone",
-    "productUrl",
-    "productName",
-    "archived",
-    "processed",
-    "category",
-  ] as const;
+  const validation = await validateRequest(request, patchEmailSchema);
+  if (!validation.ok) return validation.response;
 
   const data: Record<string, unknown> = {};
-  for (const field of allowedFields) {
-    if (field in body) {
-      data[field] = body[field];
+  for (const [key, value] of Object.entries(validation.data)) {
+    if (value !== undefined) {
+      data[key] = value === "" ? null : value;
     }
   }
 
-  // Validate email format
-  if (data.customerEmail && typeof data.customerEmail === "string") {
-    const emailRegex = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
-    if (!emailRegex.test(data.customerEmail)) {
-      return NextResponse.json({ error: "Некорректный email" }, { status: 400 });
-    }
-  }
-
-  // Validate URL format
-  if (data.productUrl && typeof data.productUrl === "string") {
-    try {
-      new URL(data.productUrl);
-    } catch {
-      return NextResponse.json({ error: "Некорректный URL товара" }, { status: 400 });
-    }
-  }
-
-  if (data.processed === true && !data.processedById) {
+  if (data.processed === true) {
     data.processedById = session.user.id;
   }
 

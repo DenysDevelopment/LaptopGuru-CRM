@@ -27,6 +27,7 @@ export function VideoSelector({ videos, loading, selectedId, onSelect }: VideoSe
           {videos.map((video) => (
             <button
               key={video.id}
+              type="button"
               onClick={() => onSelect(video.id)}
               className={`text-left rounded-lg overflow-hidden border transition-colors ${
                 selectedId === video.id

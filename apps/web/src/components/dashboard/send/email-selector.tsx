@@ -31,6 +31,7 @@ export function EmailSelector({ emails, loading, selectedId, onSelect }: EmailSe
           {emails.map((email) => (
             <button
               key={email.id}
+              type="button"
               onClick={() => onSelect(email.id)}
               className={`w-full text-left p-3 rounded-lg border transition-colors ${
                 selectedId === email.id

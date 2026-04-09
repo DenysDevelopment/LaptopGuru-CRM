@@ -1,7 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { normalizeListResponse } from '@/lib/utils/normalize-response';
+import { TeamForm } from '@/components/dashboard/settings/team-form';
+import { Button } from '@/components/ui/button';
+import type { TeamInput } from '@/lib/schemas/team';
 
 interface TeamMember {
 	id: string;
@@ -23,11 +26,8 @@ export default function TeamsSettingsPage() {
 	const [loading, setLoading] = useState(true);
 	const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
 	const [showCreateModal, setShowCreateModal] = useState(false);
-	const [newName, setNewName] = useState('');
-	const [newDescription, setNewDescription] = useState('');
-	const [saving, setSaving] = useState(false);
 
-	const fetchTeams = async () => {
+	const fetchTeams = useCallback(async () => {
 		try {
 			const res = await fetch('/api/messaging/teams');
 			if (res.ok) {
@@ -36,33 +36,26 @@ export default function TeamsSettingsPage() {
 			}
 		} catch { /* ignore */ }
 		setLoading(false);
-	};
+	}, []);
 
 	useEffect(() => {
 		// eslint-disable-next-line react-hooks/set-state-in-effect
 		fetchTeams();
-	}, []);
+	}, [fetchTeams]);
 
-	const handleCreate = async () => {
-		if (!newName.trim() || saving) return;
-		setSaving(true);
-		try {
-			const res = await fetch('/api/messaging/teams', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					name: newName.trim(),
-					description: newDescription.trim() || null,
-				}),
-			});
-			if (res.ok) {
-				setShowCreateModal(false);
-				setNewName('');
-				setNewDescription('');
-				fetchTeams();
-			}
-		} catch { /* ignore */ }
-		setSaving(false);
+	const handleCreate = async (data: TeamInput) => {
+		const res = await fetch('/api/messaging/teams', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				name: data.name,
+				description: data.description || null,
+			}),
+		});
+		if (res.ok) {
+			setShowCreateModal(false);
+			fetchTeams();
+		}
 	};
 
 	const removeMember = async (teamId: string, memberId: string) => {
@@ -89,14 +82,15 @@ export default function TeamsSettingsPage() {
 						Управление командами операторов
 					</p>
 				</div>
-				<button
+				<Button
+					type='button'
 					onClick={() => setShowCreateModal(true)}
-					className='inline-flex items-center gap-2 bg-brand hover:bg-brand-hover text-white font-medium px-4 py-2.5 rounded-lg transition-colors text-sm'>
+					className='bg-brand hover:bg-brand-hover text-white'>
 					<svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' strokeWidth={2} stroke='currentColor'>
 						<path strokeLinecap='round' strokeLinejoin='round' d='M12 4.5v15m7.5-7.5h-15' />
 					</svg>
 					Создать команду
-				</button>
+				</Button>
 			</div>
 
 			{loading ? (
@@ -195,42 +189,11 @@ export default function TeamsSettingsPage() {
 					<div className='relative bg-white rounded-2xl shadow-xl max-w-md w-full'>
 						<div className='p-6'>
 							<h2 className='text-lg font-bold text-gray-900 mb-4'>Новая команда</h2>
-
-							<div className='mb-4'>
-								<label className='block text-sm font-medium text-gray-700 mb-1'>Название</label>
-								<input
-									type='text'
-									value={newName}
-									onChange={(e) => setNewName(e.target.value)}
-									placeholder='Поддержка'
-									className='w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand placeholder:text-gray-400'
-								/>
-							</div>
-
-							<div className='mb-4'>
-								<label className='block text-sm font-medium text-gray-700 mb-1'>Описание (необязательно)</label>
-								<input
-									type='text'
-									value={newDescription}
-									onChange={(e) => setNewDescription(e.target.value)}
-									placeholder='Команда первой линии поддержки'
-									className='w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand placeholder:text-gray-400'
-								/>
-							</div>
-
-							<div className='flex gap-3'>
-								<button
-									onClick={() => setShowCreateModal(false)}
-									className='flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors'>
-									Отмена
-								</button>
-								<button
-									onClick={handleCreate}
-									disabled={!newName.trim() || saving}
-									className='flex-1 px-4 py-2.5 text-sm font-medium text-white bg-brand hover:bg-brand-hover rounded-xl transition-colors disabled:opacity-50'>
-									{saving ? 'Сохранение...' : 'Создать'}
-								</button>
-							</div>
+							<TeamForm
+								submitLabel='Создать'
+								onSubmit={handleCreate}
+								onCancel={() => setShowCreateModal(false)}
+							/>
 						</div>
 					</div>
 				</div>

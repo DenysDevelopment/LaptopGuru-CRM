@@ -1,64 +1,82 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+import {
+  createCompanySchema,
+  type CreateCompanyInput,
+} from "@/lib/schemas/company";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+
+function slugify(val: string) {
+  return val
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "");
+}
 
 export function CreateCompanyForm() {
   const [open, setOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [apiError, setApiError] = useState<string | null>(null);
   const router = useRouter();
 
-  function slugify(val: string) {
-    return val
-      .toLowerCase()
-      .replace(/\s+/g, "-")
-      .replace(/[^a-z0-9-]/g, "");
-  }
+  const form = useForm<CreateCompanyInput>({
+    resolver: zodResolver(createCompanySchema),
+    mode: "onTouched",
+    defaultValues: {
+      name: "",
+      slug: "",
+      adminEmail: "",
+      adminName: "",
+      adminPassword: "",
+    },
+  });
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError(null);
+  const [slugTouched, setSlugTouched] = useState(false);
 
-    const fd = new FormData(e.currentTarget);
-    const body = {
-      name: fd.get("name") as string,
-      slug: fd.get("slug") as string,
-      adminEmail: fd.get("adminEmail") as string,
-      adminPassword: fd.get("adminPassword") as string,
-      adminName: fd.get("adminName") as string | undefined,
-    };
-
-    startTransition(async () => {
-      try {
-        const res = await fetch("/api/super-admin/companies", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          setError(data.message ?? `Ошибка ${res.status}`);
-          return;
-        }
-
-        setOpen(false);
-        router.refresh();
-      } catch {
-        setError("Не удалось подключиться к API");
+  async function onSubmit(data: CreateCompanyInput) {
+    setApiError(null);
+    try {
+      const res = await fetch("/api/super-admin/companies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        setApiError(payload.message ?? payload.error ?? `Ошибка ${res.status}`);
+        return;
       }
-    });
+      form.reset();
+      setOpen(false);
+      setSlugTouched(false);
+      router.refresh();
+    } catch {
+      setApiError("Не удалось подключиться к API");
+    }
   }
 
   return (
     <>
-      <button
+      <Button
+        type="button"
         onClick={() => setOpen(true)}
-        className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+        className="bg-blue-600 hover:bg-blue-700 text-white"
       >
         + Новая компания
-      </button>
+      </Button>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -68,114 +86,157 @@ export function CreateCompanyForm() {
                 Создать компанию
               </h2>
               <button
-                onClick={() => { setOpen(false); setError(null); }}
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  setApiError(null);
+                }}
                 className="text-gray-400 hover:text-gray-600 text-xl leading-none"
               >
                 ×
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Название компании
-                </label>
-                <input
+            <Form {...form}>
+              <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="space-y-4"
+              >
+                <FormField
+                  control={form.control}
                   name="name"
-                  type="text"
-                  required
-                  placeholder="LaptopGuru"
-                  onChange={(e) => {
-                    const slugInput = e.currentTarget.form?.querySelector<HTMLInputElement>(
-                      '[name="slug"]'
-                    );
-                    if (slugInput && !slugInput.dataset.touched) {
-                      slugInput.value = slugify(e.target.value);
-                    }
-                  }}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Название компании</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="LaptopGuru"
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            if (!slugTouched) {
+                              form.setValue("slug", slugify(e.target.value), {
+                                shouldValidate: true,
+                              });
+                            }
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Slug{" "}
-                  <span className="text-gray-400 font-normal">(a-z, 0-9, -)</span>
-                </label>
-                <input
+                <FormField
+                  control={form.control}
                   name="slug"
-                  type="text"
-                  required
-                  placeholder="laptopguru"
-                  pattern="[a-z0-9-]+"
-                  onInput={(e) => {
-                    (e.currentTarget as HTMLInputElement).dataset.touched = "1";
-                  }}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Slug{" "}
+                        <span className="text-gray-400 font-normal">
+                          (a-z, 0-9, -)
+                        </span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="laptopguru"
+                          className="font-mono"
+                          {...field}
+                          onChange={(e) => {
+                            setSlugTouched(true);
+                            field.onChange(e);
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
 
-              <hr className="border-gray-100" />
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                Admin-аккаунт
-              </p>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input
-                  name="adminEmail"
-                  type="email"
-                  required
-                  placeholder="admin@laptopguru.com"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Имя</label>
-                <input
-                  name="adminName"
-                  type="text"
-                  placeholder="Иван Иванов"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Пароль</label>
-                <input
-                  name="adminPassword"
-                  type="password"
-                  required
-                  minLength={8}
-                  placeholder="минимум 8 символов"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              {error && (
-                <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
-                  {error}
+                <hr className="border-gray-100" />
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Admin-аккаунт
                 </p>
-              )}
 
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => { setOpen(false); setError(null); }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Отмена
-                </button>
-                <button
-                  type="submit"
-                  disabled={isPending}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                >
-                  {isPending ? "Создаём…" : "Создать"}
-                </button>
-              </div>
-            </form>
+                <FormField
+                  control={form.control}
+                  name="adminEmail"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="email"
+                          placeholder="admin@laptopguru.com"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="adminName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Имя</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Иван Иванов" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="adminPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Пароль</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="password"
+                          placeholder="минимум 8 символов"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {apiError && (
+                  <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
+                    {apiError}
+                  </p>
+                )}
+
+                <div className="flex gap-3 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setOpen(false);
+                      setApiError(null);
+                    }}
+                    className="flex-1"
+                  >
+                    Отмена
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={form.formState.isSubmitting}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    {form.formState.isSubmitting ? "Создаём…" : "Создать"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
           </div>
         </div>
       )}

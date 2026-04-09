@@ -67,6 +67,7 @@ export default async function LandingPage({ params }: Props) {
         customerName: landing.customerName,
         productName: landing.productName,
         language: lang,
+        type: landing.type,
       }}
       video={{
         youtubeId: landing.video.youtubeId,
