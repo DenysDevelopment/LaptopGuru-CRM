@@ -33,11 +33,11 @@ export const FALLBACK_NAME: Record<EmailLanguage, string> = {
 };
 
 export const BUY_BUTTON_BY_LANG: Record<EmailLanguage, string> = {
-  pl: 'Sprawdź ofertę',
-  uk: 'Переглянути пропозицію',
-  ru: 'Смотреть предложение',
-  en: 'View offer',
-  lt: 'Peržiūrėti pasiūlymą',
-  et: 'Vaata pakkumist',
-  lv: 'Skatīt piedāvājumu',
+  pl: 'Przejdź do oferty na Allegro',
+  uk: 'Перейти до пропозиції на Allegro',
+  ru: 'Перейти к предложению на Allegro',
+  en: 'Go to Allegro offer',
+  lt: 'Eiti į Allegro pasiūlymą',
+  et: 'Mine Allegro pakkumisele',
+  lv: 'Doties uz Allegro piedāvājumu',
 };

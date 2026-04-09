@@ -17,13 +17,13 @@ interface SendResultProps {
 }
 
 const MESSAGE_BY_LANG: Record<SendLanguage, string> = {
-  pl: "Aby obejrzeć recenzję wideo, skopiuj link i wklej go do przeglądarki:",
-  uk: "Щоб подивитися відеоогляд, скопіюйте посилання та вставте в браузер:",
-  ru: "Чтобы посмотреть видео-обзор, скопируйте ссылку и вставьте в браузер:",
-  en: "To watch the video review, copy the link and paste it into your browser:",
-  lt: "Norėdami peržiūrėti vaizdo apžvalgą, nukopijuokite nuorodą ir įklijuokite ją į naršyklę:",
-  et: "Videoülevaate vaatamiseks kopeerige link ja kleepige see brauserisse:",
-  lv: "Lai skatītos video apskatu, kopējiet saiti un ielīmējiet to pārlūkprogrammā:",
+  pl: "Dzień dobry, poniżej przesyłam link do wideo recenzji, w której mogą Państwo zapoznać się ze wszystkimi szczegółami.",
+  uk: "Доброго дня, нижче надсилаю посилання на відеоогляд, у якому Ви можете ознайомитися з усіма деталями.",
+  ru: "Добрый день, ниже отправляю ссылку на видеообзор, в котором Вы можете ознакомиться со всеми деталями.",
+  en: "Good day, below I am sending a link to the video review, where you can find all the details.",
+  lt: "Laba diena, žemiau siunčiu nuorodą į vaizdo apžvalgą, kurioje galite susipažinti su visomis detalėmis.",
+  et: "Tere päevast, allpool saadan lingi videoülevaatele, kus saate tutvuda kõigi üksikasjadega.",
+  lv: "Labdien, zemāk nosūtu saiti uz video apskatu, kurā varat iepazīties ar visām detaļām.",
 };
 
 const LANGUAGE_OPTIONS: { value: SendLanguage; label: string }[] = [
