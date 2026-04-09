@@ -66,6 +66,7 @@ export default function SendPage() {
   const [loadingEmails, setLoadingEmails] = useState(true);
   const [loadingVideos, setLoadingVideos] = useState(true);
   const [result, setResult] = useState<SendResultData | null>(null);
+  const [resultLanguage, setResultLanguage] = useState<SendLanguage>("pl");
   const [apiError, setApiError] = useState("");
   const [pendingData, setPendingData] = useState<
     | { kind: "email"; data: SendEmailInput }
@@ -184,6 +185,7 @@ export default function SendPage() {
             (kind === "email" ? "Ошибка отправки" : "Ошибка генерации"),
         );
       } else {
+        setResultLanguage(data.language);
         setResult(payload);
       }
     } catch {
@@ -205,7 +207,14 @@ export default function SendPage() {
   }
 
   if (result) {
-    return <SendResult result={result} mode={mode} onReset={handleReset} />;
+    return (
+      <SendResult
+        result={result}
+        mode={mode}
+        language={resultLanguage}
+        onReset={handleReset}
+      />
+    );
   }
 
   const isAllegro = mode === "allegro";

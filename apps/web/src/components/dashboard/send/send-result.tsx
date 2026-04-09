@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { CopyableLink } from "@/components/ui/copyable-link";
 import type { SendMode } from "./mode-toggle";
+import type { SendLanguage } from "@/lib/schemas/send";
 
 interface SendResultProps {
   result: {
@@ -10,11 +12,53 @@ interface SendResultProps {
     sentEmail?: { status: string };
   };
   mode?: SendMode;
+  language?: SendLanguage;
   onReset: () => void;
 }
 
-export function SendResult({ result, mode = "email", onReset }: SendResultProps) {
+const MESSAGE_BY_LANG: Record<SendLanguage, string> = {
+  pl: "Aby obejrzeć recenzję wideo, skopiuj link i wklej go do przeglądarki:",
+  uk: "Щоб подивитися відеоогляд, скопіюйте посилання та вставте в браузер:",
+  ru: "Чтобы посмотреть видео-обзор, скопируйте ссылку и вставьте в браузер:",
+  en: "To watch the video review, copy the link and paste it into your browser:",
+  lt: "Norėdami peržiūrėti vaizdo apžvalgą, nukopijuokite nuorodą ir įklijuokite ją į naršyklę:",
+  et: "Videoülevaate vaatamiseks kopeerige link ja kleepige see brauserisse:",
+  lv: "Lai skatītos video apskatu, kopējiet saiti un ielīmējiet to pārlūkprogrammā:",
+};
+
+const LANGUAGE_OPTIONS: { value: SendLanguage; label: string }[] = [
+  { value: "pl", label: "Polski" },
+  { value: "uk", label: "Українська" },
+  { value: "ru", label: "Русский" },
+  { value: "en", label: "English" },
+  { value: "lt", label: "Lietuvių" },
+  { value: "et", label: "Eesti" },
+  { value: "lv", label: "Latviešu" },
+];
+
+export function SendResult({
+  result,
+  mode = "email",
+  language = "pl",
+  onReset,
+}: SendResultProps) {
   const isAllegro = mode === "allegro";
+  const [copiedMessage, setCopiedMessage] = useState(false);
+  const [messageLanguage, setMessageLanguage] = useState<SendLanguage>(language);
+  const [allegroMessage, setAllegroMessage] = useState(
+    MESSAGE_BY_LANG[language] ?? MESSAGE_BY_LANG.pl,
+  );
+
+  function handleLanguageChange(lang: SendLanguage) {
+    setMessageLanguage(lang);
+    setAllegroMessage(MESSAGE_BY_LANG[lang] ?? MESSAGE_BY_LANG.pl);
+  }
+
+  function copyMessage() {
+    navigator.clipboard.writeText(allegroMessage);
+    setCopiedMessage(true);
+    setTimeout(() => setCopiedMessage(false), 2000);
+  }
 
   return (
     <div>
@@ -49,7 +93,43 @@ export function SendResult({ result, mode = "email", onReset }: SendResultProps)
           <CopyableLink url={result.shortLink.url} />
         </div>
 
+        {isAllegro && (
+          <div>
+            <div className="flex items-center justify-between mb-1 gap-2">
+              <p className="text-xs text-gray-400">Готовое сообщение для клиента</p>
+              <select
+                value={messageLanguage}
+                onChange={(e) => handleLanguageChange(e.target.value as SendLanguage)}
+                className="text-xs text-gray-600 bg-white border border-gray-200 rounded-md px-2 py-0.5 outline-none focus:border-brand focus:ring-1 focus:ring-brand-muted"
+              >
+                {LANGUAGE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="bg-white rounded-lg border border-gray-200 p-3 space-y-2">
+              <textarea
+                value={allegroMessage}
+                onChange={(e) => setAllegroMessage(e.target.value)}
+                rows={3}
+                className="w-full text-sm text-gray-700 bg-transparent border-0 outline-none resize-none focus:ring-0 p-0"
+                placeholder="Текст сообщения..."
+              />
+              <button
+                type="button"
+                onClick={copyMessage}
+                className="w-full text-xs font-medium text-brand hover:text-brand-hover border border-brand/30 hover:bg-brand-light rounded-md py-1.5 transition-colors"
+              >
+                {copiedMessage ? "Скопировано!" : "Скопировать текст"}
+              </button>
+            </div>
+          </div>
+        )}
+
         <button
+          type="button"
           onClick={onReset}
           className="w-full mt-4 bg-brand hover:bg-brand-hover text-white font-medium py-2.5 rounded-lg transition-colors"
         >
