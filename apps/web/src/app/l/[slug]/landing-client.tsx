@@ -10,7 +10,10 @@ import {
 } from 'lucide-react';
 import { Lato } from 'next/font/google';
 import Image from 'next/image';
+import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useRef, useState } from 'react';
+
+const VideoPlayer = dynamic(() => import('@/components/landing/video-player'), { ssr: false });
 
 const lato = Lato({ weight: ['400', '700'], subsets: ['latin', 'latin-ext'] });
 
@@ -249,8 +252,12 @@ interface Props {
 		type: string;
 	};
 	video: {
-		youtubeId: string;
+		source: string;
+		youtubeId: string | null;
+		videoUrl: string | null;
+		thumbnail: string;
 		title: string;
+		durationSeconds: number | null;
 	};
 }
 
@@ -318,6 +325,7 @@ export function LandingClient({ landing, video }: Props) {
 	const videoPlayedRef = useRef(false);
 	const videoWatchStartRef = useRef<number | null>(null);
 	const videoWatchAccumRef = useRef(0);
+	const videoCompletedRef = useRef(false);
 
 	// Send engagement update — must use PATCH (sendBeacon only does POST, so we avoid it)
 	const sendUpdate = useCallback(
@@ -962,8 +970,9 @@ export function LandingClient({ landing, video }: Props) {
 		return () => document.removeEventListener('visibilitychange', onVisibility);
 	}, []);
 
-	// YouTube iframe API — video tracking via postMessage
+	// YouTube iframe API — video tracking via postMessage (only for YouTube videos)
 	useEffect(() => {
+		if (video.source !== 'YOUTUBE') return;
 		const iframeEl = document.getElementById(
 			'yt-player',
 		) as HTMLIFrameElement | null;
@@ -1078,7 +1087,8 @@ export function LandingClient({ landing, video }: Props) {
 			window.removeEventListener('message', onMessage);
 			observer.disconnect();
 		};
-	}, []);
+		 
+	}, [video.source]);
 
 	// Periodic engagement updates + final update on unload
 	useEffect(() => {
@@ -1099,6 +1109,7 @@ export function LandingClient({ landing, video }: Props) {
 				tabSwitches: tabSwitchesRef.current,
 				videoPlayed: videoPlayedRef.current,
 				videoWatchTime: videoTime,
+				videoCompleted: videoCompletedRef.current,
 				pageVisible: !document.hidden,
 			};
 		}
@@ -1328,14 +1339,43 @@ export function LandingClient({ landing, video }: Props) {
 							{/* Video */}
 							<div data-animate className='px-4 sm:px-6 pb-4'>
 								<div className='relative aspect-video rounded-xl overflow-hidden bg-gray-900 shadow-[0_4px_20px_rgba(0,0,0,0.15)]'>
-									<iframe
-										id='yt-player'
-										src={`https://www.youtube.com/embed/${video.youtubeId}?rel=0&enablejsapi=1`}
-										title={video.title}
-										allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
-										allowFullScreen
-										className='absolute inset-0 w-full h-full'
-									/>
+									{video.source === 'S3' && video.videoUrl ? (
+										<VideoPlayer
+											src={video.videoUrl}
+											poster={video.thumbnail}
+											onPlay={() => {
+												videoPlayedRef.current = true;
+												if (!videoWatchStartRef.current) videoWatchStartRef.current = Date.now();
+											}}
+											onPause={() => {
+												if (videoWatchStartRef.current) {
+													videoWatchAccumRef.current += Math.round(
+														(Date.now() - videoWatchStartRef.current) / 1000,
+													);
+													videoWatchStartRef.current = null;
+												}
+											}}
+											onEnded={() => {
+												videoCompletedRef.current = true;
+												if (videoWatchStartRef.current) {
+													videoWatchAccumRef.current += Math.round(
+														(Date.now() - videoWatchStartRef.current) / 1000,
+													);
+													videoWatchStartRef.current = null;
+												}
+											}}
+											onTimeUpdate={() => { /* Phase 8 analytics */ }}
+										/>
+									) : video.youtubeId ? (
+										<iframe
+											id='yt-player'
+											src={`https://www.youtube.com/embed/${video.youtubeId}?rel=0&enablejsapi=1`}
+											title={video.title}
+											allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
+											allowFullScreen
+											className='absolute inset-0 w-full h-full'
+										/>
+									) : null}
 								</div>
 							</div>
 						</div>

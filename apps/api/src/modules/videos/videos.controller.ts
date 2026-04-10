@@ -17,6 +17,8 @@ import { VideosService } from './videos.service';
 import { PERMISSIONS } from '@laptopguru-crm/shared';
 import { AddVideoDto } from './dto/add-video.dto';
 import { UpdateYoutubeChannelDto } from './dto/update-youtube-channel.dto';
+import { UploadInitDto } from './dto/upload-init.dto';
+import { UploadCompleteDto } from './dto/upload-complete.dto';
 
 @ApiTags('Videos')
 @ApiBearerAuth()
@@ -59,6 +61,18 @@ export class VideosController {
   @RequirePermissions(PERMISSIONS.VIDEOS_WRITE)
   removeYoutubeChannel() {
     return this.videosService.removeYoutubeChannel();
+  }
+
+  @Post('upload-init')
+  @RequirePermissions(PERMISSIONS.VIDEOS_WRITE)
+  uploadInit(@Body() dto: UploadInitDto, @CurrentUser() user: JwtUser) {
+    return this.videosService.createUploadInit(dto, user.id);
+  }
+
+  @Post('upload-complete')
+  @RequirePermissions(PERMISSIONS.VIDEOS_WRITE)
+  uploadComplete(@Body() dto: UploadCompleteDto) {
+    return this.videosService.createUploadComplete(dto.videoId);
   }
 
   @Delete(':id')

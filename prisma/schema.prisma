@@ -60,6 +60,7 @@ model Company {
   auditLogs          AuditLog[]
   landingVisits      LandingVisit[]
   quickLinkVisits    QuickLinkVisit[]
+  videoWatchEvents   VideoWatchEvent[]
 }
 
 model User {
@@ -135,25 +136,101 @@ model IncomingEmail {
   @@unique([messageId, companyId])
 }
 
+enum VideoSource {
+  YOUTUBE
+  S3
+}
+
+enum VideoStatus {
+  UPLOADING
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum VideoEventType {
+  PLAY
+  PAUSE
+  SEEK
+  ENDED
+  HEARTBEAT
+  RATE_CHANGE
+  QUALITY_CHANGE
+  FULLSCREEN
+  ERROR
+}
+
 model Video {
-  id            String    @id @default(cuid())
-  youtubeId     String
-  title         String
-  thumbnail     String
-  duration      String?
-  channelTitle  String?
-  publishedAt   DateTime?
-  active        Boolean   @default(true)
-  addedBy       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId        String
-  companyId     String
-  company       Company   @relation(fields: [companyId], references: [id])
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                  String       @id @default(cuid())
+  source              VideoSource  @default(YOUTUBE)
+  status              VideoStatus  @default(READY)
 
-  landings      Landing[]
+  // YouTube
+  youtubeId           String?
+  channelTitle        String?
+  publishedAt         DateTime?
+  youtubeUploadStatus String?
+  youtubeUploadError  String?
+  youtubeQuotaRetryAt DateTime?
 
-  @@unique([youtubeId, companyId])
+  // Common metadata
+  title               String
+  thumbnail           String
+  duration            String?
+  durationSeconds     Int?
+
+  // S3
+  s3Bucket            String?
+  s3KeyOriginal       String?
+  s3KeyOutput         String?
+  s3KeyThumb          String?
+  cloudFrontThumbUrl  String?
+  mediaConvertJobId   String?
+  fileSize            BigInt?
+  mimeType            String?
+  uploadError         String?
+
+  active              Boolean      @default(true)
+  addedBy             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId              String
+  companyId           String
+  company             Company      @relation(fields: [companyId], references: [id])
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  landings            Landing[]
+  watchEvents         VideoWatchEvent[]
+
+  @@unique([youtubeId, companyId], name: "youtubeId_companyId")
+  @@index([companyId])
+  @@index([companyId, status])
+}
+
+model VideoWatchEvent {
+  id              String         @id @default(cuid())
+  landingVisitId  String
+  landingVisit    LandingVisit   @relation(fields: [landingVisitId], references: [id], onDelete: Cascade)
+  videoId         String
+  video           Video          @relation(fields: [videoId], references: [id])
+
+  eventType       VideoEventType
+  position        Float
+  seekFrom        Float?
+  seekTo          Float?
+  playbackRate    Float          @default(1.0)
+  volume          Float?
+  isFullscreen    Boolean?
+  errorMessage    String?
+
+  clientTimestamp  DateTime
+  serverTimestamp  DateTime       @default(now())
+
+  companyId       String
+  company         Company        @relation(fields: [companyId], references: [id])
+
+  @@index([videoId, serverTimestamp])
+  @@index([videoId, eventType])
+  @@index([landingVisitId])
   @@index([companyId])
 }
 
@@ -386,6 +463,8 @@ model LandingVisit {
 
   // Extended data — all exotic fingerprinting in JSON
   extendedData    Json?
+
+  watchEvents     VideoWatchEvent[]
 
   @@index([landingId])
   @@index([visitedAt])

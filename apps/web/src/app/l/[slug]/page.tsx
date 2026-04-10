@@ -2,6 +2,10 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import type { Metadata } from "next";
 import { LandingClient } from "./landing-client";
+import { signVideoUrl } from "@/lib/cloudfront-signer";
+
+// CloudFront signer uses node:crypto — must not run on Edge
+export const runtime = "nodejs";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -55,6 +59,18 @@ export default async function LandingPage({ params }: Props) {
 
   const lang = (landing.language || "pl") as "pl" | "uk" | "ru" | "en" | "lt" | "et" | "lv";
 
+  // For S3 videos, generate signed CloudFront URL
+  const video = landing.video;
+  const isS3 = video.source === "S3" && video.s3KeyOutput;
+  let signedVideoUrl: string | null = null;
+  if (isS3) {
+    try {
+      signedVideoUrl = signVideoUrl(video.s3KeyOutput!);
+    } catch {
+      // CloudFront not configured — fall back to no video
+    }
+  }
+
   return (
     <LandingClient
       landing={{
@@ -70,8 +86,12 @@ export default async function LandingPage({ params }: Props) {
         type: landing.type,
       }}
       video={{
-        youtubeId: landing.video.youtubeId,
-        title: landing.video.title,
+        source: video.source,
+        youtubeId: video.youtubeId,
+        videoUrl: signedVideoUrl,
+        thumbnail: video.thumbnail,
+        title: video.title,
+        durationSeconds: video.durationSeconds,
       }}
     />
   );
