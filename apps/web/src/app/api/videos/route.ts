@@ -18,7 +18,13 @@ export async function GET() {
     orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
   });
 
-  return NextResponse.json(videos);
+  // BigInt (fileSize) can't be JSON-serialized — convert to number
+  const serializable = videos.map((v) => ({
+    ...v,
+    fileSize: v.fileSize ? Number(v.fileSize) : null,
+  }));
+
+  return NextResponse.json(serializable);
 }
 
 export async function POST(request: NextRequest) {
