@@ -1,6 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
+import Link from "next/link";
 
 export function ImpersonationBanner() {
   const { data: session } = useSession();
@@ -15,12 +16,12 @@ export function ImpersonationBanner() {
       <span>
         👁 Просмотр компании: <strong>{companyId}</strong>
       </span>
-      <a
+      <Link
         href="/super-admin/companies"
         className="bg-black text-white px-3 py-1 rounded text-xs hover:bg-gray-800 transition-colors"
       >
         Выйти из просмотра →
-      </a>
+      </Link>
     </div>
   );
 }
