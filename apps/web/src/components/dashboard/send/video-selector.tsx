@@ -36,13 +36,17 @@ export function VideoSelector({ videos, loading, selectedId, onSelect }: VideoSe
               }`}
             >
               <div className="relative aspect-video bg-gray-100">
-                <Image
-                  src={video.thumbnail}
-                  alt={video.title}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 1024px) 50vw, 25vw"
-                />
+                {video.thumbnail ? (
+                  <Image
+                    src={video.thumbnail}
+                    alt={video.title}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 1024px) 50vw, 25vw"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-xs">Нет превью</div>
+                )}
                 {video.duration && (
                   <span className="absolute bottom-1 right-1 bg-black/80 text-white text-[10px] px-1 rounded">
                     {video.duration}

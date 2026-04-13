@@ -3,6 +3,23 @@ import { prisma } from "@/lib/db";
 import { parseUA } from "@/lib/utils/user-agent";
 import { geolocate } from "@/lib/utils/geo";
 import { extractDomain, extractHeaders, extractIP } from "@/lib/utils/headers";
+import { resolveCompanyFromRequest } from "@/lib/domain";
+
+// In-memory rate limiter for visit creation (single-instance; upgrade to Redis if scaling horizontally)
+const visitRateMap = new Map<string, { count: number; resetAt: number }>();
+const MAX_VISITS_PER_IP = 10;
+const VISIT_WINDOW_MS = 60_000;
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const entry = visitRateMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    visitRateMap.set(ip, { count: 1, resetAt: now + VISIT_WINDOW_MS });
+    return false;
+  }
+  entry.count++;
+  return entry.count > MAX_VISITS_PER_IP;
+}
 
 // CREATE — initial visit
 export async function POST(
@@ -11,13 +28,21 @@ export async function POST(
 ) {
   const { slug } = await params;
 
-  const landing = await prisma.landing.findFirst({ where: { slug }, select: { id: true, companyId: true } });
+  const companyId = await resolveCompanyFromRequest(request);
+  const landing = await prisma.landing.findFirst({ where: { slug, ...(companyId ? { companyId } : {}) }, select: { id: true, companyId: true } });
   if (!landing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await request.json().catch(() => ({}));
+
   const ua = request.headers.get("user-agent") || "";
   const ip = extractIP(request);
   const refHeader = request.headers.get("referer") || body.referrer || null;
+
+  // Rate limit by IP
+  if (isRateLimited(ip || "unknown")) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   const parsed = parseUA(ua);
   const geo = ip ? await geolocate(ip) : { country: null, countryCode: null, city: null, region: null, timezone: null, lat: null, lon: null, isp: null, org: null, asNumber: null };
   const headers = extractHeaders(request);
@@ -107,16 +132,25 @@ export async function PATCH(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  void slug;
 
   const body = await request.json().catch(() => ({}));
   const { visitId, ...updates } = body;
 
   if (!visitId) return NextResponse.json({ error: "visitId required" }, { status: 400 });
 
+  // Verify that the visit belongs to the landing identified by slug
+  const visit = await prisma.landingVisit.findUnique({
+    where: { id: visitId },
+    include: { landing: { select: { slug: true } } },
+  });
+  if (!visit || visit.landing.slug !== slug) {
+    return NextResponse.json({ error: "Invalid visit" }, { status: 404 });
+  }
+
   const allowedFields = [
     "timeOnPage", "maxScrollDepth", "buyButtonClicked",
     "videoPlayed", "videoWatchTime", "videoCompleted",
+    "videoTimeToPlay", "videoBufferCount", "videoBufferTime", "videoDroppedFrames",
     "pageVisible", "tabSwitches", "totalClicks",
   ];
 

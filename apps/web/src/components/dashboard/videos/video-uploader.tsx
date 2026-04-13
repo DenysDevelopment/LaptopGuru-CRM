@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
+import { VideoUploadModal } from './video-upload-modal';
 
 const MAX_BYTES = 2_147_483_648; // 2 GB
 
@@ -15,6 +16,13 @@ export function VideoUploader({ onUploadComplete }: Props) {
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Modal state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [videoId, setVideoId] = useState<string | null>(null);
+  const [fileName, setFileName] = useState('');
+  const [fileSize, setFileSize] = useState(0);
+  const [defaultTitle, setDefaultTitle] = useState('');
+
   const handleFile = useCallback(async (file: File) => {
     setError('');
 
@@ -27,11 +35,16 @@ export function VideoUploader({ onUploadComplete }: Props) {
       return;
     }
 
+    const title = file.name.replace(/\.[^.]+$/, '');
+
     setUploading(true);
     setProgress(0);
+    setFileName(file.name);
+    setFileSize(file.size);
+    setDefaultTitle(title);
 
     try {
-      // Step 1: get presigned POST
+      // Step 1: get presigned PUT URL
       const initRes = await fetch('/api/videos/upload-init', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -39,7 +52,8 @@ export function VideoUploader({ onUploadComplete }: Props) {
           fileName: file.name,
           fileSize: file.size,
           mimeType: file.type,
-          title: file.name.replace(/\.[^.]+$/, ''),
+          title,
+          publishToYoutube: false,
         }),
       });
 
@@ -48,18 +62,15 @@ export function VideoUploader({ onUploadComplete }: Props) {
         throw new Error(data.error || 'Upload init failed');
       }
 
-      const { videoId, postUrl, formFields } = await initRes.json();
+      const { videoId: vid, putUrl } = await initRes.json();
+      setVideoId(vid);
+      setModalOpen(true);
 
-      // Step 2: upload to S3 via presigned POST form
-      const formData = new FormData();
-      for (const [key, value] of Object.entries(formFields)) {
-        formData.append(key, value as string);
-      }
-      formData.append('file', file); // file MUST be last
-
+      // Step 2: upload to S3 via presigned PUT
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', postUrl, true);
+        xhr.open('PUT', putUrl, true);
+        xhr.setRequestHeader('Content-Type', file.type);
 
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) {
@@ -75,14 +86,14 @@ export function VideoUploader({ onUploadComplete }: Props) {
           }
         };
         xhr.onerror = () => reject(new Error('Network error during upload'));
-        xhr.send(formData);
+        xhr.send(file);
       });
 
       // Step 3: confirm upload
       const completeRes = await fetch('/api/videos/upload-complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ videoId }),
+        body: JSON.stringify({ videoId: vid }),
       });
 
       if (!completeRes.ok) {
@@ -95,7 +106,6 @@ export function VideoUploader({ onUploadComplete }: Props) {
       setError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setUploading(false);
-      setProgress(0);
     }
   }, [onUploadComplete]);
 
@@ -111,6 +121,15 @@ export function VideoUploader({ onUploadComplete }: Props) {
     if (file) handleFile(file);
     e.target.value = '';
   }, [handleFile]);
+
+  function handleModalClose() {
+    setModalOpen(false);
+  }
+
+  function handleModalSaved() {
+    setModalOpen(false);
+    onUploadComplete();
+  }
 
   return (
     <div className="mb-6">
@@ -154,6 +173,19 @@ export function VideoUploader({ onUploadComplete }: Props) {
       </div>
 
       {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
+
+      {modalOpen && videoId && (
+        <VideoUploadModal
+          videoId={videoId}
+          fileName={fileName}
+          fileSize={fileSize}
+          progress={progress}
+          uploading={uploading}
+          defaultTitle={defaultTitle}
+          onClose={handleModalClose}
+          onSaved={handleModalSaved}
+        />
+      )}
     </div>
   );
 }

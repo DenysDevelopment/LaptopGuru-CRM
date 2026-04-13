@@ -12,6 +12,7 @@ export class VideoTranscodeStartProcessor extends WorkerHost {
     private readonly prisma: PrismaService,
     private readonly mediaConvertService: MediaConvertService,
     @InjectQueue('video-transcode-poll') private readonly pollQueue: Queue,
+    @InjectQueue('youtube-upload') private readonly youtubeUploadQueue: Queue,
   ) {
     super();
   }
@@ -61,6 +62,41 @@ export class VideoTranscodeStartProcessor extends WorkerHost {
           where: { id: video.id },
           data: { status: 'FAILED', uploadError: `Transcode start failed: ${err instanceof Error ? err.message : err}` },
         });
+      }
+    }
+
+    // Catch-up: find READY videos that need YouTube upload but were missed
+    const pendingYoutube = await this.prisma.video.findMany({
+      where: {
+        source: 'S3',
+        status: 'READY',
+        publishToYoutube: true,
+        youtubeUploadStatus: null,
+        s3KeyOriginal: { not: null },
+      },
+      take: 5,
+    });
+
+    for (const v of pendingYoutube) {
+      try {
+        await this.youtubeUploadQueue.add(
+          'upload',
+          { videoId: v.id },
+          {
+            jobId: `yt-upload-${v.id}`,
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 60_000 },
+          },
+        );
+        await this.prisma.video.update({
+          where: { id: v.id },
+          data: { youtubeUploadStatus: 'pending' },
+        });
+        this.logger.log(`Catch-up: queued YouTube upload for video ${v.id}`);
+      } catch (err) {
+        this.logger.error(
+          `Failed to queue YouTube upload for video ${v.id}: ${err instanceof Error ? err.message : err}`,
+        );
       }
     }
   }

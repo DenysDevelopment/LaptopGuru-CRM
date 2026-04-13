@@ -13,6 +13,7 @@ export interface VideoDTO {
   youtubeUploadStatus: string | null;
   s3KeyOutput: string | null;
   cloudFrontThumbUrl: string | null;
+  publishToYoutube: boolean;
   createdAt: string;
 }
 
@@ -21,11 +22,11 @@ export interface UploadInitRequest {
   fileSize: number;
   mimeType: string;
   title: string;
+  publishToYoutube?: boolean;
 }
 
 export interface UploadInitResponse {
   videoId: string;
-  postUrl: string;
-  formFields: Record<string, string>;
+  putUrl: string;
   key: string;
 }

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { resolveCompanyFromRequest } from "@/lib/domain";
 
-// Simple in-memory rate limiter for click tracking
+// In-memory rate limiter for click tracking (single-instance; resets on deploy; upgrade to Redis if scaling horizontally)
 const clickRateMap = new Map<string, { count: number; resetAt: number }>();
 const MAX_CLICKS_PER_IP = 30;
 const WINDOW_MS = 60_000; // 1 minute
@@ -34,8 +35,9 @@ export async function POST(
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
+  const companyId = await resolveCompanyFromRequest(request);
   const result = await prisma.landing.updateMany({
-    where: { slug },
+    where: { slug, ...(companyId ? { companyId } : {}) },
     data: { clicks: { increment: 1 } },
   });
 

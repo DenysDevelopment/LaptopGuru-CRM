@@ -32,6 +32,7 @@ export class YouTubeUploadRetryProcessor extends WorkerHost {
       });
 
       await this.uploadQueue.add('upload', { videoId: video.id }, {
+        jobId: `yt-upload-${video.id}`,
         attempts: 3,
         backoff: { type: 'exponential', delay: 60_000 },
       });

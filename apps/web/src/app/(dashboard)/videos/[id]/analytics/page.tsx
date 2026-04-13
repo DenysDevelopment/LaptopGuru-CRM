@@ -2,11 +2,41 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import type { VideoAnalyticsData } from '@laptopguru-crm/shared';
 import {
   AreaChart, Area, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
+
+interface AnalyticsResponse {
+  overview: {
+    totalViews: number;
+    uniqueViewers: number;
+    totalWatchTime: number;
+    avgViewDuration: number;
+    completionRate: number;
+    playRate: number;
+  };
+  durationSeconds: number;
+  retention: { second: number; viewers: number; viewersPercent: number }[];
+  viewsTimeSeries: { date: string; views: number }[];
+  replayHeatmap: { second: number; intensity: number }[];
+  sessionStrips: {
+    sessionId: string;
+    startedAt: string;
+    country: string | null;
+    device: string | null;
+    segments: boolean[];
+  }[];
+  recentWatches: {
+    sessionId: string;
+    startedAt: string;
+    duration: number;
+    completed: boolean;
+    country: string | null;
+    device: string | null;
+    browser: string | null;
+  }[];
+}
 
 type DateRange = '7d' | '30d' | '90d';
 
@@ -28,6 +58,10 @@ function formatSeconds(s: number): string {
   return m > 0 ? `${m}м ${sec}с` : `${sec}с`;
 }
 
+function formatTimecode(s: number): string {
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
 function formatPercent(n: number): string {
   return `${(n * 100).toFixed(1)}%`;
 }
@@ -36,7 +70,7 @@ export default function VideoAnalyticsPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [range, setRange] = useState<DateRange>('30d');
-  const [data, setData] = useState<VideoAnalyticsData | null>(null);
+  const [data, setData] = useState<AnalyticsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -82,7 +116,7 @@ export default function VideoAnalyticsPage() {
 
   if (!data) return null;
 
-  const { overview, retention, viewsTimeSeries } = data;
+  const { overview, durationSeconds, retention, viewsTimeSeries, replayHeatmap, sessionStrips, recentWatches } = data;
 
   return (
     <div>
@@ -123,6 +157,66 @@ export default function VideoAnalyticsPage() {
         <Card label="Play rate" value={formatPercent(overview.playRate)} />
       </div>
 
+      {/* Watch Heatmap — aggregate intensity per segment */}
+      {replayHeatmap && replayHeatmap.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
+          <h2 className="text-sm font-medium text-gray-700 mb-1">Тепловая карта просмотра</h2>
+          <p className="text-xs text-gray-400 mb-3">Яркие сегменты — смотрели чаще, тёмные — пропускали</p>
+          <div className="flex gap-px h-10 rounded-lg overflow-hidden">
+            {replayHeatmap.map((h, i) => (
+              <div
+                key={i}
+                className="flex-1 relative group cursor-default"
+                style={{
+                  backgroundColor: h.intensity > 0
+                    ? `rgba(99, 102, 241, ${0.15 + h.intensity * 0.85})`
+                    : '#f3f4f6',
+                }}
+              >
+                <div className="absolute -top-9 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none z-10">
+                  {formatTimecode(h.second)} — {Math.round(h.intensity * 100)}%
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+            <span>0:00</span>
+            <span>{formatTimecode(durationSeconds)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Per-session watch strips */}
+      {sessionStrips && sessionStrips.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
+          <h2 className="text-sm font-medium text-gray-700 mb-1">Что смотрел каждый зритель</h2>
+          <p className="text-xs text-gray-400 mb-3">Каждая полоска — один зритель. Цветные сегменты — смотрел, серые — пропустил</p>
+          <div className="space-y-1.5">
+            {sessionStrips.map((s) => (
+              <div key={s.sessionId} className="flex items-center gap-2">
+                <div className="text-[10px] text-gray-400 w-20 flex-shrink-0 truncate" title={[s.country, s.device].filter(Boolean).join(' · ')}>
+                  {s.startedAt ? new Date(s.startedAt).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) : ''}
+                  {' '}
+                  {s.country || ''}
+                </div>
+                <div className="flex gap-px flex-1 h-5 rounded overflow-hidden">
+                  {s.segments.map((watched, i) => (
+                    <div
+                      key={i}
+                      className={`flex-1 ${watched ? 'bg-indigo-500' : 'bg-gray-200'}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between text-[10px] text-gray-400 mt-1 pl-[88px]">
+            <span>0:00</span>
+            <span>{formatTimecode(durationSeconds)}</span>
+          </div>
+        </div>
+      )}
+
       {/* Retention Chart */}
       {retention.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
@@ -132,7 +226,7 @@ export default function VideoAnalyticsPage() {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis
                 dataKey="second"
-                tickFormatter={(s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`}
+                tickFormatter={(s: number) => formatTimecode(s)}
                 fontSize={12}
               />
               <YAxis
@@ -142,7 +236,7 @@ export default function VideoAnalyticsPage() {
               />
               <Tooltip
                 formatter={(v: unknown) => [`${(Number(v) * 100).toFixed(1)}%`, 'Удержание']}
-                labelFormatter={(s: unknown) => `${Math.floor(Number(s) / 60)}:${String(Number(s) % 60).padStart(2, '0')}`}
+                labelFormatter={(s: unknown) => formatTimecode(Number(s))}
               />
               <Area
                 type="monotone"
@@ -169,6 +263,26 @@ export default function VideoAnalyticsPage() {
               <Line type="monotone" dataKey="views" stroke="#6366f1" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Recent Watches */}
+      {recentWatches && recentWatches.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 p-5">
+          <h2 className="text-sm font-medium text-gray-700 mb-4">Последние просмотры</h2>
+          <div className="space-y-2">
+            {recentWatches.map((w) => (
+              <div key={w.sessionId} className="flex items-center gap-3 text-xs py-2 border-b border-gray-50 last:border-0">
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${w.completed ? 'bg-green-500' : 'bg-yellow-400'}`} />
+                <span className="text-gray-500 w-28 flex-shrink-0">
+                  {new Date(w.startedAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                </span>
+                <span className="text-gray-700 font-medium w-16">{formatSeconds(w.duration)}</span>
+                <span className="text-gray-400">{[w.country, w.device, w.browser].filter(Boolean).join(' · ') || '—'}</span>
+                {w.completed && <span className="text-green-600 ml-auto">Досмотрел</span>}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

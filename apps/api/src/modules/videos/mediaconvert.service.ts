@@ -10,10 +10,10 @@ import {
 export class MediaConvertService {
   private readonly logger = new Logger(MediaConvertService.name);
   private client: MediaConvertClient | null = null;
-  private readonly region = process.env.AWS_REGION || 'eu-central-1';
+  private readonly region = process.env.AWS_MEDIACONVERT_REGION || 'eu-central-1';
   private readonly roleArn = process.env.AWS_MEDIACONVERT_ROLE_ARN || '';
   private readonly queueArn = process.env.AWS_MEDIACONVERT_QUEUE_ARN || '';
-  private readonly bucket = process.env.AWS_S3_VIDEO_BUCKET || 'shorterlink-videos-eu-central-1';
+  private readonly bucket = process.env.AWS_S3_VIDEO_BUCKET || 'laptopguru-videos-eu';
 
   private async getClient(): Promise<MediaConvertClient> {
     if (this.client) return this.client;
@@ -83,7 +83,6 @@ export class MediaConvertService {
                       H264Settings: {
                         RateControlMode: 'CBR',
                         Bitrate: 2_500_000,
-                        MaxBitrate: 3_000_000,
                         CodecProfile: 'HIGH',
                         CodecLevel: 'AUTO',
                       },
