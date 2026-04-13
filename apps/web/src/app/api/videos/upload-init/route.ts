@@ -30,6 +30,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Only video files accepted" }, { status: 400 });
   }
 
+  if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
+    return NextResponse.json({ error: "AWS credentials not configured" }, { status: 500 });
+  }
+
   const video = await prisma.video.create({
     data: {
       source: "S3",

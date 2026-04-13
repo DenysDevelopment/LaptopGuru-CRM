@@ -58,11 +58,15 @@ export function VideoUploader({ onUploadComplete }: Props) {
       });
 
       if (!initRes.ok) {
-        const data = await initRes.json();
+        const data = await initRes.json().catch(() => ({}));
         throw new Error(data.error || 'Upload init failed');
       }
 
-      const { videoId: vid, putUrl } = await initRes.json();
+      const initData = await initRes.json().catch(() => null);
+      if (!initData?.videoId || !initData?.putUrl) {
+        throw new Error('Invalid response from server');
+      }
+      const { videoId: vid, putUrl } = initData;
       setVideoId(vid);
       setModalOpen(true);
 
