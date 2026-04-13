@@ -10,15 +10,20 @@ function getPrivateKey(): string {
   return cachedPem;
 }
 
-export function signVideoUrl(s3KeyOutput: string, ttlSeconds = 14400): string {
+export function signVideoUrl(s3KeyOutput: string, ttlSeconds = 14400): string | null {
   const domain = process.env.AWS_CLOUDFRONT_DOMAIN;
-  if (!domain) throw new Error('AWS_CLOUDFRONT_DOMAIN not set');
+  const keyPairId = process.env.AWS_CLOUDFRONT_KEY_PAIR_ID;
+  if (!domain || !keyPairId || !process.env.AWS_CLOUDFRONT_PRIVATE_KEY_BASE64) return null;
 
-  const url = `https://${domain}/${s3KeyOutput}`;
-  return getSignedUrl({
-    url,
-    keyPairId: process.env.AWS_CLOUDFRONT_KEY_PAIR_ID!,
-    dateLessThan: new Date(Date.now() + ttlSeconds * 1000).toISOString(),
-    privateKey: getPrivateKey(),
-  });
+  try {
+    const url = `https://${domain}/${s3KeyOutput}`;
+    return getSignedUrl({
+      url,
+      keyPairId,
+      dateLessThan: new Date(Date.now() + ttlSeconds * 1000).toISOString(),
+      privateKey: getPrivateKey(),
+    });
+  } catch {
+    return null;
+  }
 }

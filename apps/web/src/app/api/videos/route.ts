@@ -12,14 +12,19 @@ const CF_PRIVATE_KEY = process.env.AWS_CLOUDFRONT_PRIVATE_KEY_BASE64
   : "";
 const CF_TTL = Number(process.env.CLOUDFRONT_SIGNED_URL_TTL_SECONDS || 14400);
 
-function signCfUrl(s3Key: string): string {
-  const url = `https://${CF_DOMAIN}/${s3Key}`;
-  return getSignedUrl({
-    url,
-    keyPairId: CF_KEY_PAIR_ID,
-    dateLessThan: new Date(Date.now() + CF_TTL * 1000).toISOString(),
-    privateKey: CF_PRIVATE_KEY,
-  });
+function signCfUrl(s3Key: string): string | null {
+  if (!CF_DOMAIN || !CF_KEY_PAIR_ID || !CF_PRIVATE_KEY) return null;
+  try {
+    const url = `https://${CF_DOMAIN}/${s3Key}`;
+    return getSignedUrl({
+      url,
+      keyPairId: CF_KEY_PAIR_ID,
+      dateLessThan: new Date(Date.now() + CF_TTL * 1000).toISOString(),
+      privateKey: CF_PRIVATE_KEY,
+    });
+  } catch {
+    return null;
+  }
 }
 
 export async function GET() {
