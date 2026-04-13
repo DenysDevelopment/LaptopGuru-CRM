@@ -89,9 +89,22 @@ export class SuperAdminCompaniesService {
     return company;
   }
 
-  async update(id: string, data: { name?: string; description?: string; logo?: string }) {
+  async update(id: string, data: { name?: string; description?: string; logo?: string; customDomain?: string | null }) {
     const company = await this.prisma.raw.company.findUnique({ where: { id } });
     if (!company) throw new NotFoundException('Company not found');
+
+    if (data.customDomain !== undefined && data.customDomain !== null) {
+      const domain = data.customDomain.toLowerCase().trim();
+      if (!/^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/.test(domain)) {
+        throw new BadRequestException('Invalid domain format');
+      }
+      const existing = await this.prisma.raw.company.findFirst({
+        where: { customDomain: domain, id: { not: id } },
+      });
+      if (existing) throw new ConflictException('Domain already in use by another company');
+      data.customDomain = domain;
+    }
+
     return this.prisma.raw.company.update({ where: { id }, data });
   }
 

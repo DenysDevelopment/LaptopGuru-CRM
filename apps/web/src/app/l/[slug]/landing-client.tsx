@@ -10,7 +10,10 @@ import {
 } from 'lucide-react';
 import { Lato } from 'next/font/google';
 import Image from 'next/image';
+import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useRef, useState } from 'react';
+
+const VideoPlayer = dynamic(() => import('@/components/landing/video-player'), { ssr: false });
 
 const lato = Lato({ weight: ['400', '700'], subsets: ['latin', 'latin-ext'] });
 
@@ -249,8 +252,13 @@ interface Props {
 		type: string;
 	};
 	video: {
-		youtubeId: string;
+		id: string;
+		source: string;
+		youtubeId: string | null;
+		videoUrl: string | null;
+		thumbnail: string;
 		title: string;
+		durationSeconds: number | null;
 	};
 }
 
@@ -311,6 +319,7 @@ export function LandingClient({ landing, video }: Props) {
 	const specs = parseSpecs(landing.productName) || parseSpecs(video.title);
 
 	const visitIdRef = useRef<string | null>(null);
+	const visitIdPromise = useRef<{ resolve: (id: string) => void; promise: Promise<string> }>(null);
 	const startTimeRef = useRef<number>(null);
 	const maxScrollRef = useRef(0);
 	const clickCountRef = useRef(0);
@@ -318,31 +327,79 @@ export function LandingClient({ landing, video }: Props) {
 	const videoPlayedRef = useRef(false);
 	const videoWatchStartRef = useRef<number | null>(null);
 	const videoWatchAccumRef = useRef(0);
+	const videoCompletedRef = useRef(false);
+	const videoEventsBuffer = useRef<{ eventType: string; position: number; seekFrom?: number; seekTo?: number; clientTimestamp: string }[]>([]);
+	const lastHeartbeatRef = useRef(0);
+	const lastSentHeartbeatPos = useRef(-5);
+	// Buffer/quality tracking
+	const bufferStartRef = useRef<number | null>(null);
+	const bufferCountRef = useRef(0);
+	const bufferTotalMsRef = useRef(0);
+	const firstPlayTimeRef = useRef<number | null>(null);
 
-	// Send engagement update — must use PATCH (sendBeacon only does POST, so we avoid it)
-	const sendUpdate = useCallback(
-		(data: Record<string, unknown>) => {
-			if (!visitIdRef.current) return;
-			const body = JSON.stringify({ visitId: visitIdRef.current, ...data });
-			try {
-				fetch(`/api/landings/${landing.slug}/track`, {
-					method: 'PATCH',
-					headers: { 'Content-Type': 'application/json' },
-					body,
-					keepalive: true, // ensures delivery even on page unload
-				}).catch(() => {});
-			} catch {
-				/* ignore */
-			}
-		},
-		[landing.slug],
-	);
+	// Create a promise that resolves when visitId is ready
+	if (visitIdPromise.current == null) {
+		let resolve: (id: string) => void;
+		const promise = new Promise<string>((r) => { resolve = r; });
+		visitIdPromise.current = { resolve: resolve!, promise };
+	}
+
+	// POST video events — waits for visitId if not ready
+	const postVideoEvents = useCallback((events: typeof videoEventsBuffer.current) => {
+		if (events.length === 0 || video.source !== 'S3') return;
+		const doPost = (visitId: string) => {
+			fetch(`/api/landings/${landing.slug}/video-events`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ videoId: video.id, landingVisitId: visitId, events }),
+				keepalive: true,
+			}).then(r => {
+				if (!r.ok) console.warn('[video-events] POST failed:', r.status);
+			}).catch(e => console.warn('[video-events] POST error:', e));
+		};
+		if (visitIdRef.current) {
+			doPost(visitIdRef.current);
+		} else {
+			visitIdPromise.current!.promise.then(doPost);
+		}
+	}, [landing.slug, video.id, video.source]);
+
+	// PATCH engagement — waits for visitId if not ready
+	const sendUpdate = useCallback((data: Record<string, unknown>) => {
+		const doPatch = (visitId: string) => {
+			fetch(`/api/landings/${landing.slug}/track`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ visitId, ...data }),
+				keepalive: true,
+			}).then(r => {
+				if (!r.ok) console.warn('[track] PATCH failed:', r.status);
+			}).catch(e => console.warn('[track] PATCH error:', e));
+		};
+		if (visitIdRef.current) {
+			doPatch(visitIdRef.current);
+		} else {
+			visitIdPromise.current!.promise.then(doPatch);
+		}
+	}, [landing.slug]);
+
+	// Flush buffered heartbeats
+	const flushVideoEvents = useCallback(() => {
+		const events = videoEventsBuffer.current;
+		if (events.length === 0) return;
+		videoEventsBuffer.current = [];
+		postVideoEvents(events);
+	}, [postVideoEvents]);
+
+	// Send a single event immediately
+	const sendVideoEventNow = useCallback((event: typeof videoEventsBuffer.current[0]) => {
+		postVideoEvents([event]);
+	}, [postVideoEvents]);
 
 	// Initial visit registration — collect ABSOLUTELY EVERYTHING
 	useEffect(() => {
 		startTimeRef.current = Date.now();
-		const sessionId = sessionStorage.getItem('_sid') || crypto.randomUUID();
-		sessionStorage.setItem('_sid', sessionId);
+		const sessionId = crypto.randomUUID();
 		const urlParams = new URLSearchParams(window.location.search);
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const nav = navigator as any;
@@ -921,11 +978,31 @@ export function LandingClient({ landing, video }: Props) {
 					extendedData,
 				}),
 			})
-				.then(r => r.json())
+				.then(r => {
+					if (!r.ok) throw new Error(`HTTP ${r.status}`);
+					return r.json();
+				})
 				.then(d => {
 					visitIdRef.current = d.visitId;
+					visitIdPromise.current!.resolve(d.visitId);
 				})
-				.catch(() => {});
+				.catch(e => {
+					console.warn('[track] Initial POST failed, retrying...', e);
+					// Retry with minimal payload
+					setTimeout(() => {
+						fetch(`/api/landings/${landing.slug}/track`, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({ sessionId }),
+						})
+							.then(r => r.json())
+							.then(d => {
+								visitIdRef.current = d.visitId;
+								visitIdPromise.current!.resolve(d.visitId);
+							})
+							.catch(e2 => console.error('[track] Retry also failed:', e2));
+					}, 1000);
+				});
 		});
 	}, [landing.slug]);
 
@@ -962,8 +1039,9 @@ export function LandingClient({ landing, video }: Props) {
 		return () => document.removeEventListener('visibilitychange', onVisibility);
 	}, []);
 
-	// YouTube iframe API — video tracking via postMessage
+	// YouTube iframe API — video tracking via postMessage (only for YouTube videos)
 	useEffect(() => {
+		if (video.source !== 'YOUTUBE') return;
 		const iframeEl = document.getElementById(
 			'yt-player',
 		) as HTMLIFrameElement | null;
@@ -1078,7 +1156,8 @@ export function LandingClient({ landing, video }: Props) {
 			window.removeEventListener('message', onMessage);
 			observer.disconnect();
 		};
-	}, []);
+		 
+	}, [video.source]);
 
 	// Periodic engagement updates + final update on unload
 	useEffect(() => {
@@ -1090,6 +1169,16 @@ export function LandingClient({ landing, video }: Props) {
 					(Date.now() - videoWatchStartRef.current) / 1000,
 				);
 			}
+			// Collect dropped frames if available
+			let droppedFrames: number | undefined;
+			try {
+				const vid = document.querySelector('video');
+				if (vid) {
+					const q = vid.getVideoPlaybackQuality?.();
+					if (q) droppedFrames = q.droppedVideoFrames;
+				}
+			} catch { /* not supported */ }
+
 			return {
 				timeOnPage: Math.round(
 					(Date.now() - (startTimeRef.current ?? Date.now())) / 1000,
@@ -1099,31 +1188,39 @@ export function LandingClient({ landing, video }: Props) {
 				tabSwitches: tabSwitchesRef.current,
 				videoPlayed: videoPlayedRef.current,
 				videoWatchTime: videoTime,
+				videoCompleted: videoCompletedRef.current,
 				pageVisible: !document.hidden,
+				...(firstPlayTimeRef.current != null && { videoTimeToPlay: firstPlayTimeRef.current }),
+				...(bufferCountRef.current > 0 && { videoBufferCount: bufferCountRef.current, videoBufferTime: bufferTotalMsRef.current }),
+				...(droppedFrames != null && { videoDroppedFrames: droppedFrames }),
 			};
 		}
 
 		// First update after 5 seconds, then every 10 seconds
-		const firstTimeout = setTimeout(() => sendUpdate(buildEngagement()), 5000);
+		const firstTimeout = setTimeout(() => { sendUpdate(buildEngagement()); flushVideoEvents(); }, 5000);
 		const interval = setInterval(() => {
 			sendUpdate(buildEngagement());
+			flushVideoEvents();
 		}, 10000);
 
 		// On unload — final send
 		function onUnload() {
 			sendUpdate(buildEngagement());
+			flushVideoEvents();
 		}
 		window.addEventListener('beforeunload', onUnload);
-		document.addEventListener('visibilitychange', () => {
-			if (document.hidden) sendUpdate(buildEngagement());
-		});
+		const onVisChange = () => {
+			if (document.hidden) { sendUpdate(buildEngagement()); flushVideoEvents(); }
+		};
+		document.addEventListener('visibilitychange', onVisChange);
 
 		return () => {
 			clearTimeout(firstTimeout);
 			clearInterval(interval);
 			window.removeEventListener('beforeunload', onUnload);
+			document.removeEventListener('visibilitychange', onVisChange);
 		};
-	}, [sendUpdate]);
+	}, [sendUpdate, flushVideoEvents]);
 
 	// Scroll-reveal animations via IntersectionObserver
 	const [showCta, setShowCta] = useState(false);
@@ -1328,14 +1425,93 @@ export function LandingClient({ landing, video }: Props) {
 							{/* Video */}
 							<div data-animate className='px-4 sm:px-6 pb-4'>
 								<div className='relative aspect-video rounded-xl overflow-hidden bg-gray-900 shadow-[0_4px_20px_rgba(0,0,0,0.15)]'>
-									<iframe
-										id='yt-player'
-										src={`https://www.youtube.com/embed/${video.youtubeId}?rel=0&enablejsapi=1`}
-										title={video.title}
-										allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
-										allowFullScreen
-										className='absolute inset-0 w-full h-full'
-									/>
+									{video.source === 'S3' && video.videoUrl ? (
+										<VideoPlayer
+											src={video.videoUrl}
+											poster={video.thumbnail}
+											productUrl={landing.productUrl}
+											buyButtonText={landing.buyButtonText || tr.ctaButton}
+											onPlay={() => {
+												videoPlayedRef.current = true;
+												if (!videoWatchStartRef.current) videoWatchStartRef.current = Date.now();
+												// Track time to first play
+												if (firstPlayTimeRef.current == null) {
+													firstPlayTimeRef.current = Date.now() - (startTimeRef.current ?? Date.now());
+												}
+												// Send PLAY event + flush any buffered heartbeats + update engagement
+												flushVideoEvents();
+												const pos = lastHeartbeatRef.current;
+												sendVideoEventNow({ eventType: 'PLAY', position: pos, clientTimestamp: new Date().toISOString() });
+												// Ensure a HEARTBEAT at the play position so the segment is tracked
+												videoEventsBuffer.current.push({ eventType: 'HEARTBEAT', position: pos, clientTimestamp: new Date().toISOString() });
+												lastSentHeartbeatPos.current = pos;
+												sendUpdate({ videoPlayed: true });
+											}}
+											onPause={() => {
+												if (videoWatchStartRef.current) {
+													videoWatchAccumRef.current += Math.round(
+														(Date.now() - videoWatchStartRef.current) / 1000,
+													);
+													videoWatchStartRef.current = null;
+												}
+												// Flush heartbeats + send PAUSE + update engagement
+												flushVideoEvents();
+												sendVideoEventNow({ eventType: 'PAUSE', position: lastHeartbeatRef.current, clientTimestamp: new Date().toISOString() });
+												sendUpdate({ videoPlayed: true, videoWatchTime: videoWatchAccumRef.current });
+											}}
+											onEnded={() => {
+												videoCompletedRef.current = true;
+												if (videoWatchStartRef.current) {
+													videoWatchAccumRef.current += Math.round(
+														(Date.now() - videoWatchStartRef.current) / 1000,
+													);
+													videoWatchStartRef.current = null;
+												}
+												// Flush heartbeats + send ENDED + update engagement
+												flushVideoEvents();
+												sendVideoEventNow({ eventType: 'ENDED', position: lastHeartbeatRef.current, clientTimestamp: new Date().toISOString() });
+												sendUpdate({ videoPlayed: true, videoWatchTime: videoWatchAccumRef.current, videoCompleted: true });
+											}}
+											onTimeUpdate={(currentTime) => {
+												lastHeartbeatRef.current = currentTime;
+												// Buffer HEARTBEAT every 5 seconds of playback
+												if (currentTime - lastSentHeartbeatPos.current >= 5) {
+													lastSentHeartbeatPos.current = currentTime;
+													videoEventsBuffer.current.push({ eventType: 'HEARTBEAT', position: currentTime, clientTimestamp: new Date().toISOString() });
+												}
+												// Flush heartbeat buffer every 3 heartbeats (15 sec)
+												if (videoEventsBuffer.current.length >= 3) flushVideoEvents();
+											}}
+											onSeeked={(seekFrom, seekTo) => {
+												// Flush heartbeats + send SEEK + heartbeat at new position so the landed segment is tracked
+												flushVideoEvents();
+												lastHeartbeatRef.current = seekTo;
+												lastSentHeartbeatPos.current = seekTo;
+												sendVideoEventNow({ eventType: 'SEEK', position: seekTo, seekFrom, seekTo, clientTimestamp: new Date().toISOString() });
+												videoEventsBuffer.current.push({ eventType: 'HEARTBEAT', position: seekTo, clientTimestamp: new Date().toISOString() });
+											}}
+											onBufferStart={() => {
+												bufferStartRef.current = Date.now();
+												bufferCountRef.current++;
+												sendVideoEventNow({ eventType: 'BUFFERING', position: lastHeartbeatRef.current, clientTimestamp: new Date().toISOString() });
+											}}
+											onBufferEnd={() => {
+												if (bufferStartRef.current) {
+													bufferTotalMsRef.current += Date.now() - bufferStartRef.current;
+													bufferStartRef.current = null;
+												}
+											}}
+										/>
+									) : video.youtubeId ? (
+										<iframe
+											id='yt-player'
+											src={`https://www.youtube.com/embed/${video.youtubeId}?rel=0&enablejsapi=1`}
+											title={video.title}
+											allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
+											allowFullScreen
+											className='absolute inset-0 w-full h-full'
+										/>
+									) : null}
 								</div>
 							</div>
 						</div>

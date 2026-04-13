@@ -25,7 +25,7 @@ interface Video {
 	id: string;
 	title: string;
 	thumbnail: string;
-	youtubeId: string;
+	youtubeId: string | null;
 }
 
 interface SendVideoModalProps {

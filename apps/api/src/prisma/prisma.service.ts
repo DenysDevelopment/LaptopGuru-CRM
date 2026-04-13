@@ -169,6 +169,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get analyticsMessageDaily() { return this.client.analyticsMessageDaily; }
   get analyticsConversationDaily() { return this.client.analyticsConversationDaily; }
   get analyticsResponseTime() { return this.client.analyticsResponseTime; }
+  get videoWatchEvent() { return this.client.videoWatchEvent; }
 
   async $queryRaw(query: TemplateStringsArray, ...values: unknown[]) {
     return this.rawClient_.$queryRaw(query, ...values);

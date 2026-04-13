@@ -63,11 +63,17 @@ export type TimelineItem =
 
 export interface Video {
   id: string;
-  youtubeId: string;
+  source: 'YOUTUBE' | 'S3';
+  status: 'UPLOADING' | 'PROCESSING' | 'READY' | 'FAILED';
+  youtubeId: string | null;
   title: string;
   thumbnail: string;
   duration: string | null;
+  durationSeconds: number | null;
   channelTitle?: string | null;
+  youtubeUploadStatus?: string | null;
+  s3KeyOutput?: string | null;
+  cloudFrontThumbUrl?: string | null;
   createdAt?: string;
 }
 

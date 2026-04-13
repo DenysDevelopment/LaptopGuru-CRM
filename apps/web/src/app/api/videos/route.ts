@@ -3,6 +3,24 @@ import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
 import { extractYoutubeId, fetchVideoInfo } from "@/lib/youtube";
 import { PERMISSIONS } from "@laptopguru-crm/shared";
+import { getSignedUrl } from "@aws-sdk/cloudfront-signer";
+
+const CF_DOMAIN = process.env.AWS_CLOUDFRONT_DOMAIN || "";
+const CF_KEY_PAIR_ID = process.env.AWS_CLOUDFRONT_KEY_PAIR_ID || "";
+const CF_PRIVATE_KEY = process.env.AWS_CLOUDFRONT_PRIVATE_KEY_BASE64
+  ? Buffer.from(process.env.AWS_CLOUDFRONT_PRIVATE_KEY_BASE64, "base64").toString("utf-8")
+  : "";
+const CF_TTL = Number(process.env.CLOUDFRONT_SIGNED_URL_TTL_SECONDS || 14400);
+
+function signCfUrl(s3Key: string): string {
+  const url = `https://${CF_DOMAIN}/${s3Key}`;
+  return getSignedUrl({
+    url,
+    keyPairId: CF_KEY_PAIR_ID,
+    dateLessThan: new Date(Date.now() + CF_TTL * 1000).toISOString(),
+    privateKey: CF_PRIVATE_KEY,
+  });
+}
 
 export async function GET() {
   const { session, error } = await authorize(PERMISSIONS.VIDEOS_READ);
@@ -18,7 +36,16 @@ export async function GET() {
     orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
   });
 
-  return NextResponse.json(videos);
+  // BigInt (fileSize) can't be JSON-serialized — convert to number
+  // Sign CloudFront thumbnail URLs on-the-fly
+  const serializable = videos.map((v) => ({
+    ...v,
+    fileSize: v.fileSize ? Number(v.fileSize) : null,
+    thumbnail: v.s3KeyThumb ? signCfUrl(v.s3KeyThumb) : v.thumbnail,
+    cloudFrontThumbUrl: v.s3KeyThumb ? signCfUrl(v.s3KeyThumb) : v.cloudFrontThumbUrl,
+  }));
+
+  return NextResponse.json(serializable);
 }
 
 export async function POST(request: NextRequest) {
