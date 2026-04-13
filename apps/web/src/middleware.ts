@@ -36,9 +36,10 @@ function handleCustomDomain(request: NextRequest, host: string): NextResponse {
 
 export default async function middleware(request: NextRequest) {
 	const host = request.headers.get("host")?.split(":")[0] ?? "";
-	const crmDomain = process.env.DOMAIN ?? "localhost";
+	const crmDomain = process.env.DOMAIN ?? "";
 
-	const isCustomDomain = host !== crmDomain && host !== "localhost";
+	// Only treat as custom domain when DOMAIN env is explicitly set and host differs
+	const isCustomDomain = crmDomain !== "" && host !== crmDomain && host !== "localhost";
 
 	if (isCustomDomain) {
 		return handleCustomDomain(request, host);
