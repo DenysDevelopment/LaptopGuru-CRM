@@ -32,7 +32,11 @@ export default function LinksPage() {
   }, []);
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const shortUrlBase = customDomain ? `https://${customDomain}` : origin;
+  const isLocalhost =
+    typeof window !== "undefined" &&
+    /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname);
+  const effectiveDomain = isLocalhost ? null : customDomain;
+  const shortUrlBase = effectiveDomain ? `https://${effectiveDomain}` : origin;
 
   function copyToClipboard(text: string) {
     navigator.clipboard.writeText(text);
@@ -74,7 +78,7 @@ export default function LinksPage() {
                         onClick={() => copyToClipboard(`${shortUrlBase}/${sl.code}`)}
                         className="text-xs text-brand hover:text-brand-hover transition-colors"
                       >
-                        {(customDomain ?? origin.replace(/^https?:\/\//, "")) + "/" + sl.code} — копировать
+                        {(effectiveDomain ?? origin.replace(/^https?:\/\//, "")) + "/" + sl.code} — копировать
                       </button>
                     ))}
                   </div>

@@ -1441,7 +1441,7 @@ export function LandingClient({ landing, video }: Props) {
 							)}
 							{/* Video */}
 							<div data-animate className='px-4 sm:px-6 pb-4'>
-								<div className='relative aspect-video rounded-xl overflow-hidden bg-gray-900 shadow-[0_4px_20px_rgba(0,0,0,0.15)]'>
+								<div className='relative aspect-[9/16] max-w-[360px] mx-auto rounded-xl overflow-hidden bg-gray-900 shadow-[0_4px_20px_rgba(0,0,0,0.15)]'>
 									{video.source === 'S3' && video.videoUrl ? (
 										<VideoPlayer
 											src={video.videoUrl}

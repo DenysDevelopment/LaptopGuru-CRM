@@ -52,6 +52,7 @@ export default function VideoPlayer({
 	const seekFromCapture = useRef(0); // Captured at 'seeking' before timeupdate overwrites lastKnownTime
 	const isSeeking = useRef(false);
 	const boundRef = useRef(false);
+	const wrapperRef = useRef<HTMLDivElement>(null);
 
 	const [nearEnd, setNearEnd] = useState(false);
 
@@ -166,8 +167,31 @@ export default function VideoPlayer({
 		handlePlaying,
 	]);
 
+	useEffect(() => {
+		const wrapper = wrapperRef.current;
+		if (!wrapper) return;
+		const onClickCapture = (e: Event) => {
+			const target = e.target as HTMLElement | null;
+			if (!target) return;
+			const isPlayClick =
+				target.closest('.plyr__control--overlaid') ||
+				target.closest('button[data-plyr="play"]');
+			if (!isPlayClick) return;
+			const p = plyrRef.current?.plyr;
+			if (!p?.fullscreen || p.fullscreen.active || !p.paused) return;
+			try {
+				p.fullscreen.enter();
+			} catch {
+				// Fullscreen may be blocked — ignore
+			}
+		};
+		wrapper.addEventListener('click', onClickCapture, true);
+		return () => wrapper.removeEventListener('click', onClickCapture, true);
+	}, []);
+
 	return (
 		<div
+			ref={wrapperRef}
 			className='plyr-fullscreen-wrapper relative'
 			style={{ '--plyr-color-main': '#fb7830' } as React.CSSProperties}>
 			<Plyr
@@ -179,6 +203,7 @@ export default function VideoPlayer({
 					title: 'Course Introduction Video',
 				}}
 				options={{
+					ratio: '9:16',
 					controls: [
 						'play-large',
 						'play',
