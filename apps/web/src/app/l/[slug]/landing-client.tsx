@@ -330,7 +330,7 @@ export function LandingClient({ landing, video }: Props) {
 	const videoCompletedRef = useRef(false);
 	const videoEventsBuffer = useRef<{ clientEventId: string; eventType: string; position: number; seekFrom?: number; seekTo?: number; clientTimestamp: string }[]>([]);
 	const lastHeartbeatRef = useRef(0);
-	const lastSentHeartbeatPos = useRef(-5);
+	const lastSentHeartbeatPos = useRef(-1);
 	// Buffer/quality tracking
 	const bufferStartRef = useRef<number | null>(null);
 	const bufferCountRef = useRef(0);
@@ -1455,7 +1455,7 @@ export function LandingClient({ landing, video }: Props) {
 												const pos = lastHeartbeatRef.current;
 												sendVideoEventNow({ clientEventId: crypto.randomUUID(), eventType: 'PLAY', position: pos, clientTimestamp: new Date().toISOString() });
 												// Anchor heartbeat origin at the play position; the first real HEARTBEAT
-												// will fire after 5s of actual playback. No synthetic heartbeat here.
+												// will fire after 1s of actual playback. No synthetic heartbeat here.
 												lastSentHeartbeatPos.current = pos;
 												sendUpdate({ videoPlayed: true });
 											}}
@@ -1486,17 +1486,20 @@ export function LandingClient({ landing, video }: Props) {
 											}}
 											onTimeUpdate={(currentTime) => {
 												lastHeartbeatRef.current = currentTime;
-												// Buffer HEARTBEAT every 5 seconds of playback
-												if (currentTime - lastSentHeartbeatPos.current >= 5) {
+												// Buffer HEARTBEAT every 1 second of playback for second-level
+												// position tracking. Plyr fires onTimeUpdate ~4x/sec, so we gate
+												// on video currentTime advancing at least 1s since the last send.
+												if (currentTime - lastSentHeartbeatPos.current >= 1) {
 													lastSentHeartbeatPos.current = currentTime;
 													videoEventsBuffer.current.push({ clientEventId: crypto.randomUUID(), eventType: 'HEARTBEAT', position: currentTime, clientTimestamp: new Date().toISOString() });
 												}
-												// Flush heartbeat buffer every 3 heartbeats (15 sec)
-												if (videoEventsBuffer.current.length >= 3) flushVideoEvents();
+												// Flush every 10 buffered heartbeats (≈10s) to stay well under the
+												// 60 requests/min per-visit rate limit while keeping data fresh.
+												if (videoEventsBuffer.current.length >= 10) flushVideoEvents();
 											}}
 											onSeeked={(seekFrom, seekTo) => {
 												// Flush heartbeats + send SEEK. Do NOT push a synthetic HEARTBEAT —
-												// a real one will come once playback has advanced 5s past seekTo.
+												// a real one will come once playback has advanced 1s past seekTo.
 												flushVideoEvents();
 												lastHeartbeatRef.current = seekTo;
 												lastSentHeartbeatPos.current = seekTo;
