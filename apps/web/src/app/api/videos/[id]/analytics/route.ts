@@ -34,8 +34,6 @@ export async function GET(
   const fromDate = from ? new Date(from) : new Date(Date.now() - 30 * 86_400_000);
   const toDate = to ? new Date(to) : new Date();
 
-  const minWatch = Number(process.env.VIDEO_MIN_WATCH_FOR_VIEW_SECONDS || 10);
-
   // All landing visits — scoped to specific landing if provided, otherwise all landings with this video
   const allVisits = await prisma.landingVisit.findMany({
     where: {
@@ -76,27 +74,68 @@ export async function GET(
   let timeSeriesData: { date: string; views: number }[] = [];
 
   if (eventCount > 0) {
-    // --- Detailed analytics from VideoWatchEvent ---
-    // When scoped to a landing, filter by visit IDs; otherwise use date range
-    // totalWatch = heartbeat_count * 5s (approximation: client sends HEARTBEAT every ~5s)
-    // BigInt→Number conversion is safe here: watch seconds won't exceed Number.MAX_SAFE_INTEGER
+    // --- Detailed analytics from VideoWatchEvent (segment aggregation) ---
+    // A PLAY or HEARTBEAT row "opens" a segment closed by the next event for the
+    // same visit. Sum (nextPos - pos) across consecutive pairs, clamped to [0, 600].
+    // Matches apps/api/src/modules/videos/video-analytics.service.ts — keep in sync.
+    type WatchRow = { landingVisitId: string; totalWatch: number | bigint; completed: boolean };
     const watchRows = landingId
-      ? await prisma.$queryRaw<{ landingVisitId: string; totalWatch: bigint; completed: boolean }[]>`
-          SELECT "landingVisitId",
-            COUNT(*) FILTER (WHERE "eventType" = 'HEARTBEAT') * 5 AS "totalWatch",
+      ? await prisma.$queryRaw<WatchRow[]>`
+          WITH ordered AS (
+            SELECT
+              "landingVisitId", "eventType", "position",
+              LEAD("eventType") OVER w AS next_type,
+              LEAD("position")  OVER w AS next_pos
+            FROM "VideoWatchEvent"
+            WHERE "videoId" = ${id}
+              AND "landingVisitId" = ANY(${visitIds}::text[])
+              AND "eventType" IN ('PLAY','PAUSE','SEEK','ENDED','HEARTBEAT')
+            WINDOW w AS (PARTITION BY "landingVisitId" ORDER BY "serverTimestamp", "id")
+          )
+          SELECT
+            "landingVisitId",
+            COALESCE(SUM(
+              CASE
+                WHEN "eventType" = 'PLAY' AND next_type IN ('PAUSE','ENDED','SEEK','HEARTBEAT')
+                  THEN GREATEST(0, LEAST(next_pos - "position", 600))
+                WHEN "eventType" = 'HEARTBEAT' AND next_type IN ('HEARTBEAT','PAUSE','ENDED')
+                  THEN GREATEST(0, LEAST(next_pos - "position", 600))
+                ELSE 0
+              END
+            ), 0)::float AS "totalWatch",
             BOOL_OR("eventType" = 'ENDED') AS completed
-          FROM "VideoWatchEvent"
-          WHERE "videoId" = ${id} AND "landingVisitId" = ANY(${visitIds}::text[])
+          FROM ordered
           GROUP BY "landingVisitId"`
-      : await prisma.$queryRaw<{ landingVisitId: string; totalWatch: bigint; completed: boolean }[]>`
-          SELECT "landingVisitId",
-            COUNT(*) FILTER (WHERE "eventType" = 'HEARTBEAT') * 5 AS "totalWatch",
+      : await prisma.$queryRaw<WatchRow[]>`
+          WITH ordered AS (
+            SELECT
+              "landingVisitId", "eventType", "position",
+              LEAD("eventType") OVER w AS next_type,
+              LEAD("position")  OVER w AS next_pos
+            FROM "VideoWatchEvent"
+            WHERE "videoId" = ${id}
+              AND "serverTimestamp" BETWEEN ${fromDate} AND ${toDate}
+              AND "eventType" IN ('PLAY','PAUSE','SEEK','ENDED','HEARTBEAT')
+            WINDOW w AS (PARTITION BY "landingVisitId" ORDER BY "serverTimestamp", "id")
+          )
+          SELECT
+            "landingVisitId",
+            COALESCE(SUM(
+              CASE
+                WHEN "eventType" = 'PLAY' AND next_type IN ('PAUSE','ENDED','SEEK','HEARTBEAT')
+                  THEN GREATEST(0, LEAST(next_pos - "position", 600))
+                WHEN "eventType" = 'HEARTBEAT' AND next_type IN ('HEARTBEAT','PAUSE','ENDED')
+                  THEN GREATEST(0, LEAST(next_pos - "position", 600))
+                ELSE 0
+              END
+            ), 0)::float AS "totalWatch",
             BOOL_OR("eventType" = 'ENDED') AS completed
-          FROM "VideoWatchEvent"
-          WHERE "videoId" = ${id} AND "serverTimestamp" BETWEEN ${fromDate} AND ${toDate}
+          FROM ordered
           GROUP BY "landingVisitId"`;
 
-    views = watchRows.filter((r) => Number(r.totalWatch) >= minWatch).length;
+    // No minimum-watch threshold: any visit with a play counts as a view so that
+    // short test plays and legit-but-brief impressions still render in the UI.
+    views = watchRows.length;
     totalWatchTime = watchRows.reduce((sum, r) => sum + Number(r.totalWatch), 0);
     completedCount = watchRows.filter((r) => r.completed).length;
     uniqueViewers = watchRows.length;
@@ -142,10 +181,10 @@ export async function GET(
       views: Number(r.views),
     }));
   } else {
-    // --- Fallback: aggregate data from LandingVisit ---
+    // --- Fallback: aggregate data from LandingVisit (no minimum-watch filter) ---
     const videoViewers = allVisits.filter((v) => v.videoPlayed);
     uniqueViewers = videoViewers.length;
-    views = videoViewers.filter((v) => (v.videoWatchTime ?? 0) >= minWatch).length;
+    views = videoViewers.length;
     totalWatchTime = videoViewers.reduce((sum, v) => sum + (v.videoWatchTime ?? 0), 0);
     completedCount = videoViewers.filter((v) => v.videoCompleted).length;
 
