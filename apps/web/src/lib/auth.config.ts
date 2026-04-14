@@ -7,6 +7,7 @@ const PUBLIC_PREFIXES = [
   "/login",
   "/register",
   "/api/auth",
+  "/api/domain-check",
   "/l/",
   "/r/",
   "/_next",
