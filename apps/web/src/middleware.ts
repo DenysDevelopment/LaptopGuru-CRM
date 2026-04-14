@@ -5,11 +5,14 @@ import { NextRequest, NextResponse } from "next/server";
 const { auth } = NextAuth(authConfig);
 
 /** Paths that should pass through unchanged on custom domains */
-const PASSTHROUGH_PREFIXES = ["/api/", "/r/", "/_next/", "/favicon"];
+const PASSTHROUGH_PREFIXES = ["/api/", "/r/", "/go/", "/_next/", "/favicon"];
 
 function isPassthrough(pathname: string): boolean {
 	return PASSTHROUGH_PREFIXES.some((p) => pathname.startsWith(p));
 }
+
+/** Short link codes are exactly 6 alphanumeric chars (see apps/api/src/common/utils/links.ts) */
+const SHORT_CODE_RE = /^\/[0-9a-zA-Z]{6}$/;
 
 function handleCustomDomain(request: NextRequest, host: string): NextResponse {
 	const { pathname } = request.nextUrl;
@@ -26,9 +29,16 @@ function handleCustomDomain(request: NextRequest, host: string): NextResponse {
 		return new NextResponse("Not Found", { status: 404 });
 	}
 
-	// Everything else: /slug → rewrite to /l/slug
 	const url = request.nextUrl.clone();
-	url.pathname = `/l${pathname}`;
+
+	// /XXXXXX (6 alphanumeric chars) → rewrite to /r/XXXXXX (short link redirect)
+	if (SHORT_CODE_RE.test(pathname)) {
+		url.pathname = `/r${pathname}`;
+	} else {
+		// Everything else: /slug → rewrite to /l/slug
+		url.pathname = `/l${pathname}`;
+	}
+
 	const response = NextResponse.rewrite(url);
 	response.headers.set("x-custom-domain", host);
 	return response;
