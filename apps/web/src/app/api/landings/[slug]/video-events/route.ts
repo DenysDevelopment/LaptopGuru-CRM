@@ -8,6 +8,31 @@ const VALID_EVENT_TYPES = [
   "RATE_CHANGE", "QUALITY_CHANGE", "FULLSCREEN", "ERROR", "BUFFERING",
 ] as const;
 
+// In-memory per-visit rate limiter (single-instance; upgrade to Redis if scaling
+// horizontally). Caps tampered clients at ~60 requests/min per visit — enough
+// headroom for legit flush cadence (≤6/min from the 10s interval) but kills
+// trivial curl-based inflation of watch metrics.
+const videoEventsRateMap = new Map<string, { count: number; resetAt: number }>();
+const MAX_VIDEO_EVENT_POSTS_PER_VISIT = 60;
+const VIDEO_EVENT_WINDOW_MS = 60_000;
+
+function isVideoEventsRateLimited(visitId: string): boolean {
+  const now = Date.now();
+  // Opportunistic sweep so the map doesn't grow unbounded.
+  if (videoEventsRateMap.size > 10_000) {
+    for (const [key, entry] of videoEventsRateMap) {
+      if (now > entry.resetAt) videoEventsRateMap.delete(key);
+    }
+  }
+  const entry = videoEventsRateMap.get(visitId);
+  if (!entry || now > entry.resetAt) {
+    videoEventsRateMap.set(visitId, { count: 1, resetAt: now + VIDEO_EVENT_WINDOW_MS });
+    return false;
+  }
+  entry.count++;
+  return entry.count > MAX_VIDEO_EVENT_POSTS_PER_VISIT;
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
@@ -15,6 +40,7 @@ export async function POST(
   const { slug } = await params;
 
   interface VideoEvent {
+    clientEventId?: string;
     eventType: (typeof VALID_EVENT_TYPES)[number];
     position: number;
     seekFrom?: number | null;
@@ -39,6 +65,10 @@ export async function POST(
   }
   if (events.length > 100) {
     return NextResponse.json({ error: "Too many events" }, { status: 400 });
+  }
+
+  if (isVideoEventsRateLimited(landingVisitId)) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
   // Validate the landing visit belongs to this slug and videoId matches
@@ -81,6 +111,9 @@ export async function POST(
       data: validEvents.map((e) => ({
         landingVisitId,
         videoId,
+        // Fallback for older clients that don't send a UUID yet — server-generated
+        // ID is still unique per-row and keeps the NOT NULL constraint satisfied.
+        clientEventId: e.clientEventId || crypto.randomUUID(),
         eventType: e.eventType,
         position: e.position,
         seekFrom: e.seekFrom ?? null,
@@ -92,6 +125,7 @@ export async function POST(
         clientTimestamp: new Date(e.clientTimestamp),
         companyId: visit.landing.companyId,
       })),
+      skipDuplicates: true,
     });
   }
 

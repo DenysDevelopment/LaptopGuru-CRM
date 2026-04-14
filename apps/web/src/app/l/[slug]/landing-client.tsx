@@ -328,7 +328,7 @@ export function LandingClient({ landing, video }: Props) {
 	const videoWatchStartRef = useRef<number | null>(null);
 	const videoWatchAccumRef = useRef(0);
 	const videoCompletedRef = useRef(false);
-	const videoEventsBuffer = useRef<{ eventType: string; position: number; seekFrom?: number; seekTo?: number; clientTimestamp: string }[]>([]);
+	const videoEventsBuffer = useRef<{ clientEventId: string; eventType: string; position: number; seekFrom?: number; seekTo?: number; clientTimestamp: string }[]>([]);
 	const lastHeartbeatRef = useRef(0);
 	const lastSentHeartbeatPos = useRef(-5);
 	// Buffer/quality tracking
@@ -344,14 +344,26 @@ export function LandingClient({ landing, video }: Props) {
 		visitIdPromise.current = { resolve: resolve!, promise };
 	}
 
-	// POST video events — waits for visitId if not ready
+	// POST video events — waits for visitId if not ready. On page hide / unload,
+	// prefers navigator.sendBeacon (more reliable than fetch keepalive on Safari/Firefox).
 	const postVideoEvents = useCallback((events: typeof videoEventsBuffer.current) => {
 		if (events.length === 0 || video.source !== 'S3') return;
+		const url = `/api/landings/${landing.slug}/video-events`;
 		const doPost = (visitId: string) => {
-			fetch(`/api/landings/${landing.slug}/video-events`, {
+			const payload = JSON.stringify({ videoId: video.id, landingVisitId: visitId, events });
+			const unloading = typeof document !== 'undefined' && document.visibilityState === 'hidden';
+			if (unloading && typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+				try {
+					const blob = new Blob([payload], { type: 'application/json' });
+					if (navigator.sendBeacon(url, blob)) return;
+				} catch {
+					// fall through to fetch
+				}
+			}
+			fetch(url, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ videoId: video.id, landingVisitId: visitId, events }),
+				body: payload,
 				keepalive: true,
 			}).then(r => {
 				if (!r.ok) console.warn('[video-events] POST failed:', r.status);
@@ -1441,9 +1453,9 @@ export function LandingClient({ landing, video }: Props) {
 												// Send PLAY event + flush any buffered heartbeats + update engagement
 												flushVideoEvents();
 												const pos = lastHeartbeatRef.current;
-												sendVideoEventNow({ eventType: 'PLAY', position: pos, clientTimestamp: new Date().toISOString() });
-												// Ensure a HEARTBEAT at the play position so the segment is tracked
-												videoEventsBuffer.current.push({ eventType: 'HEARTBEAT', position: pos, clientTimestamp: new Date().toISOString() });
+												sendVideoEventNow({ clientEventId: crypto.randomUUID(), eventType: 'PLAY', position: pos, clientTimestamp: new Date().toISOString() });
+												// Anchor heartbeat origin at the play position; the first real HEARTBEAT
+												// will fire after 5s of actual playback. No synthetic heartbeat here.
 												lastSentHeartbeatPos.current = pos;
 												sendUpdate({ videoPlayed: true });
 											}}
@@ -1456,7 +1468,7 @@ export function LandingClient({ landing, video }: Props) {
 												}
 												// Flush heartbeats + send PAUSE + update engagement
 												flushVideoEvents();
-												sendVideoEventNow({ eventType: 'PAUSE', position: lastHeartbeatRef.current, clientTimestamp: new Date().toISOString() });
+												sendVideoEventNow({ clientEventId: crypto.randomUUID(), eventType: 'PAUSE', position: lastHeartbeatRef.current, clientTimestamp: new Date().toISOString() });
 												sendUpdate({ videoPlayed: true, videoWatchTime: videoWatchAccumRef.current });
 											}}
 											onEnded={() => {
@@ -1469,7 +1481,7 @@ export function LandingClient({ landing, video }: Props) {
 												}
 												// Flush heartbeats + send ENDED + update engagement
 												flushVideoEvents();
-												sendVideoEventNow({ eventType: 'ENDED', position: lastHeartbeatRef.current, clientTimestamp: new Date().toISOString() });
+												sendVideoEventNow({ clientEventId: crypto.randomUUID(), eventType: 'ENDED', position: lastHeartbeatRef.current, clientTimestamp: new Date().toISOString() });
 												sendUpdate({ videoPlayed: true, videoWatchTime: videoWatchAccumRef.current, videoCompleted: true });
 											}}
 											onTimeUpdate={(currentTime) => {
@@ -1477,23 +1489,23 @@ export function LandingClient({ landing, video }: Props) {
 												// Buffer HEARTBEAT every 5 seconds of playback
 												if (currentTime - lastSentHeartbeatPos.current >= 5) {
 													lastSentHeartbeatPos.current = currentTime;
-													videoEventsBuffer.current.push({ eventType: 'HEARTBEAT', position: currentTime, clientTimestamp: new Date().toISOString() });
+													videoEventsBuffer.current.push({ clientEventId: crypto.randomUUID(), eventType: 'HEARTBEAT', position: currentTime, clientTimestamp: new Date().toISOString() });
 												}
 												// Flush heartbeat buffer every 3 heartbeats (15 sec)
 												if (videoEventsBuffer.current.length >= 3) flushVideoEvents();
 											}}
 											onSeeked={(seekFrom, seekTo) => {
-												// Flush heartbeats + send SEEK + heartbeat at new position so the landed segment is tracked
+												// Flush heartbeats + send SEEK. Do NOT push a synthetic HEARTBEAT —
+												// a real one will come once playback has advanced 5s past seekTo.
 												flushVideoEvents();
 												lastHeartbeatRef.current = seekTo;
 												lastSentHeartbeatPos.current = seekTo;
-												sendVideoEventNow({ eventType: 'SEEK', position: seekTo, seekFrom, seekTo, clientTimestamp: new Date().toISOString() });
-												videoEventsBuffer.current.push({ eventType: 'HEARTBEAT', position: seekTo, clientTimestamp: new Date().toISOString() });
+												sendVideoEventNow({ clientEventId: crypto.randomUUID(), eventType: 'SEEK', position: seekTo, seekFrom, seekTo, clientTimestamp: new Date().toISOString() });
 											}}
 											onBufferStart={() => {
 												bufferStartRef.current = Date.now();
 												bufferCountRef.current++;
-												sendVideoEventNow({ eventType: 'BUFFERING', position: lastHeartbeatRef.current, clientTimestamp: new Date().toISOString() });
+												sendVideoEventNow({ clientEventId: crypto.randomUUID(), eventType: 'BUFFERING', position: lastHeartbeatRef.current, clientTimestamp: new Date().toISOString() });
 											}}
 											onBufferEnd={() => {
 												if (bufferStartRef.current) {
