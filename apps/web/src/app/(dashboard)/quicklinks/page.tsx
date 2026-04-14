@@ -10,8 +10,10 @@ import { EmptyState } from "@/components/ui/empty-state";
 export default function QuickLinksPage() {
   const [links, setLinks] = useState<QuickLink[]>([]);
   const [loading, setLoading] = useState(true);
+  const [customDomain, setCustomDomain] = useState<string | null>(null);
 
-  const appUrl = typeof window !== "undefined" ? window.location.origin : "";
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const appUrl = customDomain ? `https://${customDomain}` : origin;
 
   function loadLinks() {
     fetch("/api/quicklinks")
@@ -19,7 +21,13 @@ export default function QuickLinksPage() {
       .then((d) => { setLinks(d); setLoading(false); });
   }
 
-  useEffect(() => { loadLinks(); }, []);
+  useEffect(() => {
+    loadLinks();
+    fetch("/api/company-settings")
+      .then((r) => r.json())
+      .then((d) => setCustomDomain(d?.customDomain ?? null))
+      .catch(() => {});
+  }, []);
 
   async function handleDelete(id: string) {
     if (!confirm("Удалить ссылку?")) return;
