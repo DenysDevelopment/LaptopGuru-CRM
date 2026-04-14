@@ -2,7 +2,23 @@
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+
+type Check = {
+	name: string;
+	label: string;
+	ok: boolean;
+	skipped?: boolean;
+	message: string;
+	hint?: string;
+};
+
+type DomainStatus = {
+	domain: string | null;
+	expectedTarget?: string;
+	allOk?: boolean;
+	checks: Check[];
+};
 
 export default function DomainSettingsPage() {
 	const [domain, setDomain] = useState('');
@@ -13,6 +29,23 @@ export default function DomainSettingsPage() {
 		type: 'ok' | 'err';
 		text: string;
 	} | null>(null);
+	const [status, setStatus] = useState<DomainStatus | null>(null);
+	const [checking, setChecking] = useState(false);
+
+	const runStatusCheck = useCallback(async () => {
+		setChecking(true);
+		try {
+			const res = await fetch('/api/domain-status', { cache: 'no-store' });
+			if (res.ok) {
+				const data: DomainStatus = await res.json();
+				setStatus(data);
+			}
+		} catch {
+			// ignore
+		} finally {
+			setChecking(false);
+		}
+	}, []);
 
 	useEffect(() => {
 		fetch('/api/company-settings')
@@ -20,10 +53,13 @@ export default function DomainSettingsPage() {
 			.then(data => {
 				setDomain(data.customDomain ?? '');
 				setSavedDomain(data.customDomain ?? null);
+				if (data.customDomain) {
+					runStatusCheck();
+				}
 			})
 			.catch(() => {})
 			.finally(() => setLoading(false));
-	}, []);
+	}, [runStatusCheck]);
 
 	async function handleSave() {
 		setSaving(true);
@@ -42,6 +78,7 @@ export default function DomainSettingsPage() {
 			const data = await res.json();
 			setSavedDomain(data.customDomain ?? null);
 			setMessage({ type: 'ok', text: 'Домен сохранён' });
+			runStatusCheck();
 		} catch {
 			setMessage({ type: 'err', text: 'Ошибка соединения' });
 		} finally {
@@ -65,6 +102,7 @@ export default function DomainSettingsPage() {
 			}
 			setDomain('');
 			setSavedDomain(null);
+			setStatus(null);
 			setMessage({ type: 'ok', text: 'Домен удалён' });
 		} catch {
 			setMessage({ type: 'err', text: 'Ошибка соединения' });
@@ -112,6 +150,75 @@ export default function DomainSettingsPage() {
 							Удалить
 						</Button>
 					</div>
+				</div>
+			)}
+
+			{/* Diagnostic checks */}
+			{savedDomain && (
+				<div className='bg-white border border-gray-200 rounded-lg p-5 mb-6'>
+					<div className='flex items-center justify-between mb-4'>
+						<h3 className='text-sm font-semibold text-gray-900'>
+							Статус подключения
+						</h3>
+						<Button
+							variant='outline'
+							size='sm'
+							onClick={runStatusCheck}
+							disabled={checking}>
+							{checking ? 'Проверяем...' : 'Перепроверить'}
+						</Button>
+					</div>
+
+					{status && status.allOk && (
+						<div className='bg-green-50 border border-green-200 rounded-md px-3 py-2 mb-3 text-sm text-green-800'>
+							Всё работает — домен полностью подключён
+						</div>
+					)}
+
+					{!status && checking && (
+						<p className='text-sm text-gray-500'>Проверяем подключение...</p>
+					)}
+
+					{status && status.checks.length > 0 && (
+						<ul className='space-y-3'>
+							{status.checks.map(check => (
+								<li
+									key={check.name}
+									className='flex gap-3 items-start text-sm'>
+									<span
+										className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
+											check.skipped
+												? 'bg-gray-100 text-gray-400'
+												: check.ok
+													? 'bg-green-100 text-green-700'
+													: 'bg-red-100 text-red-700'
+										}`}>
+										{check.skipped ? '—' : check.ok ? '✓' : '✕'}
+									</span>
+									<div className='flex-1'>
+										<p
+											className={`font-medium ${
+												check.skipped
+													? 'text-gray-400'
+													: check.ok
+														? 'text-gray-900'
+														: 'text-red-700'
+											}`}>
+											{check.label}
+										</p>
+										<p className='text-gray-600 text-xs mt-0.5'>
+											{check.message}
+										</p>
+										{check.hint && !check.ok && (
+											<p className='text-amber-700 text-xs mt-1 bg-amber-50 border border-amber-200 rounded px-2 py-1'>
+												💡 {check.hint}
+											</p>
+										)}
+									</div>
+								</li>
+							))}
+						</ul>
+					)}
 				</div>
 			)}
 
