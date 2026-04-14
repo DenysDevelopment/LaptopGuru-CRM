@@ -216,6 +216,9 @@ model VideoWatchEvent {
   videoId         String
   video           Video          @relation(fields: [videoId], references: [id])
 
+  // Client-generated UUID for idempotent ingestion (retries/dup flushes are safe).
+  clientEventId   String
+
   eventType       VideoEventType
   position        Float
   seekFrom        Float?
@@ -231,6 +234,7 @@ model VideoWatchEvent {
   companyId       String
   company         Company        @relation(fields: [companyId], references: [id])
 
+  @@unique([landingVisitId, clientEventId])
   @@index([videoId, serverTimestamp])
   @@index([videoId, eventType])
   @@index([landingVisitId])

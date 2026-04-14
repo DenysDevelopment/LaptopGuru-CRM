@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { VideoAnalyticsService } from './video-analytics.service';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 
@@ -286,7 +288,7 @@ describe('VideoAnalyticsService', () => {
   });
 
   describe('recentWatches', () => {
-    it('enriches with landing visit data', async () => {
+    it('enriches with landing visit data in a single query', async () => {
       const video = { id: 'v1', companyId: 'c1', source: 'S3', durationSeconds: 30 };
       prisma.video.findUnique.mockResolvedValue(video);
 
@@ -294,28 +296,27 @@ describe('VideoAnalyticsService', () => {
         .mockResolvedValueOnce([]) // overview
         .mockResolvedValueOnce([]) // retention
         .mockResolvedValueOnce([]) // timeSeries
-        // RecentWatches
+        // RecentWatches — LEFT JOIN with LandingVisit, all fields in one row
         .mockResolvedValueOnce([
           {
             landingVisitId: 'lv1',
             startedAt: new Date('2026-01-15T12:00:00Z'),
-            totalWatch: BigInt(25),
+            totalWatch: 25,
             completed: true,
+            sessionId: 'sess-123',
+            country: 'PL',
+            deviceType: 'desktop',
+            browser: 'Chrome',
           },
         ]);
 
       prisma.landingVisit.count.mockResolvedValue(0);
-      prisma.landingVisit.findMany.mockResolvedValue([
-        {
-          id: 'lv1',
-          sessionId: 'sess-123',
-          country: 'PL',
-          deviceType: 'desktop',
-          browser: 'Chrome',
-        },
-      ]);
 
       const result = await service.getFullAnalytics('v1', 'c1', from, to);
+
+      // findMany should no longer be invoked for recentWatches — the single raw
+      // query now returns enrichment columns.
+      expect(prisma.landingVisit.findMany).not.toHaveBeenCalled();
 
       expect(result.recentWatches).toHaveLength(1);
       expect(result.recentWatches[0]).toEqual({
@@ -327,6 +328,85 @@ describe('VideoAnalyticsService', () => {
         device: 'desktop',
         browser: 'Chrome',
       });
+    });
+
+    it('accepts plain numeric totalWatch from segment aggregation', async () => {
+      const video = { id: 'v1', companyId: 'c1', source: 'S3', durationSeconds: 60 };
+      prisma.video.findUnique.mockResolvedValue(video);
+
+      prisma.$queryRaw
+        // Overview — segment SQL returns ::float, not bigint
+        .mockResolvedValueOnce([
+          { landingVisitId: 'lv1', totalWatch: 22.5, completed: true },
+        ])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      prisma.landingVisit.count.mockResolvedValue(1);
+
+      const result = await service.getFullAnalytics('v1', 'c1', from, to);
+
+      expect(result.overview.totalWatchTime).toBe(22.5);
+      expect(result.overview.totalViews).toBe(1);
+      expect(result.overview.completionRate).toBe(1);
+    });
+
+    it('no longer calls landingVisit.findMany for recentWatches enrichment', async () => {
+      const video = { id: 'v1', companyId: 'c1', source: 'S3', durationSeconds: 60 };
+      prisma.video.findUnique.mockResolvedValue(video);
+
+      prisma.$queryRaw
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      prisma.landingVisit.count.mockResolvedValue(0);
+
+      await service.getFullAnalytics('v1', 'c1', from, to);
+      expect(prisma.landingVisit.findMany).not.toHaveBeenCalled();
+    });
+
+    it('uses window-function segment aggregation in source (guards against regression)', () => {
+      const src = fs.readFileSync(
+        path.join(__dirname, 'video-analytics.service.ts'),
+        'utf8',
+      );
+      // The legacy count*5 approximation must be gone from getOverview/getRecentWatches.
+      expect(src).not.toMatch(/COUNT\(\*\)\s*FILTER\s*\(WHERE\s*"eventType"\s*=\s*'HEARTBEAT'\)\s*\*\s*5/);
+      // And the new LEAD() window must be present.
+      expect(src).toMatch(/LEAD\("position"\)/);
+      expect(src).toMatch(/PARTITION BY "landingVisitId"/);
+    });
+
+    it('falls back to landingVisitId when visit row is missing', async () => {
+      const video = { id: 'v1', companyId: 'c1', source: 'S3', durationSeconds: 30 };
+      prisma.video.findUnique.mockResolvedValue(video);
+
+      prisma.$queryRaw
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            landingVisitId: 'lv-orphan',
+            startedAt: new Date('2026-01-15T12:00:00Z'),
+            totalWatch: 25,
+            completed: false,
+            sessionId: null,
+            country: null,
+            deviceType: null,
+            browser: null,
+          },
+        ]);
+
+      prisma.landingVisit.count.mockResolvedValue(0);
+
+      const result = await service.getFullAnalytics('v1', 'c1', from, to);
+
+      expect(result.recentWatches[0].sessionId).toBe('lv-orphan');
+      expect(result.recentWatches[0].country).toBeNull();
     });
   });
 });
