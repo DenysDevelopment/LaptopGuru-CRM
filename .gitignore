@@ -45,6 +45,9 @@ apps/api/src/generated/prisma
 # superpowers
 .superpowers/
 
+# claude worktrees
+.claude/worktrees/
+
 # deploy keys — never commit
 deploy_key
 deploy_key.pub

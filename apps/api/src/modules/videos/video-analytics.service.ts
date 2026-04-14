@@ -44,16 +44,41 @@ export class VideoAnalyticsService {
   private async getOverview(video: any, from: Date, to: Date) {
     const minWatch = Number(process.env.VIDEO_MIN_WATCH_FOR_VIEW_SECONDS || 10);
 
+    // Segment-based aggregation: a PLAY or HEARTBEAT row "opens" a segment that is
+    // closed by the next event for the same visit. We sum (nextPos - pos) across
+    // consecutive pairs where the opener is PLAY or HEARTBEAT. Deltas are clamped
+    // to [0, 600] seconds to guard against clock glitches and single-segment abuse.
+    // This replaces the old COUNT(HEARTBEAT)*5 approximation, which overcounted on
+    // synthetic heartbeats and undercounted the tail of each play segment.
     const rows = (await this.prisma.$queryRaw`
+      WITH ordered AS (
+        SELECT
+          "landingVisitId",
+          "eventType",
+          "position",
+          LEAD("eventType") OVER w AS next_type,
+          LEAD("position")  OVER w AS next_pos
+        FROM "VideoWatchEvent"
+        WHERE "videoId" = ${video.id}
+          AND "serverTimestamp" BETWEEN ${from} AND ${to}
+          AND "eventType" IN ('PLAY','PAUSE','SEEK','ENDED','HEARTBEAT')
+        WINDOW w AS (PARTITION BY "landingVisitId" ORDER BY "serverTimestamp", "id")
+      )
       SELECT
         "landingVisitId",
-        COUNT(*) FILTER (WHERE "eventType" = 'HEARTBEAT') * 5 AS "totalWatch",
+        COALESCE(SUM(
+          CASE
+            WHEN "eventType" = 'PLAY' AND next_type IN ('PAUSE','ENDED','SEEK','HEARTBEAT')
+              THEN GREATEST(0, LEAST(next_pos - "position", 600))
+            WHEN "eventType" = 'HEARTBEAT' AND next_type IN ('HEARTBEAT','PAUSE','ENDED')
+              THEN GREATEST(0, LEAST(next_pos - "position", 600))
+            ELSE 0
+          END
+        ), 0)::float AS "totalWatch",
         BOOL_OR("eventType" = 'ENDED') AS completed
-      FROM "VideoWatchEvent"
-      WHERE "videoId" = ${video.id}
-        AND "serverTimestamp" BETWEEN ${from} AND ${to}
+      FROM ordered
       GROUP BY "landingVisitId"
-    `) as { landingVisitId: string; totalWatch: bigint; completed: boolean }[];
+    `) as { landingVisitId: string; totalWatch: number | bigint; completed: boolean }[];
 
     const views = rows.filter((r) => Number(r.totalWatch) >= minWatch).length;
     const totalWatchTime = rows.reduce((sum, r) => sum + Number(r.totalWatch), 0);
@@ -139,50 +164,72 @@ export class VideoAnalyticsService {
   }
 
   private async getRecentWatches(videoId: string, from: Date, to: Date) {
+    // Single query: segment-based watch duration joined with LandingVisit metadata.
+    // Eliminates the previous raw SQL + findMany N+1 round trip.
     const rows = (await this.prisma.$queryRaw`
+      WITH ordered AS (
+        SELECT
+          "landingVisitId",
+          "eventType",
+          "position",
+          "serverTimestamp",
+          LEAD("eventType") OVER w AS next_type,
+          LEAD("position")  OVER w AS next_pos
+        FROM "VideoWatchEvent"
+        WHERE "videoId" = ${videoId}
+          AND "serverTimestamp" BETWEEN ${from} AND ${to}
+          AND "eventType" IN ('PLAY','PAUSE','SEEK','ENDED','HEARTBEAT')
+        WINDOW w AS (PARTITION BY "landingVisitId" ORDER BY "serverTimestamp", "id")
+      ),
+      per_visit AS (
+        SELECT
+          "landingVisitId",
+          MIN("serverTimestamp") AS "startedAt",
+          COALESCE(SUM(
+            CASE
+              WHEN "eventType" = 'PLAY' AND next_type IN ('PAUSE','ENDED','SEEK','HEARTBEAT')
+                THEN GREATEST(0, LEAST(next_pos - "position", 600))
+              WHEN "eventType" = 'HEARTBEAT' AND next_type IN ('HEARTBEAT','PAUSE','ENDED')
+                THEN GREATEST(0, LEAST(next_pos - "position", 600))
+              ELSE 0
+            END
+          ), 0)::float AS "totalWatch",
+          BOOL_OR("eventType" = 'ENDED') AS completed
+        FROM ordered
+        GROUP BY "landingVisitId"
+      )
       SELECT
-        "landingVisitId",
-        MIN("serverTimestamp") AS "startedAt",
-        COUNT(*) FILTER (WHERE "eventType" = 'HEARTBEAT') * 5 AS "totalWatch",
-        BOOL_OR("eventType" = 'ENDED') AS completed
-      FROM "VideoWatchEvent"
-      WHERE "videoId" = ${videoId}
-        AND "serverTimestamp" BETWEEN ${from} AND ${to}
-      GROUP BY "landingVisitId"
-      ORDER BY "startedAt" DESC
+        pv."landingVisitId",
+        pv."startedAt",
+        pv."totalWatch",
+        pv."completed",
+        v."sessionId",
+        v."country",
+        v."deviceType",
+        v."browser"
+      FROM per_visit pv
+      LEFT JOIN "LandingVisit" v ON v."id" = pv."landingVisitId"
+      ORDER BY pv."startedAt" DESC
       LIMIT 50
     `) as {
       landingVisitId: string;
       startedAt: Date;
-      totalWatch: bigint;
+      totalWatch: number | bigint;
       completed: boolean;
+      sessionId: string | null;
+      country: string | null;
+      deviceType: string | null;
+      browser: string | null;
     }[];
 
-    // Enrich with LandingVisit data
-    const visitIds = rows.map((r) => r.landingVisitId);
-    const visits = await this.prisma.landingVisit.findMany({
-      where: { id: { in: visitIds } },
-      select: {
-        id: true,
-        sessionId: true,
-        country: true,
-        deviceType: true,
-        browser: true,
-      },
-    });
-    const visitMap = new Map(visits.map((v) => [v.id, v]));
-
-    return rows.map((r) => {
-      const visit = visitMap.get(r.landingVisitId);
-      return {
-        sessionId: visit?.sessionId || r.landingVisitId,
-        startedAt: r.startedAt.toISOString(),
-        duration: Number(r.totalWatch),
-        completed: r.completed,
-        country: visit?.country || null,
-        device: visit?.deviceType || null,
-        browser: visit?.browser || null,
-      };
-    });
+    return rows.map((r) => ({
+      sessionId: r.sessionId || r.landingVisitId,
+      startedAt: r.startedAt.toISOString(),
+      duration: Number(r.totalWatch),
+      completed: r.completed,
+      country: r.country || null,
+      device: r.deviceType || null,
+      browser: r.browser || null,
+    }));
   }
 }
