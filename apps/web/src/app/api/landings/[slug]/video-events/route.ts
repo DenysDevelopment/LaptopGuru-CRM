@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 
 const VALID_EVENT_TYPES = [
   "PLAY", "PAUSE", "SEEK", "ENDED", "HEARTBEAT",
-  "RATE_CHANGE", "QUALITY_CHANGE", "FULLSCREEN", "ERROR", "BUFFERING",
+  "RATE_CHANGE", "QUALITY_CHANGE", "FULLSCREEN", "VOLUME_CHANGE", "ERROR", "BUFFERING",
 ] as const;
 
 // In-memory per-visit rate limiter (single-instance; upgrade to Redis if scaling

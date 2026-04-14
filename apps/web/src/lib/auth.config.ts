@@ -14,6 +14,13 @@ const PUBLIC_PREFIXES = [
   "/favicon",
 ];
 
+/**
+ * Tracking/telemetry endpoints the public landing pages POST to. These MUST
+ * accept anonymous traffic — they're hit by every real visitor, not authors.
+ * Matches `/api/landings/<slug>/track|click|video-events` with any slug value.
+ */
+const PUBLIC_LANDING_API_RE = /^\/api\/landings\/[^/]+\/(track|click|video-events)$/;
+
 export const authConfig: NextAuthConfig = {
   providers: [], // Configured in auth.ts with Credentials
   session: {
@@ -27,7 +34,10 @@ export const authConfig: NextAuthConfig = {
     authorized({ auth, request }) {
       const isLoggedIn = !!auth?.user;
       const { pathname } = request.nextUrl;
-      const isPublic = PUBLIC_PREFIXES.some((p) => pathname.startsWith(p)) || pathname === '/';
+      const isPublic =
+        PUBLIC_PREFIXES.some((p) => pathname.startsWith(p)) ||
+        PUBLIC_LANDING_API_RE.test(pathname) ||
+        pathname === '/';
 
       if (isPublic) return true;
       if (!isLoggedIn) return false;

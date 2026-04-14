@@ -346,12 +346,14 @@ export function LandingClient({ landing, video }: Props) {
 
 	// POST video events — waits for visitId if not ready. On page hide / unload,
 	// prefers navigator.sendBeacon (more reliable than fetch keepalive on Safari/Firefox).
-	const postVideoEvents = useCallback((events: typeof videoEventsBuffer.current) => {
+	// Callers on the unload path pass { unload: true } because visibilityState may
+	// still be 'visible' during beforeunload, which would otherwise skip sendBeacon.
+	const postVideoEvents = useCallback((events: typeof videoEventsBuffer.current, opts?: { unload?: boolean }) => {
 		if (events.length === 0 || video.source !== 'S3') return;
 		const url = `/api/landings/${landing.slug}/video-events`;
 		const doPost = (visitId: string) => {
 			const payload = JSON.stringify({ videoId: video.id, landingVisitId: visitId, events });
-			const unloading = typeof document !== 'undefined' && document.visibilityState === 'hidden';
+			const unloading = opts?.unload || (typeof document !== 'undefined' && document.visibilityState === 'hidden');
 			if (unloading && typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
 				try {
 					const blob = new Blob([payload], { type: 'application/json' });
@@ -396,11 +398,11 @@ export function LandingClient({ landing, video }: Props) {
 	}, [landing.slug]);
 
 	// Flush buffered heartbeats
-	const flushVideoEvents = useCallback(() => {
+	const flushVideoEvents = useCallback((opts?: { unload?: boolean }) => {
 		const events = videoEventsBuffer.current;
 		if (events.length === 0) return;
 		videoEventsBuffer.current = [];
-		postVideoEvents(events);
+		postVideoEvents(events, opts);
 	}, [postVideoEvents]);
 
 	// Send a single event immediately
@@ -1215,14 +1217,16 @@ export function LandingClient({ landing, video }: Props) {
 			flushVideoEvents();
 		}, 10000);
 
-		// On unload — final send
+		// On unload — final send. pagehide is the only reliable signal on iOS Safari
+		// (beforeunload often doesn't fire on swipe-close), so we listen for both.
 		function onUnload() {
 			sendUpdate(buildEngagement());
-			flushVideoEvents();
+			flushVideoEvents({ unload: true });
 		}
 		window.addEventListener('beforeunload', onUnload);
+		window.addEventListener('pagehide', onUnload);
 		const onVisChange = () => {
-			if (document.hidden) { sendUpdate(buildEngagement()); flushVideoEvents(); }
+			if (document.hidden) { sendUpdate(buildEngagement()); flushVideoEvents({ unload: true }); }
 		};
 		document.addEventListener('visibilitychange', onVisChange);
 
@@ -1230,6 +1234,7 @@ export function LandingClient({ landing, video }: Props) {
 			clearTimeout(firstTimeout);
 			clearInterval(interval);
 			window.removeEventListener('beforeunload', onUnload);
+			window.removeEventListener('pagehide', onUnload);
 			document.removeEventListener('visibilitychange', onVisChange);
 		};
 	}, [sendUpdate, flushVideoEvents]);

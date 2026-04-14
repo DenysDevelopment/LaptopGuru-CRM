@@ -6,7 +6,6 @@ import { YouTubeChannelCard } from '@/components/dashboard/videos/youtube-channe
 import { EmptyState } from '@/components/ui/empty-state';
 import type { Video } from '@/types';
 import Image from 'next/image';
-import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export default function VideosPage() {
@@ -203,13 +202,6 @@ export default function VideosPage() {
 											: ''}
 									</span>
 									<div className='flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity'>
-										{video.source === 'S3' && video.status === 'READY' && (
-											<Link
-												href={`/videos/${video.id}/analytics`}
-												className='text-xs text-brand hover:underline'>
-												Аналитика
-											</Link>
-										)}
 										<button
 											onClick={() => handleDelete(video.id)}
 											className='text-xs text-gray-400 hover:text-red-500 transition-colors'>

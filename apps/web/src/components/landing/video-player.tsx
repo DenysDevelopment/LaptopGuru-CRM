@@ -14,6 +14,11 @@ interface Props {
 	onSeeked: (seekFrom: number, seekTo: number) => void;
 	onBufferStart: () => void;
 	onBufferEnd: () => void;
+	onVolumeChange?: (volume: number, muted: boolean, position: number) => void;
+	onRateChange?: (rate: number, position: number) => void;
+	onFullscreenChange?: (isFullscreen: boolean, position: number) => void;
+	onQualityChange?: (quality: number | string, position: number) => void;
+	onError?: (message: string, position: number) => void;
 	productUrl?: string;
 	buyButtonText?: string;
 }
