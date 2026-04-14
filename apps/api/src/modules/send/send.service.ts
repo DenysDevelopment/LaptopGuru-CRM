@@ -64,6 +64,22 @@ export class SendService {
     try {
       // 1. Create landing page
       const companyId = this.cls.get<string>('companyId');
+
+      // Prefer the company's customDomain for public links so customers land on
+      // the external site (e.g. www.laptop.guru) instead of the CRM host.
+      // Middleware on the custom domain rewrites /{slug} → /l/{slug} and
+      // /{6-char code} → /r/{code}, so we can drop the /l/ and /r/ prefixes.
+      const company = companyId
+        ? await this.prisma.company.findUnique({
+            where: { id: companyId },
+            select: { customDomain: true },
+          })
+        : null;
+      const publicBase = company?.customDomain
+        ? `https://${company.customDomain}`
+        : appUrl;
+      const useCustomDomain = Boolean(company?.customDomain);
+
       let slug = generateSlug();
       while (await this.prisma.landing.findFirst({ where: { slug, companyId } })) {
         slug = generateSlug();
@@ -95,8 +111,12 @@ export class SendService {
         data: { code: shortCode, landingId: landing.id, companyId },
       });
 
-      const shortUrl = `${appUrl}/r/${shortCode}`;
-      const landingUrl = `${appUrl}/l/${slug}`;
+      const shortUrl = useCustomDomain
+        ? `${publicBase}/${shortCode}`
+        : `${publicBase}/r/${shortCode}`;
+      const landingUrl = useCustomDomain
+        ? `${publicBase}/${slug}`
+        : `${publicBase}/l/${slug}`;
 
       // 3. Build and send email
       const html = buildEmailHtml({
