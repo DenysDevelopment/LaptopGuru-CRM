@@ -19,14 +19,20 @@ interface Landing {
 export default function LinksPage() {
   const [landings, setLandings] = useState<Landing[]>([]);
   const [loading, setLoading] = useState(true);
+  const [customDomain, setCustomDomain] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/links")
       .then((r) => r.json())
       .then((d) => { setLandings(d); setLoading(false); });
+    fetch("/api/company-settings")
+      .then((r) => r.json())
+      .then((d) => setCustomDomain(d?.customDomain ?? null))
+      .catch(() => {});
   }, []);
 
-  const appUrl = typeof window !== "undefined" ? window.location.origin : "";
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const shortUrlBase = customDomain ? `https://${customDomain}` : origin;
 
   function copyToClipboard(text: string) {
     navigator.clipboard.writeText(text);
@@ -65,10 +71,10 @@ export default function LinksPage() {
                     {landing.shortLinks.map((sl) => (
                       <button
                         key={sl.code}
-                        onClick={() => copyToClipboard(`${appUrl}/r/${sl.code}`)}
+                        onClick={() => copyToClipboard(`${shortUrlBase}/${sl.code}`)}
                         className="text-xs text-brand hover:text-brand-hover transition-colors"
                       >
-                        /r/{sl.code} — копировать
+                        {(customDomain ?? origin.replace(/^https?:\/\//, "")) + "/" + sl.code} — копировать
                       </button>
                     ))}
                   </div>
