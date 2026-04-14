@@ -170,20 +170,72 @@ export default function VideoPlayer({
 	useEffect(() => {
 		const wrapper = wrapperRef.current;
 		if (!wrapper) return;
-		const onClickCapture = (e: Event) => {
-			const target = e.target as HTMLElement | null;
-			if (!target) return;
-			const isPlayClick =
-				target.closest('.plyr__control--overlaid') ||
-				target.closest('button[data-plyr="play"]');
-			if (!isPlayClick) return;
-			const p = plyrRef.current?.plyr;
-			if (!p?.fullscreen || p.fullscreen.active || !p.paused) return;
+
+		const enterFullscreen = () => {
+			// 1. iOS Safari: use the video element's native fullscreen.
+			//    Plyr's container-based fullscreen is a no-op on iOS.
+			const video = wrapper.querySelector('video') as
+				| (HTMLVideoElement & { webkitEnterFullscreen?: () => void })
+				| null;
+			if (video && typeof video.webkitEnterFullscreen === 'function') {
+				try {
+					video.webkitEnterFullscreen();
+					return;
+				} catch {
+					// fall through
+				}
+			}
+			// 2. Other browsers: call the Fullscreen API directly on the
+			//    wrapper, synchronously within the user gesture. Going via
+			//    Plyr's API can lose the gesture on Android Chrome.
+			const el = wrapper as HTMLElement & {
+				webkitRequestFullscreen?: () => Promise<void> | void;
+				mozRequestFullScreen?: () => Promise<void> | void;
+				msRequestFullscreen?: () => Promise<void> | void;
+			};
+			const req =
+				el.requestFullscreen ||
+				el.webkitRequestFullscreen ||
+				el.mozRequestFullScreen ||
+				el.msRequestFullscreen;
+			if (!req) return;
 			try {
-				p.fullscreen.enter();
+				const result = req.call(el);
+				if (result && typeof (result as Promise<void>).catch === 'function') {
+					(result as Promise<void>).catch(() => {
+						// Gesture lost or blocked — ignore
+					});
+				}
 			} catch {
 				// Fullscreen may be blocked — ignore
 			}
+		};
+
+		const onClickCapture = (e: Event) => {
+			const target = e.target as HTMLElement | null;
+			if (!target) return;
+			// Any click on Plyr's big play button or the small play control
+			// while paused triggers fullscreen entry. Using capture phase so
+			// we run before Plyr's own click handler.
+			const isPlayClick =
+				target.closest('.plyr__control--overlaid') ||
+				target.closest('button[data-plyr="play"]') ||
+				target.closest('.plyr__poster');
+			if (!isPlayClick) return;
+			const p = plyrRef.current?.plyr;
+			if (!p || !p.paused) return;
+			// Check current fullscreen state via DOM (Plyr's state may lag).
+			const doc = document as Document & {
+				webkitFullscreenElement?: Element | null;
+				mozFullScreenElement?: Element | null;
+			};
+			const fsEl =
+				doc.fullscreenElement ??
+				doc.webkitFullscreenElement ??
+				doc.mozFullScreenElement ??
+				null;
+			if (fsEl) return;
+			enterFullscreen();
 		};
 		wrapper.addEventListener('click', onClickCapture, true);
 		return () => wrapper.removeEventListener('click', onClickCapture, true);
@@ -210,7 +262,6 @@ export default function VideoPlayer({
 						'progress',
 						'current-time',
 						'mute',
-						'volume',
 						'fullscreen',
 					],
 					fullscreen: {
