@@ -1,5 +1,6 @@
-import { Module } from '@nestjs/common';
-import { BullModule } from '@nestjs/bullmq';
+import { Module, OnModuleInit } from '@nestjs/common';
+import { BullModule, InjectQueue } from '@nestjs/bullmq';
+import type { Queue } from 'bullmq';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { RateLimitService } from '../../common/services/rate-limit.service';
 import { redisProvider } from '../../common/services/redis.provider';
@@ -28,4 +29,16 @@ import { ReaperProcessor } from './workers/reaper.processor';
   ],
   exports: [VideoSessionsService],
 })
-export class VideoSessionsModule {}
+export class VideoSessionsModule implements OnModuleInit {
+  constructor(
+    @InjectQueue('video-session-reaper') private readonly reaperQueue: Queue,
+  ) {}
+
+  async onModuleInit() {
+    await this.reaperQueue.add(
+      'reap',
+      {},
+      { repeat: { pattern: '*/5 * * * *' }, removeOnComplete: true, removeOnFail: true },
+    );
+  }
+}
