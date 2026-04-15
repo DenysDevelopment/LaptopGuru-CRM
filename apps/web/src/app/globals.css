@@ -27,64 +27,80 @@
 }
 
 /*
- * Vertical 9:16 landing video player.
+ * Vertical 9:16 landing video player using video.js.
  * In the normal (inline) layout the wrapper is whatever size its parent
- * defines (aspect-[9/16] max-w-[360px] in the landing), and we make the
- * Plyr chrome + <video> fill that box.
+ * defines (aspect-[9/16] max-w-[240px] in the landing), and we make
+ * video.js's .video-js root + <video> fill that box.
  */
-.plyr-fullscreen-wrapper,
-.plyr-fullscreen-wrapper .plyr,
-.plyr-fullscreen-wrapper .plyr__video-wrapper {
-  width: 100%;
-  height: 100%;
+.vjs-fullscreen-wrapper,
+.vjs-fullscreen-wrapper .video-js,
+.vjs-fullscreen-wrapper video {
+  width: 100% !important;
+  height: 100% !important;
 }
-.plyr-fullscreen-wrapper .plyr__video-wrapper {
-  padding-bottom: 0 !important;
-}
-.plyr-fullscreen-wrapper video {
-  width: 100%;
-  height: 100%;
+.vjs-fullscreen-wrapper .video-js video {
   object-fit: cover;
-}
-.plyr-fullscreen-wrapper .plyr__poster {
-  background-size: cover;
 }
 
 /*
- * Fullscreen mode.
- *
- * Three distinct states all need the same viewport-filling layout:
+ * Brand the video.js skin: orange accent + slimmer big-play button so the
+ * inline 240×426 player doesn't get dwarfed by the default red square.
+ */
+.vjs-fullscreen-wrapper .video-js {
+  --vjs-color-main: #fb7830;
+  background: #000;
+}
+.vjs-fullscreen-wrapper .video-js .vjs-big-play-button {
+  background-color: rgba(251, 120, 48, 0.9);
+  border: none;
+  border-radius: 999px;
+  width: 4rem;
+  height: 4rem;
+  line-height: 4rem;
+  font-size: 2rem;
+  margin-top: -2rem;
+  margin-left: -2rem;
+}
+.vjs-fullscreen-wrapper .video-js:hover .vjs-big-play-button,
+.vjs-fullscreen-wrapper .video-js .vjs-big-play-button:focus {
+  background-color: rgba(229, 106, 37, 1);
+}
+.vjs-fullscreen-wrapper .video-js .vjs-control-bar {
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent);
+}
+.vjs-fullscreen-wrapper .video-js .vjs-play-progress,
+.vjs-fullscreen-wrapper .video-js .vjs-volume-level {
+  background-color: #fb7830;
+}
+
+/*
+ * Fullscreen mode — three distinct states all need the same viewport-
+ * filling layout:
  *   1. Native fullscreen via requestFullscreen()        → :fullscreen
  *   2. Native fullscreen on WebKit                      → :-webkit-full-screen
- *   3. iOS CSS fallback (position:fixed over viewport)  → .plyr-ios-fullscreen
+ *   3. iOS CSS fallback (position:fixed over viewport)  → .vjs-ios-fullscreen
  *
- * Rules must be in separate selectors — a browser that doesn't understand
+ * Rules must live in separate selectors — a browser that doesn't understand
  * one pseudo-class will reject the whole comma-list.
  */
 
 /* 1. Wrapper itself fills the viewport + black background */
-.plyr-fullscreen-wrapper:fullscreen {
+.vjs-fullscreen-wrapper:fullscreen {
   width: 100vw !important;
   height: 100vh !important;
   height: 100dvh !important;
   max-width: none !important;
   max-height: none !important;
   background: #000 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
 }
-.plyr-fullscreen-wrapper:-webkit-full-screen {
+.vjs-fullscreen-wrapper:-webkit-full-screen {
   width: 100vw !important;
   height: 100vh !important;
   max-width: none !important;
   max-height: none !important;
   background: #000 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
 }
-.plyr-fullscreen-wrapper.plyr-ios-fullscreen {
+.vjs-fullscreen-wrapper.vjs-ios-fullscreen {
   position: fixed !important;
   inset: 0 !important;
   width: 100vw !important;
@@ -94,96 +110,56 @@
   max-height: none !important;
   z-index: 2147483647 !important;
   background: #000 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
   /* Prevent iOS rubber-band scrolling while pinned. */
   touch-action: none;
 }
 
-/*
- * 2. Plyr + inner wrapper fill the viewport and drop their aspect ratio.
- *
- * Plyr ≥ 3.7 uses the modern `aspect-ratio` CSS property (not just
- * padding-bottom) to preserve the `ratio: '9:16'` option. If we only zero
- * the padding, `.plyr__video-wrapper` still enforces 9/16 via aspect-ratio
- * and the video ends up as a small centred box inside a huge viewport.
- * Force `aspect-ratio: auto` on every Plyr layer so the flex-centered
- * wrapper can stretch its child to 100%/100%.
- */
-.plyr-fullscreen-wrapper:fullscreen .plyr,
-.plyr-fullscreen-wrapper:fullscreen .plyr__video-wrapper,
-.plyr-fullscreen-wrapper:-webkit-full-screen .plyr,
-.plyr-fullscreen-wrapper:-webkit-full-screen .plyr__video-wrapper,
-.plyr-fullscreen-wrapper.plyr-ios-fullscreen .plyr,
-.plyr-fullscreen-wrapper.plyr-ios-fullscreen .plyr__video-wrapper {
+/* 2. video.js root + <video> fill the viewport with letterboxing */
+.vjs-fullscreen-wrapper:fullscreen .video-js,
+.vjs-fullscreen-wrapper:-webkit-full-screen .video-js,
+.vjs-fullscreen-wrapper.vjs-ios-fullscreen .video-js {
   width: 100% !important;
   height: 100% !important;
   max-width: none !important;
   max-height: none !important;
-  min-width: 0 !important;
-  min-height: 0 !important;
-  padding-bottom: 0 !important;
   aspect-ratio: auto !important;
-  flex: 1 1 auto !important;
+}
+.vjs-fullscreen-wrapper:fullscreen video,
+.vjs-fullscreen-wrapper:-webkit-full-screen video,
+.vjs-fullscreen-wrapper.vjs-ios-fullscreen video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
 }
 
-/* 3. <video> fills the viewport with letterboxing (contain, not cover) */
-.plyr-fullscreen-wrapper:fullscreen video {
-  width: 100% !important;
-  height: 100% !important;
-  max-width: none !important;
-  max-height: none !important;
-  object-fit: contain !important;
+/* 3. CTA button + close button sit above the video.js control bar */
+.vjs-fullscreen-wrapper:fullscreen .vjs-fs-cta,
+.vjs-fullscreen-wrapper:-webkit-full-screen .vjs-fs-cta,
+.vjs-fullscreen-wrapper.vjs-ios-fullscreen .vjs-fs-cta {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 4rem) !important;
 }
-.plyr-fullscreen-wrapper:-webkit-full-screen video {
-  width: 100% !important;
-  height: 100% !important;
-  max-width: none !important;
-  max-height: none !important;
-  object-fit: contain !important;
-}
-.plyr-fullscreen-wrapper.plyr-ios-fullscreen video {
-  width: 100% !important;
-  height: 100% !important;
-  max-width: none !important;
-  max-height: none !important;
-  object-fit: contain !important;
-}
-
-/* 4. CTA button + close button sit above Plyr's control layer */
-.plyr-fullscreen-wrapper:fullscreen .plyr-fs-cta,
-.plyr-fullscreen-wrapper:-webkit-full-screen .plyr-fs-cta,
-.plyr-fullscreen-wrapper.plyr-ios-fullscreen .plyr-fs-cta {
-  /* Lift above Plyr's bottom controls (which use padding-bottom 10px
-     and its own z-index). The wrapper is flex-centered, so the CTA's
-     inset-x-0/bottom-0 still anchors it to the viewport. */
-  padding-bottom: max(env(safe-area-inset-bottom, 0px), 3.5rem) !important;
-}
-.plyr-fullscreen-wrapper:fullscreen .plyr-fs-close,
-.plyr-fullscreen-wrapper:-webkit-full-screen .plyr-fs-close,
-.plyr-fullscreen-wrapper.plyr-ios-fullscreen .plyr-fs-close {
+.vjs-fullscreen-wrapper:fullscreen .vjs-fs-toggle,
+.vjs-fullscreen-wrapper:-webkit-full-screen .vjs-fs-toggle,
+.vjs-fullscreen-wrapper.vjs-ios-fullscreen .vjs-fs-toggle {
   top: max(env(safe-area-inset-top, 0px), 0.75rem) !important;
   right: max(env(safe-area-inset-right, 0px), 0.75rem) !important;
 }
 
 /* Lock page scroll while any fullscreen mode is active. */
-html.plyr-is-fullscreen,
-html.plyr-is-fullscreen body {
+html.vjs-is-fullscreen,
+html.vjs-is-fullscreen body {
   overflow: hidden !important;
   overscroll-behavior: none !important;
 }
 
 /*
- * Our landing uses a slide-up animation that leaves `transform: translateY(0)`
- * on every [data-animate] element. An ancestor with any `transform` (even an
- * identity matrix) becomes the containing block for position:fixed children,
- * so the wrapper's .plyr-ios-fullscreen rule would otherwise pin it to the
- * animated card, not the viewport. While fullscreen is active we strip the
- * transform from every data-animate ancestor so position:fixed resolves to
- * the viewport again.
+ * The landing uses a slide-up animation that leaves `transform: translateY(0)`
+ * on every [data-animate] element. An ancestor with any `transform` becomes
+ * the containing block for position:fixed children, so .vjs-ios-fullscreen
+ * would be pinned to the animated card instead of the viewport. While
+ * fullscreen is active, strip the transform from every data-animate ancestor.
  */
-html.plyr-is-fullscreen [data-animate] {
+html.vjs-is-fullscreen [data-animate] {
   transform: none !important;
   transition: none !important;
 }

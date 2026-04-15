@@ -1,102 +1,121 @@
-import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db";
-import type { Metadata } from "next";
-import { LandingClient } from "./landing-client";
-import { signVideoUrl } from "@/lib/cloudfront-signer";
-import { resolveCompanyFromDomain } from "@/lib/domain";
+import { signVideoUrl } from '@/lib/cloudfront-signer';
+import { prisma } from '@/lib/db';
+import { resolveCompanyFromDomain } from '@/lib/domain';
+import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+import { LandingClient } from './landing-client';
 
 // CloudFront signer uses node:crypto — must not run on Edge
-export const runtime = "nodejs";
+export const runtime = 'nodejs';
 
 interface Props {
-  params: Promise<{ slug: string }>;
+	params: Promise<{ slug: string }>;
 }
 
 const metaByLang: Record<string, { desc: string; og: string }> = {
-  pl: { desc: "Recenzja wideo od laptopguru.pl", og: "Obejrzyj recenzję wideo od laptopguru.pl" },
-  uk: { desc: "Відеоогляд від laptopguru.pl", og: "Дивіться відеоогляд від laptopguru.pl" },
-  ru: { desc: "Видеообзор от laptopguru.pl", og: "Смотрите видеообзор от laptopguru.pl" },
-  en: { desc: "Video review from laptopguru.pl", og: "Watch a video review from laptopguru.pl" },
+	pl: {
+		desc: 'Recenzja wideo od laptopguru.pl',
+		og: 'Obejrzyj recenzję wideo od laptopguru.pl',
+	},
+	uk: {
+		desc: 'Відеоогляд від laptopguru.pl',
+		og: 'Дивіться відеоогляд від laptopguru.pl',
+	},
+	ru: {
+		desc: 'Видеообзор от laptopguru.pl',
+		og: 'Смотрите видеообзор от laptopguru.pl',
+	},
+	en: {
+		desc: 'Video review from laptopguru.pl',
+		og: 'Watch a video review from laptopguru.pl',
+	},
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug } = await params;
-  const companyId = await resolveCompanyFromDomain();
-  const landing = await prisma.landing.findFirst({
-    where: { slug, ...(companyId ? { companyId } : {}) },
-    include: { video: true },
-  });
+	const { slug } = await params;
+	const companyId = await resolveCompanyFromDomain();
+	const landing = await prisma.landing.findFirst({
+		where: { slug, ...(companyId ? { companyId } : {}) },
+		include: { video: true },
+	});
 
-  if (!landing) return {};
+	if (!landing) return {};
 
-  const lang = landing.language || "pl";
-  const meta = metaByLang[lang] || metaByLang.pl;
+	const lang = landing.language || 'pl';
+	const meta = metaByLang[lang] || metaByLang.pl;
 
-  return {
-    title: landing.title,
-    description: `${meta.desc} — ${landing.video.title}`,
-    openGraph: {
-      title: landing.title,
-      description: meta.og,
-      images: [landing.video.thumbnail],
-    },
-  };
+	return {
+		title: landing.title,
+		description: `${meta.desc} — ${landing.video.title}`,
+		openGraph: {
+			title: landing.title,
+			description: meta.og,
+			images: [landing.video.thumbnail],
+		},
+	};
 }
 
 export default async function LandingPage({ params }: Props) {
-  const { slug } = await params;
-  const companyId = await resolveCompanyFromDomain();
+	const { slug } = await params;
+	const companyId = await resolveCompanyFromDomain();
 
-  const landing = await prisma.landing.findFirst({
-    where: { slug, ...(companyId ? { companyId } : {}) },
-    include: { video: true },
-  });
+	const landing = await prisma.landing.findFirst({
+		where: { slug, ...(companyId ? { companyId } : {}) },
+		include: { video: true },
+	});
 
-  if (!landing) notFound();
+	if (!landing) notFound();
 
-  // Increment views
-  await prisma.landing.update({
-    where: { id: landing.id },
-    data: { views: { increment: 1 } },
-  });
+	// Increment views
+	await prisma.landing.update({
+		where: { id: landing.id },
+		data: { views: { increment: 1 } },
+	});
 
-  const lang = (landing.language || "pl") as "pl" | "uk" | "ru" | "en" | "lt" | "et" | "lv";
+	const lang = (landing.language || 'pl') as
+		| 'pl'
+		| 'uk'
+		| 'ru'
+		| 'en'
+		| 'lt'
+		| 'et'
+		| 'lv';
 
-  // For S3 videos, generate signed CloudFront URL
-  const video = landing.video;
-  const isS3 = video.source === "S3" && video.s3KeyOutput;
-  let signedVideoUrl: string | null = null;
-  if (isS3) {
-    try {
-      signedVideoUrl = signVideoUrl(video.s3KeyOutput!);
-    } catch {
-      // CloudFront not configured — fall back to no video
-    }
-  }
+	// For S3 videos, generate signed CloudFront URL
+	const video = landing.video;
+	const isS3 = video.source === 'S3' && video.s3KeyOutput;
+	let signedVideoUrl: string | null = null;
+	if (isS3) {
+		try {
+			signedVideoUrl = signVideoUrl(video.s3KeyOutput!);
+		} catch {
+			// CloudFront not configured — fall back to no video
+		}
+	}
 
-  return (
-    <LandingClient
-      landing={{
-        id: landing.id,
-        slug: landing.slug,
-        title: landing.title,
-        productUrl: landing.productUrl,
-        buyButtonText: landing.buyButtonText,
-        personalNote: landing.personalNote,
-        customerName: landing.customerName,
-        productName: landing.productName,
-        language: lang,
-        type: landing.type,
-      }}
-      video={{
-        id: video.id,
-        source: video.source,
-        youtubeId: video.youtubeId,
-        videoUrl: signedVideoUrl,
-        thumbnail: video.thumbnail,
-        title: video.title,
-        durationSeconds: video.durationSeconds,
-      }}
-    />
-  );
+	return (
+		<LandingClient
+			landing={{
+				id: landing.id,
+				slug: landing.slug,
+				title: landing.title,
+				productUrl: landing.productUrl,
+				buyButtonText: landing.buyButtonText,
+				personalNote: landing.personalNote,
+				customerName: landing.customerName,
+				productName: landing.productName,
+				language: lang,
+				type: landing.type,
+			}}
+			video={{
+				id: video.id,
+				source: video.source,
+				youtubeId: video.youtubeId,
+				videoUrl: signedVideoUrl,
+				thumbnail: video.thumbnail,
+				title: video.title,
+				durationSeconds: video.durationSeconds,
+			}}
+		/>
+	);
 }
