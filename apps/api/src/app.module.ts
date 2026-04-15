@@ -17,6 +17,7 @@ import { LandingsModule } from './modules/landings/landings.module';
 import { StatsModule } from './modules/stats/stats.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { SuperAdminModule } from './modules/super-admin/super-admin.module';
+import { VideoSessionsModule } from './modules/video-sessions/video-sessions.module';
 import { CompanyGuard } from './common/guards/company.guard';
 
 @Module({
@@ -36,6 +37,7 @@ import { CompanyGuard } from './common/guards/company.guard';
     HealthModule,
     MessagingModule,
     VideosModule,
+    VideoSessionsModule,
     EmailsModule,
     LinksModule,
     SendModule,
