@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 
 const VALID_EVENT_TYPES = [
   "PLAY", "PAUSE", "SEEK", "ENDED", "HEARTBEAT",
-  "RATE_CHANGE", "QUALITY_CHANGE", "FULLSCREEN", "ERROR",
+  "RATE_CHANGE", "QUALITY_CHANGE", "FULLSCREEN", "ERROR", "BUFFERING",
 ] as const;
 
 export async function POST(
@@ -41,21 +41,40 @@ export async function POST(
     return NextResponse.json({ error: "Too many events" }, { status: 400 });
   }
 
-  // Validate the landing visit belongs to this slug
+  // Validate the landing visit belongs to this slug and videoId matches
   const visit = await prisma.landingVisit.findUnique({
     where: { id: landingVisitId },
-    include: { landing: { select: { slug: true, companyId: true } } },
+    include: {
+      landing: {
+        select: {
+          slug: true,
+          companyId: true,
+          videoId: true,
+          video: { select: { durationSeconds: true } },
+        },
+      },
+    },
   });
   if (!visit || visit.landing.slug !== slug) {
     return NextResponse.json({ error: "Invalid visit" }, { status: 400 });
   }
+  if (visit.landing.videoId !== videoId) {
+    return NextResponse.json({ error: "Video mismatch" }, { status: 400 });
+  }
 
-  const validEvents = events.filter(
-    (e) =>
-      VALID_EVENT_TYPES.includes(e.eventType) &&
-      typeof e.position === "number" &&
-      e.clientTimestamp,
-  );
+  const now = Date.now();
+  const durationSeconds = visit.landing.video?.durationSeconds ?? 0;
+
+  const validEvents = events.filter((e) => {
+    if (!VALID_EVENT_TYPES.includes(e.eventType)) return false;
+    if (typeof e.position !== "number" || e.position < 0) return false;
+    // Reject positions far beyond video duration (10s buffer for timing drift)
+    if (durationSeconds > 0 && e.position > durationSeconds + 10) return false;
+    // Validate clientTimestamp: must be a valid date, not in future, not older than 24h
+    const ts = new Date(e.clientTimestamp).getTime();
+    if (isNaN(ts) || ts > now + 60_000 || now - ts > 24 * 3600_000) return false;
+    return true;
+  });
 
   if (validEvents.length > 0) {
     await prisma.videoWatchEvent.createMany({

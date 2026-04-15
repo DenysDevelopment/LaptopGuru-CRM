@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import type { Metadata } from "next";
 import { LandingClient } from "./landing-client";
 import { signVideoUrl } from "@/lib/cloudfront-signer";
+import { resolveCompanyFromDomain } from "@/lib/domain";
 
 // CloudFront signer uses node:crypto — must not run on Edge
 export const runtime = "nodejs";
@@ -20,8 +21,9 @@ const metaByLang: Record<string, { desc: string; og: string }> = {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
+  const companyId = await resolveCompanyFromDomain();
   const landing = await prisma.landing.findFirst({
-    where: { slug },
+    where: { slug, ...(companyId ? { companyId } : {}) },
     include: { video: true },
   });
 
@@ -43,9 +45,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function LandingPage({ params }: Props) {
   const { slug } = await params;
+  const companyId = await resolveCompanyFromDomain();
 
   const landing = await prisma.landing.findFirst({
-    where: { slug },
+    where: { slug, ...(companyId ? { companyId } : {}) },
     include: { video: true },
   });
 
@@ -86,6 +89,7 @@ export default async function LandingPage({ params }: Props) {
         type: landing.type,
       }}
       video={{
+        id: video.id,
         source: video.source,
         youtubeId: video.youtubeId,
         videoUrl: signedVideoUrl,

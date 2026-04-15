@@ -92,8 +92,11 @@ export class VideoWebhooksController {
       const durationSeconds = durationMs ? Math.round(durationMs / 1000) : null;
       const duration = durationSeconds ? formatDuration(durationSeconds) : null;
 
-      const s3KeyOutput = `outputs/${video.companyId}/${video.id}/video.mp4`;
-      const s3KeyThumb = `outputs/${video.companyId}/${video.id}/thumb.0000000.jpg`;
+      // MediaConvert output = {destination}{inputBaseName}{NameModifier}.{ext}
+      // Input key: originals/{companyId}/{videoId}.mp4 → baseName = videoId
+      const inputBase = (video.s3KeyOriginal ?? '').split('/').pop()?.replace(/\.[^.]+$/, '') || video.id;
+      const s3KeyOutput = `outputs/${video.companyId}/${video.id}/${inputBase}video.mp4`;
+      const s3KeyThumb = `outputs/${video.companyId}/${video.id}/${inputBase}thumb.0000000.jpg`;
       const cloudFrontThumbUrl = this.cfSigner.getPublicThumbUrl(s3KeyThumb);
 
       await this.prisma.video.update({
@@ -109,16 +112,22 @@ export class VideoWebhooksController {
         },
       });
 
-      // Queue YouTube dual-publish
-      await this.youtubeUploadQueue.add(
-        'upload',
-        { videoId },
-        { attempts: 3, backoff: { type: 'exponential', delay: 60_000 } },
-      );
-      await this.prisma.video.update({
-        where: { id: videoId },
-        data: { youtubeUploadStatus: 'pending' },
-      });
+      // Queue YouTube dual-publish (only if opted in)
+      if (video.publishToYoutube) {
+        await this.youtubeUploadQueue.add(
+          'upload',
+          { videoId },
+          {
+            jobId: `yt-upload-${videoId}`,
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 60_000 },
+          },
+        );
+        await this.prisma.video.update({
+          where: { id: videoId },
+          data: { youtubeUploadStatus: 'pending' },
+        });
+      }
 
       this.logger.log(`Video ${videoId} marked READY via webhook`);
     } else if (jobStatus === 'ERROR') {

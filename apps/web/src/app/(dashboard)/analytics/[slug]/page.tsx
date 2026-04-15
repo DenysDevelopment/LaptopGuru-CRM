@@ -4,14 +4,60 @@ import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import {
   Eye, User, ShoppingCart, TrendingUp, Clock,
-  ScrollText, Play, Clapperboard, Hourglass,
+  ScrollText, Play, Pause, Clapperboard, Hourglass,
   Globe, Building2, Smartphone, Globe2, Monitor,
   Link2, Megaphone, Settings, Wifi, Palette,
-  BarChart3, Key,
+  BarChart3, Key, SkipForward, CheckCircle, AlertCircle, Gauge, Film,
 } from "lucide-react";
+
+interface VideoAnalytics {
+  overview: {
+    totalViews: number;
+    uniqueViewers: number;
+    totalWatchTime: number;
+    avgViewDuration: number;
+    completionRate: number;
+    playRate: number;
+  };
+  durationSeconds: number;
+  retention: { second: number; viewers: number; viewersPercent: number }[];
+  viewsTimeSeries: { date: string; views: number }[];
+  replayHeatmap: { second: number; intensity: number }[];
+  sessionStrips: {
+    sessionId: string;
+    startedAt: string;
+    country: string | null;
+    device: string | null;
+    segments: boolean[];
+  }[];
+  recentWatches: {
+    sessionId: string;
+    startedAt: string;
+    duration: number;
+    completed: boolean;
+    country: string | null;
+    device: string | null;
+    browser: string | null;
+  }[];
+}
+
+interface VisitVideoAnalytics {
+  segments: boolean[];
+  durationSeconds: number;
+  watchPercentage: number;
+  events: {
+    eventType: string;
+    position: number;
+    seekFrom: number | null;
+    seekTo: number | null;
+    playbackRate: number;
+    clientTimestamp: string;
+  }[];
+}
 
 interface Analytics {
   landing: {
+    id: string;
     slug: string;
     title: string;
     views: number;
@@ -20,6 +66,9 @@ interface Analytics {
     customerName: string | null;
     customerEmail: string | null;
     videoTitle: string;
+    videoId: string;
+    videoSource: string;
+    videoDurationSeconds: number | null;
   };
   summary: {
     totalVisits: number;
@@ -30,6 +79,7 @@ interface Analytics {
     avgScrollDepth: number;
     videoPlays: number;
     videoPlayRate: number;
+    videoCompleted: number;
     avgVideoWatch: number;
   };
   breakdown: {
@@ -41,6 +91,7 @@ interface Analytics {
     referrers: [string, number][];
     utmSources: [string, number][];
   };
+  pagination: { page: number; limit: number; totalCount: number };
   visits: {
     id: string;
     visitedAt: string;
@@ -62,6 +113,10 @@ interface Analytics {
     buyButtonClicked: boolean;
     videoPlayed: boolean;
     videoWatchTime: number | null;
+    videoTimeToPlay: number | null;
+    videoBufferCount: number | null;
+    videoBufferTime: number | null;
+    videoDroppedFrames: number | null;
     totalClicks: number | null;
     tabSwitches: number | null;
     browserLang: string | null;
@@ -77,6 +132,10 @@ function formatTime(sec: number): string {
   return s > 0 ? `${m}м ${s}с` : `${m}м`;
 }
 
+function formatTimecode(s: number): string {
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
 function DeviceIcon({ type }: { type: string | null }) {
   if (type === "mobile" || type === "tablet") return <Smartphone className="w-4 h-4 inline text-gray-400" />;
   return <Monitor className="w-4 h-4 inline text-gray-400" />;
@@ -88,7 +147,10 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"overview" | "visits">("overview");
 
+  const [videoAnalytics, setVideoAnalytics] = useState<VideoAnalytics | null>(null);
   const [error, setError] = useState("");
+  const [visitsPage, setVisitsPage] = useState(1);
+  const [loadingVisits, setLoadingVisits] = useState(false);
 
   useEffect(() => {
     fetch(`/api/landings/${slug}/analytics`)
@@ -96,7 +158,17 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
-      .then((d) => { setData(d); setLoading(false); })
+      .then((d) => {
+        setData(d);
+        setLoading(false);
+        // Fetch detailed video analytics for S3 videos (scoped to this landing)
+        if (d.landing.videoSource === "S3" && d.landing.videoId) {
+          fetch(`/api/videos/${d.landing.videoId}/analytics?landingId=${d.landing.id}`)
+            .then((r) => r.ok ? r.json() : null)
+            .then((va) => { if (va) setVideoAnalytics(va); })
+            .catch(() => {});
+        }
+      })
       .catch((e) => { setError(e.message); setLoading(false); });
   }, [slug]);
 
@@ -131,7 +203,7 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
           onClick={() => setTab("visits")}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === "visits" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
         >
-          Визиты ({data.visits.length})
+          Визиты ({data.pagination.totalCount})
         </button>
       </div>
 
@@ -147,12 +219,136 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
           </div>
 
           {/* Engagement KPIs */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
             <KPI label="Ø скролл" value={`${s.avgScrollDepth}%`} icon={<ScrollText className="w-4 h-4 text-gray-500" />} />
             <KPI label="Смотрели видео" value={s.videoPlays} icon={<Play className="w-4 h-4 text-gray-500" />} />
             <KPI label="% запуска видео" value={`${s.videoPlayRate}%`} icon={<Clapperboard className="w-4 h-4 text-gray-500" />} />
+            <KPI label="Досмотрели" value={s.videoCompleted ?? 0} icon={<TrendingUp className="w-4 h-4 text-gray-500" />} />
             <KPI label="Ø просмотр видео" value={formatTime(s.avgVideoWatch)} icon={<Hourglass className="w-4 h-4 text-gray-500" />} />
           </div>
+
+          {/* Video Analytics (S3) */}
+          {videoAnalytics && (
+            <div className="mb-8">
+              <h2 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-1.5">
+                <Clapperboard className="w-4 h-4 text-brand" /> Аналитика видео
+              </h2>
+
+              {/* Video KPIs */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+                <KPI label="Просмотры" value={videoAnalytics.overview.totalViews} icon={<Eye className="w-4 h-4 text-gray-500" />} />
+                <KPI label="Уникальные" value={videoAnalytics.overview.uniqueViewers} icon={<User className="w-4 h-4 text-gray-500" />} />
+                <KPI label="Время просмотра" value={formatTime(videoAnalytics.overview.totalWatchTime)} icon={<Clock className="w-4 h-4 text-gray-500" />} />
+                <KPI label="Ø длительность" value={formatTime(videoAnalytics.overview.avgViewDuration)} icon={<Hourglass className="w-4 h-4 text-gray-500" />} />
+                <KPI label="Досмотрели" value={`${Math.round(videoAnalytics.overview.completionRate * 100)}%`} icon={<TrendingUp className="w-4 h-4 text-brand" />} accent />
+                <KPI label="% запуска" value={`${Math.round(videoAnalytics.overview.playRate * 100)}%`} icon={<Play className="w-4 h-4 text-gray-500" />} />
+              </div>
+
+              {/* Watch Heatmap */}
+              {videoAnalytics.replayHeatmap && videoAnalytics.replayHeatmap.length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-100 p-5 mb-4">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-1">Тепловая карта</h3>
+                  <p className="text-xs text-gray-400 mb-3">Яркие сегменты — смотрели чаще, тёмные — пропускали</p>
+                  <div className="flex gap-px h-10 rounded-lg overflow-hidden">
+                    {videoAnalytics.replayHeatmap.map((h, i) => (
+                      <div
+                        key={i}
+                        className="flex-1 relative group cursor-default"
+                        style={{
+                          backgroundColor: h.intensity > 0
+                            ? `rgba(99, 102, 241, ${0.15 + h.intensity * 0.85})`
+                            : '#f3f4f6',
+                        }}
+                      >
+                        <div className="absolute -top-9 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none z-10">
+                          {formatTimecode(h.second)} — {Math.round(h.intensity * 100)}%
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                    <span>0:00</span>
+                    <span>{formatTimecode(videoAnalytics.durationSeconds)}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Per-session watch strips */}
+              {videoAnalytics.sessionStrips && videoAnalytics.sessionStrips.length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-100 p-5 mb-4">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-1">Что смотрел каждый зритель</h3>
+                  <p className="text-xs text-gray-400 mb-3">Цветные сегменты — смотрел, серые — пропустил</p>
+                  <div className="space-y-1.5">
+                    {videoAnalytics.sessionStrips.map((strip) => (
+                      <div key={strip.sessionId} className="flex items-center gap-2">
+                        <div className="text-[10px] text-gray-400 w-20 flex-shrink-0 truncate" title={[strip.country, strip.device].filter(Boolean).join(' · ')}>
+                          {strip.startedAt ? new Date(strip.startedAt).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) : ''}
+                          {' '}
+                          {strip.country || ''}
+                        </div>
+                        <div className="flex gap-px flex-1 h-5 rounded overflow-hidden">
+                          {strip.segments.map((watched, i) => (
+                            <div
+                              key={i}
+                              className={`flex-1 ${watched ? 'bg-indigo-500' : 'bg-gray-200'}`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-between text-[10px] text-gray-400 mt-1 pl-[88px]">
+                    <span>0:00</span>
+                    <span>{formatTimecode(videoAnalytics.durationSeconds)}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Retention chart */}
+              {videoAnalytics.retention.length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-100 p-5 mb-4">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Удержание</h3>
+                  <div className="flex items-end gap-px h-32">
+                    {videoAnalytics.retention.map((r, i) => (
+                      <div
+                        key={i}
+                        className="flex-1 bg-brand/70 hover:bg-brand rounded-t transition-colors relative group"
+                        style={{ height: `${Math.max(r.viewersPercent * 100, 2)}%` }}
+                      >
+                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none z-10">
+                          {formatTimecode(r.second)} — {r.viewers} ({Math.round(r.viewersPercent * 100)}%)
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                    <span>0:00</span>
+                    <span>{formatTimecode(videoAnalytics.retention[videoAnalytics.retention.length - 1]?.second ?? 0)}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Recent watches */}
+              {videoAnalytics.recentWatches && videoAnalytics.recentWatches.length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-100 p-5">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Последние просмотры видео</h3>
+                  <div className="space-y-2">
+                    {videoAnalytics.recentWatches.map((w) => (
+                      <div key={w.sessionId} className="flex items-center gap-3 text-xs py-2 border-b border-gray-50 last:border-0">
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${w.completed ? 'bg-green-500' : 'bg-yellow-400'}`} />
+                        <span className="text-gray-500 w-28 flex-shrink-0">
+                          {new Date(w.startedAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <span className="text-gray-700 font-medium w-16">{formatTime(w.duration)}</span>
+                        <span className="text-gray-400">{[w.country, w.device, w.browser].filter(Boolean).join(' · ') || '—'}</span>
+                        {w.completed && <span className="text-green-600 ml-auto">Досмотрел</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Breakdowns */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -168,14 +364,58 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
           </div>
         </>
       ) : (
-        /* Visits — expandable cards with ALL data */
+        /* Visits — expandable cards with pagination */
         <div className="space-y-3">
           {data.visits.length === 0 && (
             <p className="text-center py-8 text-gray-400">Визитов пока нет</p>
           )}
           {data.visits.map((v) => (
-            <VisitCard key={v.id} v={v} />
+            <VisitCard
+              key={v.id}
+              v={v}
+              slug={slug}
+              videoDurationSeconds={data.landing.videoDurationSeconds}
+              isS3Video={data.landing.videoSource === "S3"}
+            />
           ))}
+          {/* Pagination */}
+          {data.pagination.totalCount > data.pagination.limit && (
+            <div className="flex items-center justify-center gap-3 pt-4">
+              <button
+                disabled={visitsPage <= 1 || loadingVisits}
+                onClick={() => {
+                  const p = visitsPage - 1;
+                  setVisitsPage(p);
+                  setLoadingVisits(true);
+                  fetch(`/api/landings/${slug}/analytics?page=${p}&limit=${data.pagination.limit}`)
+                    .then(r => r.json())
+                    .then(d => { setData((prev) => prev ? { ...prev, visits: d.visits, pagination: d.pagination } : prev); })
+                    .finally(() => setLoadingVisits(false));
+                }}
+                className="px-3 py-1.5 text-sm rounded-md bg-gray-100 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                ← Назад
+              </button>
+              <span className="text-sm text-gray-500">
+                {visitsPage} / {Math.ceil(data.pagination.totalCount / data.pagination.limit)}
+              </span>
+              <button
+                disabled={visitsPage >= Math.ceil(data.pagination.totalCount / data.pagination.limit) || loadingVisits}
+                onClick={() => {
+                  const p = visitsPage + 1;
+                  setVisitsPage(p);
+                  setLoadingVisits(true);
+                  fetch(`/api/landings/${slug}/analytics?page=${p}&limit=${data.pagination.limit}`)
+                    .then(r => r.json())
+                    .then(d => { setData((prev) => prev ? { ...prev, visits: d.visits, pagination: d.pagination } : prev); })
+                    .finally(() => setLoadingVisits(false));
+                }}
+                className="px-3 py-1.5 text-sm rounded-md bg-gray-100 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Вперёд →
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -197,8 +437,26 @@ function KPI({ label, value, icon, accent }: { label: string; value: number | st
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function VisitCard({ v }: { v: any }) {
+function VisitCard({ v, slug, videoDurationSeconds, isS3Video }: { v: any; slug: string; videoDurationSeconds: number | null; isS3Video: boolean }) {
   const [open, setOpen] = useState(false);
+  const [videoData, setVideoData] = useState<VisitVideoAnalytics | null>(null);
+  const [videoLoading, setVideoLoading] = useState(false);
+
+  useEffect(() => {
+    if (open && v.videoPlayed && !videoData && !videoLoading && isS3Video) {
+      setVideoLoading(true);
+      fetch(`/api/landings/${slug}/visits/${v.id}/video-events`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => { if (d) setVideoData(d); })
+        .catch(() => {})
+        .finally(() => setVideoLoading(false));
+    }
+  }, [open, v.videoPlayed, v.id, slug, isS3Video, videoData, videoLoading]);
+
+  // Compute video watch percentage from basic data when detailed data not yet loaded
+  const basicWatchPct = v.videoPlayed && videoDurationSeconds && videoDurationSeconds > 0 && v.videoWatchTime
+    ? Math.min(100, Math.round((v.videoWatchTime / videoDurationSeconds) * 100))
+    : null;
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
@@ -226,6 +484,11 @@ function VisitCard({ v }: { v: any }) {
               ↓{v.maxScrollDepth}%
             </span>
           )}
+          {v.videoPlayed && basicWatchPct != null && (
+            <span className={basicWatchPct >= 80 ? "text-indigo-600 font-semibold" : basicWatchPct >= 40 ? "text-indigo-400" : "text-gray-400"}>
+              ▶{basicWatchPct}%
+            </span>
+          )}
         </div>
 
         <svg className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -236,6 +499,71 @@ function VisitCard({ v }: { v: any }) {
       {/* Expanded details — ALL data */}
       {open && (
         <div className="border-t border-gray-100 px-4 py-4 text-xs space-y-4">
+
+          {/* Video analytics section — full width above the grid */}
+          {v.videoPlayed && (
+            <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+              <p className="font-semibold text-gray-900 flex items-center gap-1.5">
+                <Film className="w-4 h-4 text-indigo-500" /> Видео-просмотр
+              </p>
+
+              {/* Basic stats */}
+              <div className="flex flex-wrap gap-x-6 gap-y-1">
+                <DataRow label="Время просмотра" value={v.videoWatchTime ? formatTime(v.videoWatchTime) : "—"} />
+                <DataRow label="Просмотрено" value={videoData ? `${videoData.watchPercentage}%` : basicWatchPct != null ? `${basicWatchPct}%` : "—"} />
+                <DataRow label="Досмотрел" value={v.videoCompleted ? "Да" : "Нет"} />
+                {v.videoTimeToPlay != null && <DataRow label="До воспроизв." value={`${(v.videoTimeToPlay / 1000).toFixed(1)}с`} />}
+                {v.videoBufferCount != null && v.videoBufferCount > 0 && (
+                  <DataRow label="Буферизаций" value={`${v.videoBufferCount} (${((v.videoBufferTime ?? 0) / 1000).toFixed(1)}с)`} />
+                )}
+                {v.videoDroppedFrames != null && v.videoDroppedFrames > 0 && (
+                  <DataRow label="Dropped frames" value={String(v.videoDroppedFrames)} />
+                )}
+              </div>
+
+              {/* Segment strip */}
+              {videoLoading && (
+                <p className="text-gray-400 text-[11px]">Загрузка...</p>
+              )}
+              {videoData && videoData.segments.length > 0 && (
+                <div>
+                  <p className="text-[11px] text-gray-400 mb-1">Какие части видео смотрел</p>
+                  <div className="flex gap-px h-5 rounded overflow-hidden">
+                    {videoData.segments.map((watched, i) => (
+                      <div
+                        key={i}
+                        className={`flex-1 ${watched ? "bg-indigo-500" : "bg-gray-200"}`}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex justify-between text-[10px] text-gray-400 mt-0.5">
+                    <span>0:00</span>
+                    <span>{formatTimecode(videoData.durationSeconds)}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Event timeline */}
+              {videoData && videoData.events.length > 0 && (
+                <div>
+                  <p className="text-[11px] text-gray-400 mb-1">События</p>
+                  <div className="max-h-40 overflow-y-auto space-y-0">
+                    {videoData.events.map((e, i) => (
+                      <div key={i} className="flex items-center gap-2 text-[11px] py-1 border-b border-gray-100 last:border-0">
+                        <VideoEventIcon type={e.eventType} />
+                        <span className="text-gray-500 w-14 flex-shrink-0">{formatTimecode(Math.round(e.position))}</span>
+                        <span className="text-gray-700">{videoEventLabel(e)}</span>
+                        <span className="text-gray-400 ml-auto flex-shrink-0">
+                          {new Date(e.clientTimestamp).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Grid of data sections */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 
@@ -297,7 +625,6 @@ function VisitCard({ v }: { v: any }) {
               <DataRow label="Скролл" value={v.maxScrollDepth != null ? `${v.maxScrollDepth}%` : null} />
               <DataRow label="Клики" value={v.totalClicks} />
               <DataRow label="Переключ. табов" value={v.tabSwitches} />
-              <DataRow label="Видео" value={v.videoPlayed ? `${v.videoWatchTime ? formatTime(v.videoWatchTime) : "Да"}` : "Нет"} />
               <DataRow label="Купить" value={v.buyButtonClicked ? "Да" : "Нет"} />
             </DataSection>
 
@@ -333,6 +660,32 @@ function VisitCard({ v }: { v: any }) {
       )}
     </div>
   );
+}
+
+function VideoEventIcon({ type }: { type: string }) {
+  switch (type) {
+    case "PLAY": return <Play className="w-3 h-3 text-green-500 flex-shrink-0" />;
+    case "PAUSE": return <Pause className="w-3 h-3 text-yellow-500 flex-shrink-0" />;
+    case "SEEK": return <SkipForward className="w-3 h-3 text-gray-400 flex-shrink-0" />;
+    case "ENDED": return <CheckCircle className="w-3 h-3 text-green-600 flex-shrink-0" />;
+    case "RATE_CHANGE": return <Gauge className="w-3 h-3 text-gray-400 flex-shrink-0" />;
+    case "ERROR": return <AlertCircle className="w-3 h-3 text-red-500 flex-shrink-0" />;
+    default: return <Play className="w-3 h-3 text-gray-300 flex-shrink-0" />;
+  }
+}
+
+function videoEventLabel(e: { eventType: string; seekFrom: number | null; seekTo: number | null; playbackRate: number }): string {
+  switch (e.eventType) {
+    case "PLAY": return "Воспроизведение";
+    case "PAUSE": return "Пауза";
+    case "SEEK": return `Перемотка ${e.seekFrom != null ? formatTimecode(Math.round(e.seekFrom)) : "?"} → ${e.seekTo != null ? formatTimecode(Math.round(e.seekTo)) : "?"}`;
+    case "ENDED": return "Конец видео";
+    case "RATE_CHANGE": return `Скорость ×${e.playbackRate}`;
+    case "QUALITY_CHANGE": return "Смена качества";
+    case "FULLSCREEN": return "Полный экран";
+    case "ERROR": return "Ошибка";
+    default: return e.eventType;
+  }
 }
 
 function DataSection({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {

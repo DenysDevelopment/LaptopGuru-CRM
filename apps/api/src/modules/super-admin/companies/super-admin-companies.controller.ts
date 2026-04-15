@@ -42,7 +42,7 @@ export class SuperAdminCompaniesController {
   @Patch(':id')
   update(
     @Param('id') id: string,
-    @Body() body: { name?: string; description?: string; logo?: string },
+    @Body() body: { name?: string; description?: string; logo?: string; customDomain?: string | null },
   ) {
     return this.svc.update(id, body);
   }

@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
 import { PERMISSIONS } from "@laptopguru-crm/shared";
-import { S3Client } from "@aws-sdk/client-s3";
-import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const MAX_BYTES = Number(process.env.VIDEO_UPLOAD_MAX_BYTES || 2_147_483_648);
 const PRESIGN_TTL = Number(process.env.VIDEO_PRESIGN_TTL_SECONDS || 900);
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No company assigned" }, { status: 403 });
   }
 
-  const { fileName, fileSize, mimeType, title } = await request.json();
+  const { fileName, fileSize, mimeType, title, publishToYoutube } = await request.json();
 
   if (!fileName || !fileSize || !mimeType || !title) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -41,22 +41,22 @@ export async function POST(request: NextRequest) {
       s3Bucket: BUCKET,
       userId: session.user.id,
       companyId,
+      publishToYoutube: publishToYoutube !== false,
     },
   });
 
   const key = `originals/${companyId}/${video.id}.mp4`;
 
   const s3 = new S3Client({ region: process.env.AWS_REGION || "eu-central-1" });
-  const { url, fields } = await createPresignedPost(s3, {
-    Bucket: BUCKET,
-    Key: key,
-    Conditions: [
-      ["content-length-range", 1, MAX_BYTES],
-      ["eq", "$Content-Type", mimeType],
-    ],
-    Fields: { "Content-Type": mimeType },
-    Expires: PRESIGN_TTL,
-  });
+  const putUrl = await getSignedUrl(
+    s3,
+    new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+      ContentType: mimeType,
+    }),
+    { expiresIn: PRESIGN_TTL },
+  );
 
   await prisma.video.update({
     where: { id: video.id },
@@ -65,8 +65,7 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     videoId: video.id,
-    postUrl: url,
-    formFields: fields,
+    putUrl,
     key,
   });
 }

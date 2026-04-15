@@ -20,6 +20,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { hostname: "img.youtube.com" },
       { hostname: "i.ytimg.com" },
+      { hostname: "d2e1etvd6vwgr0.cloudfront.net" },
     ],
   },
   headers: async () => [

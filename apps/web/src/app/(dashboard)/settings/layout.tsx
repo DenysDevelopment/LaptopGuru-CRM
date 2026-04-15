@@ -7,6 +7,7 @@ const SETTINGS_TABS = [
 	{ href: '/settings/channels', label: 'Каналы' },
 	{ href: '/settings/templates', label: 'Шаблоны' },
 	{ href: '/settings/quick-replies', label: 'Быстрые ответы' },
+	{ href: '/settings/domain', label: 'Домен' },
 ];
 
 export default function SettingsLayout({

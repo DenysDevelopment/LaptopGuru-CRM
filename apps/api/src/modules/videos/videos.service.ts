@@ -12,6 +12,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { S3Service } from './s3.service';
 import { MediaConvertService } from './mediaconvert.service';
+import { CloudFrontSignerService } from './cloudfront-signer.service';
 import type { UploadInitResponse } from '@laptopguru-crm/shared';
 
 /* ------------------------------------------------------------------ */
@@ -189,16 +190,22 @@ export class VideosService {
     private readonly cls: ClsService,
     private readonly s3Service: S3Service,
     private readonly mediaConvertService: MediaConvertService,
+    private readonly cfSigner: CloudFrontSignerService,
     @InjectQueue('video-transcode-poll') private readonly transcodePollQueue: Queue,
   ) {}
 
   /** List all active videos for current company, newest first. */
   async findAll() {
     const companyId = this.cls.get<string>('companyId');
-    return this.prisma.video.findMany({
+    const videos = await this.prisma.video.findMany({
       where: { active: true, companyId },
       orderBy: { createdAt: 'desc' },
     });
+    return videos.map((v) => ({
+      ...v,
+      thumbnail: v.s3KeyThumb ? this.cfSigner.signVideoUrl(v.s3KeyThumb) : v.thumbnail,
+      cloudFrontThumbUrl: v.s3KeyThumb ? this.cfSigner.signVideoUrl(v.s3KeyThumb) : v.cloudFrontThumbUrl,
+    }));
   }
 
   /** Add a YouTube video by URL (or re-activate if soft-deleted). */
@@ -271,7 +278,7 @@ export class VideosService {
     return { ok: true };
   }
 
-  /** Step 1 of S3 upload: create Video row + presigned POST. */
+  /** Step 1 of S3 upload: create Video row + presigned PUT URL. */
   async createUploadInit(
     dto: { fileName: string; fileSize: number; mimeType: string; title: string },
     userId: string,
@@ -302,10 +309,9 @@ export class VideosService {
 
     const key = `originals/${companyId}/${video.id}.mp4`;
 
-    const { url, fields } = await this.s3Service.createPresignedPostUrl({
+    const putUrl = await this.s3Service.createPresignedPutUrl({
       key,
       contentType: dto.mimeType,
-      maxBytes,
       ttlSeconds: Number(process.env.VIDEO_PRESIGN_TTL_SECONDS || 900),
     });
 
@@ -314,7 +320,7 @@ export class VideosService {
       data: { s3KeyOriginal: key },
     });
 
-    return { videoId: video.id, postUrl: url, formFields: fields, key };
+    return { videoId: video.id, putUrl, key };
   }
 
   /** Step 2 of S3 upload: verify the file landed in S3, set status PROCESSING or READY. */
