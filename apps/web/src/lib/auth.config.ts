@@ -22,6 +22,7 @@ const PUBLIC_PREFIXES = [
 const PUBLIC_LANDING_API_RE = /^\/api\/landings\/[^/]+\/(track|click|video-events)$/;
 
 export const authConfig: NextAuthConfig = {
+  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
   providers: [], // Configured in auth.ts with Credentials
   session: {
     strategy: "jwt",
