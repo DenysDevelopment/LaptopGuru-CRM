@@ -35,5 +35,8 @@
     "lint-staged": "^16.4.0",
     "prisma": "^7.5.0",
     "turbo": "^2.5.4"
+  },
+  "dependencies": {
+    "@videojs/react": "^10.0.0-beta.21"
   }
 }
