@@ -346,14 +346,12 @@ export function LandingClient({ landing, video }: Props) {
 
 	// POST video events — waits for visitId if not ready. On page hide / unload,
 	// prefers navigator.sendBeacon (more reliable than fetch keepalive on Safari/Firefox).
-	// Callers on the unload path pass { unload: true } because visibilityState may
-	// still be 'visible' during beforeunload, which would otherwise skip sendBeacon.
-	const postVideoEvents = useCallback((events: typeof videoEventsBuffer.current, opts?: { unload?: boolean }) => {
+	const postVideoEvents = useCallback((events: typeof videoEventsBuffer.current) => {
 		if (events.length === 0 || video.source !== 'S3') return;
 		const url = `/api/landings/${landing.slug}/video-events`;
 		const doPost = (visitId: string) => {
 			const payload = JSON.stringify({ videoId: video.id, landingVisitId: visitId, events });
-			const unloading = opts?.unload || (typeof document !== 'undefined' && document.visibilityState === 'hidden');
+			const unloading = typeof document !== 'undefined' && document.visibilityState === 'hidden';
 			if (unloading && typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
 				try {
 					const blob = new Blob([payload], { type: 'application/json' });
@@ -398,11 +396,11 @@ export function LandingClient({ landing, video }: Props) {
 	}, [landing.slug]);
 
 	// Flush buffered heartbeats
-	const flushVideoEvents = useCallback((opts?: { unload?: boolean }) => {
+	const flushVideoEvents = useCallback(() => {
 		const events = videoEventsBuffer.current;
 		if (events.length === 0) return;
 		videoEventsBuffer.current = [];
-		postVideoEvents(events, opts);
+		postVideoEvents(events);
 	}, [postVideoEvents]);
 
 	// Send a single event immediately
@@ -1217,16 +1215,14 @@ export function LandingClient({ landing, video }: Props) {
 			flushVideoEvents();
 		}, 10000);
 
-		// On unload — final send. pagehide is the only reliable signal on iOS Safari
-		// (beforeunload often doesn't fire on swipe-close), so we listen for both.
+		// On unload — final send
 		function onUnload() {
 			sendUpdate(buildEngagement());
-			flushVideoEvents({ unload: true });
+			flushVideoEvents();
 		}
 		window.addEventListener('beforeunload', onUnload);
-		window.addEventListener('pagehide', onUnload);
 		const onVisChange = () => {
-			if (document.hidden) { sendUpdate(buildEngagement()); flushVideoEvents({ unload: true }); }
+			if (document.hidden) { sendUpdate(buildEngagement()); flushVideoEvents(); }
 		};
 		document.addEventListener('visibilitychange', onVisChange);
 
@@ -1234,7 +1230,6 @@ export function LandingClient({ landing, video }: Props) {
 			clearTimeout(firstTimeout);
 			clearInterval(interval);
 			window.removeEventListener('beforeunload', onUnload);
-			window.removeEventListener('pagehide', onUnload);
 			document.removeEventListener('visibilitychange', onVisChange);
 		};
 	}, [sendUpdate, flushVideoEvents]);
@@ -1386,7 +1381,7 @@ export function LandingClient({ landing, video }: Props) {
 			<div className='flex-1 pb-28'>
 				{/* Header — email-style gradient */}
 				<div
-					className='py-4 px-6 text-center header-shine'
+					className='py-2 px-4 text-center header-shine'
 					style={{
 						background:
 							'linear-gradient(135deg, #fb7830 0%, #f59e0b 50%, #fb7830 100%)',
@@ -1395,24 +1390,24 @@ export function LandingClient({ landing, video }: Props) {
 					<Image
 						src='/LG_logo2.webp'
 						alt='Laptop Guru'
-						width={200}
-						height={72}
+						width={140}
+						height={44}
 						priority
-						className='mx-auto mb-1.5 w-auto'
-						style={{ height: 72, filter: 'brightness(0) invert(1)' }}
+						className='mx-auto w-auto'
+						style={{ height: 44, filter: 'brightness(0) invert(1)' }}
 					/>
 				</div>
 
 				{/* Body */}
 				<div>
 					{/* Hero card */}
-					<div className='max-w-3xl mx-auto px-4 sm:px-6 mt-6 mb-6'>
+					<div className='max-w-3xl mx-auto px-3 sm:px-6 mt-3 sm:mt-6 mb-4 sm:mb-6'>
 						<div
 							data-animate
 							className='bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.08)] border border-gray-100 overflow-hidden'>
 							{/* Greeting */}
-							<div className='px-6 pt-6 pb-4'>
-								<p className='text-2xl sm:text-3xl font-bold text-[#222] leading-tight m-0 mb-3'>
+							<div className='px-4 sm:px-6 pt-3 sm:pt-6 pb-1 sm:pb-4'>
+								<p className='text-lg sm:text-3xl font-bold text-[#222] leading-tight m-0'>
 									{tr.greeting}
 									{landing.customerName
 										? `, ${landing.customerName}`
@@ -1422,26 +1417,9 @@ export function LandingClient({ landing, video }: Props) {
 									</span>
 								</p>
 							</div>
-							{/* Intro text */}
-							<div data-animate data-animate-delay='2' className='px-6 pb-5'>
-								<p className='text-[15px] text-[#555] leading-relaxed m-0'>
-									{tr.intro}
-								</p>
-							</div>
-							{/* Personal note */}
-							{landing.personalNote && (
-								<div data-animate className='px-6 pb-5'>
-									<div className='flex gap-3 items-start bg-[#f8f5f1] rounded-xl p-4'>
-										<span className='text-xl flex-shrink-0'>💬</span>
-										<p className='text-[14px] text-[#555] leading-relaxed italic m-0'>
-											{landing.personalNote}
-										</p>
-									</div>
-								</div>
-							)}
-							{/* Video */}
-							<div data-animate className='px-4 sm:px-6 pb-4'>
-								<div className='relative aspect-[9/16] max-w-[360px] mx-auto rounded-xl overflow-hidden bg-gray-900 shadow-[0_4px_20px_rgba(0,0,0,0.15)]'>
+							{/* Video — above intro text so it's visible on first paint */}
+							<div data-animate className='px-3 sm:px-6 pt-2 sm:pt-3 pb-3 sm:pb-4'>
+								<div className='relative aspect-[9/16] max-w-[240px] sm:max-w-[360px] mx-auto rounded-xl overflow-hidden bg-gray-900 shadow-[0_4px_20px_rgba(0,0,0,0.15)]'>
 									{video.source === 'S3' && video.videoUrl ? (
 										<VideoPlayer
 											src={video.videoUrl}
@@ -1534,6 +1512,23 @@ export function LandingClient({ landing, video }: Props) {
 									) : null}
 								</div>
 							</div>
+							{/* Intro text */}
+							<div data-animate data-animate-delay='2' className='px-4 sm:px-6 pb-4 sm:pb-5'>
+								<p className='text-[14px] sm:text-[15px] text-[#555] leading-relaxed m-0'>
+									{tr.intro}
+								</p>
+							</div>
+							{/* Personal note */}
+							{landing.personalNote && (
+								<div data-animate className='px-4 sm:px-6 pb-4 sm:pb-5'>
+									<div className='flex gap-3 items-start bg-[#f8f5f1] rounded-xl p-4'>
+										<span className='text-xl flex-shrink-0'>💬</span>
+										<p className='text-[14px] text-[#555] leading-relaxed italic m-0'>
+											{landing.personalNote}
+										</p>
+									</div>
+								</div>
+							)}
 						</div>
 					</div>
 

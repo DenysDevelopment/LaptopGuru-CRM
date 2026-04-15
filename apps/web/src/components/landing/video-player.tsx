@@ -14,13 +14,72 @@ interface Props {
 	onSeeked: (seekFrom: number, seekTo: number) => void;
 	onBufferStart: () => void;
 	onBufferEnd: () => void;
-	onVolumeChange?: (volume: number, muted: boolean, position: number) => void;
-	onRateChange?: (rate: number, position: number) => void;
-	onFullscreenChange?: (isFullscreen: boolean, position: number) => void;
-	onQualityChange?: (quality: number | string, position: number) => void;
-	onError?: (message: string, position: number) => void;
 	productUrl?: string;
 	buyButtonText?: string;
+}
+
+function isIOS(): boolean {
+	if (typeof navigator === 'undefined') return false;
+	return /iPhone|iPod/.test(navigator.userAgent);
+}
+
+function isTouchDevice(): boolean {
+	if (typeof window === 'undefined') return false;
+	return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+}
+
+type AnyDoc = Document & {
+	webkitFullscreenElement?: Element | null;
+	mozFullScreenElement?: Element | null;
+	webkitExitFullscreen?: () => Promise<void> | void;
+	mozCancelFullScreen?: () => Promise<void> | void;
+	msExitFullscreen?: () => Promise<void> | void;
+};
+
+type AnyEl = HTMLElement & {
+	webkitRequestFullscreen?: () => Promise<void> | void;
+	mozRequestFullScreen?: () => Promise<void> | void;
+	msRequestFullscreen?: () => Promise<void> | void;
+};
+
+function nativeFullscreenElement(): Element | null {
+	const doc = document as AnyDoc;
+	return (
+		doc.fullscreenElement ??
+		doc.webkitFullscreenElement ??
+		doc.mozFullScreenElement ??
+		null
+	);
+}
+
+function callRequestFullscreen(el: HTMLElement): Promise<void> | void {
+	const e = el as AnyEl;
+	const req =
+		e.requestFullscreen ||
+		e.webkitRequestFullscreen ||
+		e.mozRequestFullScreen ||
+		e.msRequestFullscreen;
+	if (!req) return;
+	try {
+		return req.call(e) as Promise<void> | void;
+	} catch {
+		return undefined;
+	}
+}
+
+function callExitFullscreen(): Promise<void> | void {
+	const doc = document as AnyDoc;
+	const exit =
+		doc.exitFullscreen ||
+		doc.webkitExitFullscreen ||
+		doc.mozCancelFullScreen ||
+		doc.msExitFullscreen;
+	if (!exit) return;
+	try {
+		return exit.call(doc) as Promise<void> | void;
+	} catch {
+		return undefined;
+	}
 }
 
 export default function VideoPlayer({
@@ -48,15 +107,15 @@ export default function VideoPlayer({
 		onBufferEnd,
 	});
 	const isBuffering = useRef(false);
-	const lastKnownTime = useRef(0); // Tracks position before seek (updated by timeupdate)
-	const seekFromCapture = useRef(0); // Captured at 'seeking' before timeupdate overwrites lastKnownTime
+	const lastKnownTime = useRef(0);
+	const seekFromCapture = useRef(0);
 	const isSeeking = useRef(false);
 	const boundRef = useRef(false);
 	const wrapperRef = useRef<HTMLDivElement>(null);
 
 	const [nearEnd, setNearEnd] = useState(false);
+	const [isFullscreen, setIsFullscreen] = useState(false);
 
-	// Keep callbacks ref up to date without re-subscribing events
 	useEffect(() => {
 		callbacksRef.current = { onPlay, onPause, onEnded, onTimeUpdate, onSeeked, onBufferStart, onBufferEnd };
 	}, [onPlay, onPause, onEnded, onTimeUpdate, onSeeked, onBufferStart, onBufferEnd]);
@@ -112,7 +171,7 @@ export default function VideoPlayer({
 			on: (e: string, cb: () => void) => void;
 			off: (e: string, cb: () => void) => void;
 		}) {
-			if (boundRef.current) return; // Prevent double-bind in strict mode
+			if (boundRef.current) return;
 			boundRef.current = true;
 			plyr.on('play', handlePlay);
 			plyr.on('pause', handlePause);
@@ -142,7 +201,6 @@ export default function VideoPlayer({
 			return () => unbind(player);
 		}
 
-		// Plyr instance may not be ready on first render — poll until it is
 		const id = setInterval(() => {
 			const p = plyrRef.current?.plyr;
 			if (p && typeof p.on === 'function') {
@@ -167,56 +225,125 @@ export default function VideoPlayer({
 		handlePlaying,
 	]);
 
+	// Fullscreen is handled entirely by us, not Plyr:
+	//   - Plyr's fullscreen.container option does NOT actually put the
+	//     container in :fullscreen — it still fullscreens .plyr, which
+	//     leaves our CTA button (a sibling of .plyr inside the wrapper)
+	//     outside the top layer and invisible.
+	//   - On iOS Safari requestFullscreen on an arbitrary element is
+	//     unsupported; we use a CSS fallback class instead.
+	// That's why Plyr's built-in fullscreen button is removed from the
+	// controls list and a custom expand/collapse button is rendered at
+	// the bottom of the player instead.
+
+	const enterFullscreen = useCallback(() => {
+		const wrapper = wrapperRef.current;
+		if (!wrapper) return;
+		if (wrapper.classList.contains('plyr-ios-fullscreen')) return;
+		if (nativeFullscreenElement()) return;
+		if (isIOS()) {
+			// iOS: CSS fallback — pin the wrapper to the viewport.
+			wrapper.classList.add('plyr-ios-fullscreen');
+			document.documentElement.classList.add('plyr-is-fullscreen');
+			document.body.style.overflow = 'hidden';
+			setIsFullscreen(true);
+			return;
+		}
+		// Android/desktop: real native fullscreen on the wrapper.
+		const result = callRequestFullscreen(wrapper);
+		if (result && typeof (result as Promise<void>).catch === 'function') {
+			(result as Promise<void>).catch(() => {
+				/* gesture lost / blocked — ignore */
+			});
+		}
+	}, []);
+
+	const exitFullscreen = useCallback(() => {
+		const wrapper = wrapperRef.current;
+		if (!wrapper) return;
+		if (wrapper.classList.contains('plyr-ios-fullscreen')) {
+			wrapper.classList.remove('plyr-ios-fullscreen');
+			document.documentElement.classList.remove('plyr-is-fullscreen');
+			document.body.style.overflow = '';
+			setIsFullscreen(false);
+			return;
+		}
+		callExitFullscreen();
+	}, []);
+
+	// Sync state with native fullscreen changes + lock body scroll + try
+	// orientation lock to portrait on Android for the 9:16 video.
 	useEffect(() => {
 		const wrapper = wrapperRef.current;
 		if (!wrapper) return;
 
-		const enterFullscreen = () => {
-			// 1. iOS Safari: use the video element's native fullscreen.
-			//    Plyr's container-based fullscreen is a no-op on iOS.
-			const video = wrapper.querySelector('video') as
-				| (HTMLVideoElement & { webkitEnterFullscreen?: () => void })
-				| null;
-			if (video && typeof video.webkitEnterFullscreen === 'function') {
-				try {
-					video.webkitEnterFullscreen();
-					return;
-				} catch {
-					// fall through
+		const onChange = () => {
+			const isNative = nativeFullscreenElement() === wrapper;
+			const isFake = wrapper.classList.contains('plyr-ios-fullscreen');
+			const active = isNative || isFake;
+			setIsFullscreen(active);
+			if (active) {
+				document.documentElement.classList.add('plyr-is-fullscreen');
+				document.body.style.overflow = 'hidden';
+				if (isNative) {
+					const orientation = (screen as Screen & {
+						orientation?: ScreenOrientation & { lock?: (o: string) => Promise<void> };
+					}).orientation;
+					if (orientation && typeof orientation.lock === 'function') {
+						orientation.lock('portrait').catch(() => {
+							/* not allowed — ignore */
+						});
+					}
 				}
-			}
-			// 2. Other browsers: call the Fullscreen API directly on the
-			//    wrapper, synchronously within the user gesture. Going via
-			//    Plyr's API can lose the gesture on Android Chrome.
-			const el = wrapper as HTMLElement & {
-				webkitRequestFullscreen?: () => Promise<void> | void;
-				mozRequestFullScreen?: () => Promise<void> | void;
-				msRequestFullscreen?: () => Promise<void> | void;
-			};
-			const req =
-				el.requestFullscreen ||
-				el.webkitRequestFullscreen ||
-				el.mozRequestFullScreen ||
-				el.msRequestFullscreen;
-			if (!req) return;
-			try {
-				const result = req.call(el);
-				if (result && typeof (result as Promise<void>).catch === 'function') {
-					(result as Promise<void>).catch(() => {
-						// Gesture lost or blocked — ignore
-					});
+			} else {
+				document.documentElement.classList.remove('plyr-is-fullscreen');
+				document.body.style.overflow = '';
+				const orientation = (screen as Screen & {
+					orientation?: ScreenOrientation & { unlock?: () => void };
+				}).orientation;
+				if (orientation && typeof orientation.unlock === 'function') {
+					try {
+						orientation.unlock();
+					} catch {
+						/* ignore */
+					}
 				}
-			} catch {
-				// Fullscreen may be blocked — ignore
 			}
 		};
+
+		document.addEventListener('fullscreenchange', onChange);
+		document.addEventListener('webkitfullscreenchange', onChange);
+		return () => {
+			document.removeEventListener('fullscreenchange', onChange);
+			document.removeEventListener('webkitfullscreenchange', onChange);
+			document.documentElement.classList.remove('plyr-is-fullscreen');
+			document.body.style.overflow = '';
+		};
+	}, []);
+
+	// Escape closes iOS fake fullscreen (native fullscreen already exits on Esc).
+	useEffect(() => {
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key !== 'Escape') return;
+			const wrapper = wrapperRef.current;
+			if (!wrapper?.classList.contains('plyr-ios-fullscreen')) return;
+			exitFullscreen();
+		};
+		window.addEventListener('keydown', onKey);
+		return () => window.removeEventListener('keydown', onKey);
+	}, [exitFullscreen]);
+
+	// Auto-enter fullscreen on touch devices when the user taps play.
+	// Bound in capture phase so we run inside the user-gesture stack even
+	// though Plyr is about to handle the same click.
+	useEffect(() => {
+		const wrapper = wrapperRef.current;
+		if (!wrapper) return;
+		if (!isTouchDevice()) return;
 
 		const onClickCapture = (e: Event) => {
 			const target = e.target as HTMLElement | null;
 			if (!target) return;
-			// Any click on Plyr's big play button or the small play control
-			// while paused triggers fullscreen entry. Using capture phase so
-			// we run before Plyr's own click handler.
 			const isPlayClick =
 				target.closest('.plyr__control--overlaid') ||
 				target.closest('button[data-plyr="play"]') ||
@@ -224,22 +351,13 @@ export default function VideoPlayer({
 			if (!isPlayClick) return;
 			const p = plyrRef.current?.plyr;
 			if (!p || !p.paused) return;
-			// Check current fullscreen state via DOM (Plyr's state may lag).
-			const doc = document as Document & {
-				webkitFullscreenElement?: Element | null;
-				mozFullScreenElement?: Element | null;
-			};
-			const fsEl =
-				doc.fullscreenElement ??
-				doc.webkitFullscreenElement ??
-				doc.mozFullScreenElement ??
-				null;
-			if (fsEl) return;
 			enterFullscreen();
 		};
 		wrapper.addEventListener('click', onClickCapture, true);
 		return () => wrapper.removeEventListener('click', onClickCapture, true);
-	}, []);
+	}, [enterFullscreen]);
+
+	const showCta = Boolean(productUrl) && (isFullscreen || nearEnd);
 
 	return (
 		<div
@@ -262,15 +380,29 @@ export default function VideoPlayer({
 						'progress',
 						'current-time',
 						'mute',
-						'fullscreen',
 					],
 					fullscreen: {
-						container: '.plyr-fullscreen-wrapper',
+						enabled: false,
+						fallback: false,
+						iosNative: false,
 					},
 				}}
 			/>
-			{nearEnd && productUrl && (
-				<div className='absolute inset-0 z-[9999] flex items-end justify-center pb-20 pointer-events-none'>
+			{/* Custom fullscreen toggle (Plyr's built-in one is disabled). */}
+			<button
+				type='button'
+				aria-label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+				onClick={isFullscreen ? exitFullscreen : enterFullscreen}
+				className={`plyr-fs-toggle absolute z-[10000] h-10 w-10 rounded-full
+					bg-black/60 text-white text-xl leading-none
+					flex items-center justify-center
+					backdrop-blur-sm shadow-lg
+					hover:bg-black/80 transition-colors
+					${isFullscreen ? 'top-3 right-3' : 'bottom-2 right-2'}`}>
+				{isFullscreen ? '×' : '⛶'}
+			</button>
+			{showCta && (
+				<div className='plyr-fs-cta absolute inset-x-0 bottom-0 z-[9999] flex justify-center px-4 pb-6 pointer-events-none'>
 					<a
 						href={productUrl}
 						target='_blank'
@@ -279,7 +411,7 @@ export default function VideoPlayer({
 							e.preventDefault();
 							window.open(productUrl, '_blank');
 						}}
-						className='pointer-events-auto px-8 py-4 rounded-xl text-white text-lg font-bold
+						className='pointer-events-auto w-full max-w-[320px] text-center px-6 py-4 rounded-xl text-white text-lg font-bold
 							bg-gradient-to-r from-[#fb7830] to-[#e56a25]
 							hover:from-[#e56a25] hover:to-[#d45a15]
 							shadow-[0_6px_28px_rgba(251,120,48,0.5)]
