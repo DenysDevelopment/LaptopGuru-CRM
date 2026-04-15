@@ -101,30 +101,31 @@
   touch-action: none;
 }
 
-/* 2. Plyr + inner wrapper fill the viewport and drop their aspect padding */
+/*
+ * 2. Plyr + inner wrapper fill the viewport and drop their aspect ratio.
+ *
+ * Plyr ≥ 3.7 uses the modern `aspect-ratio` CSS property (not just
+ * padding-bottom) to preserve the `ratio: '9:16'` option. If we only zero
+ * the padding, `.plyr__video-wrapper` still enforces 9/16 via aspect-ratio
+ * and the video ends up as a small centred box inside a huge viewport.
+ * Force `aspect-ratio: auto` on every Plyr layer so the flex-centered
+ * wrapper can stretch its child to 100%/100%.
+ */
 .plyr-fullscreen-wrapper:fullscreen .plyr,
-.plyr-fullscreen-wrapper:fullscreen .plyr__video-wrapper {
-  width: 100% !important;
-  height: 100% !important;
-  max-width: none !important;
-  max-height: none !important;
-  padding-bottom: 0 !important;
-}
+.plyr-fullscreen-wrapper:fullscreen .plyr__video-wrapper,
 .plyr-fullscreen-wrapper:-webkit-full-screen .plyr,
-.plyr-fullscreen-wrapper:-webkit-full-screen .plyr__video-wrapper {
-  width: 100% !important;
-  height: 100% !important;
-  max-width: none !important;
-  max-height: none !important;
-  padding-bottom: 0 !important;
-}
+.plyr-fullscreen-wrapper:-webkit-full-screen .plyr__video-wrapper,
 .plyr-fullscreen-wrapper.plyr-ios-fullscreen .plyr,
 .plyr-fullscreen-wrapper.plyr-ios-fullscreen .plyr__video-wrapper {
   width: 100% !important;
   height: 100% !important;
   max-width: none !important;
   max-height: none !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
   padding-bottom: 0 !important;
+  aspect-ratio: auto !important;
+  flex: 1 1 auto !important;
 }
 
 /* 3. <video> fills the viewport with letterboxing (contain, not cover) */
