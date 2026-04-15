@@ -160,6 +160,7 @@ enum VideoEventType {
   FULLSCREEN
   ERROR
   BUFFERING
+  VOLUME_CHANGE
 }
 
 model Video {

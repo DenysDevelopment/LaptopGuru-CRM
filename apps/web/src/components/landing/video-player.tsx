@@ -373,7 +373,14 @@ export default function VideoPlayer({
 					title: 'Course Introduction Video',
 				}}
 				options={{
-					ratio: '9:16',
+					// NOTE: deliberately NOT setting `ratio: '9:16'`. Plyr's
+					// ratio option puts `aspect-ratio: 9/16` on .plyr and
+					// .plyr__video-wrapper, and in fullscreen Plyr's own JS
+					// re-asserts that aspect-ratio after our CSS cascades —
+					// so the video stays 9:16 inside a viewport-sized black
+					// box. The outer landing wrapper already constrains the
+					// inline layout to aspect-[9/16] max-w-[240px], so we
+					// don't need Plyr's ratio at all.
 					controls: [
 						'play-large',
 						'play',

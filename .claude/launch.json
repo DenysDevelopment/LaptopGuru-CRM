@@ -4,9 +4,10 @@
     {
       "name": "web",
       "runtimeExecutable": "/bin/bash",
-      "runtimeArgs": ["-c", "export PATH=/Users/denysmaksymuck/.nvm/versions/node/v25.2.1/bin:$PATH && npm run dev --workspace=@laptopguru-crm/web"],
+      "runtimeArgs": ["-c", "export PATH=/Users/denysmaksymuck/.nvm/versions/node/v25.2.1/bin:$PATH && npm run dev --workspace=@laptopguru-crm/web -- --port $PORT"],
       "port": 3000,
-      "portReady": "ready"
+      "portReady": "ready",
+      "autoPort": true
     }
   ]
 }
