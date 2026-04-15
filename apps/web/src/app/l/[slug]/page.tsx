@@ -19,18 +19,41 @@ const metaByLang: Record<string, { desc: string; og: string }> = {
   en: { desc: "Video review from laptopguru.pl", og: "Watch a video review from laptopguru.pl" },
 };
 
+// Strip common landing-subdomain prefixes to get the apex domain the favicon
+// should come from: `l.laptopguru.pl` -> `laptopguru.pl`. Multi-label public
+// suffixes (e.g. co.uk) are rare here, so we only peel a single known prefix.
+const FAVICON_SUBDOMAIN_PREFIXES = ["l.", "landing.", "www."];
+function apexFromCustomDomain(customDomain: string): string {
+  const lower = customDomain.toLowerCase();
+  for (const prefix of FAVICON_SUBDOMAIN_PREFIXES) {
+    if (lower.startsWith(prefix)) return lower.slice(prefix.length);
+  }
+  return lower;
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const companyId = await resolveCompanyFromDomain();
   const landing = await prisma.landing.findFirst({
     where: { slug, ...(companyId ? { companyId } : {}) },
-    include: { video: true },
+    include: { video: true, company: { select: { customDomain: true } } },
   });
 
   if (!landing) return {};
 
   const lang = landing.language || "pl";
   const meta = metaByLang[lang] || metaByLang.pl;
+
+  // Pull the favicon from the company's public site so the landing tab icon
+  // matches the parent brand (e.g. laptopguru.pl) instead of the CRM's default.
+  // Google's s2 service returns an icon for any domain without needing to
+  // parse Shopify's versioned <link rel="icon"> CDN URL.
+  const customDomain = landing.company?.customDomain;
+  const icons = customDomain
+    ? {
+        icon: `https://www.google.com/s2/favicons?domain=${apexFromCustomDomain(customDomain)}&sz=64`,
+      }
+    : undefined;
 
   return {
     title: landing.title,
@@ -40,6 +63,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description: meta.og,
       images: [landing.video.thumbnail],
     },
+    ...(icons && { icons }),
   };
 }
 
