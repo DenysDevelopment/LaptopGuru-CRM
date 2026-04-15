@@ -277,6 +277,33 @@ export default function VideoPlayer({
 		const wrapper = wrapperRef.current;
 		if (!wrapper) return;
 
+		// Plyr sets `aspect-ratio: 9/16` on .plyr and .plyr__video-wrapper
+		// (and sometimes inline styles from its ratio math). CSS !important
+		// overrides usually win, but Plyr can re-apply inline styles on
+		// resize/timeupdate which may race with our CSS cascade. Forcing
+		// inline styles from JS when entering fullscreen is bulletproof.
+		const FS_INLINE_STYLE =
+			'width:100% !important;height:100% !important;max-width:none !important;max-height:none !important;min-width:0 !important;min-height:0 !important;padding:0 !important;aspect-ratio:auto !important;flex:1 1 auto !important;';
+		const VIDEO_FS_INLINE_STYLE =
+			'width:100% !important;height:100% !important;max-width:none !important;max-height:none !important;object-fit:contain !important;';
+
+		const applyFsInlineStyles = () => {
+			const plyr = wrapper.querySelector<HTMLElement>('.plyr');
+			const videoWrapper = wrapper.querySelector<HTMLElement>('.plyr__video-wrapper');
+			const video = wrapper.querySelector<HTMLElement>('video');
+			if (plyr) plyr.setAttribute('style', FS_INLINE_STYLE);
+			if (videoWrapper) videoWrapper.setAttribute('style', FS_INLINE_STYLE);
+			if (video) video.setAttribute('style', VIDEO_FS_INLINE_STYLE);
+		};
+		const clearFsInlineStyles = () => {
+			const plyr = wrapper.querySelector<HTMLElement>('.plyr');
+			const videoWrapper = wrapper.querySelector<HTMLElement>('.plyr__video-wrapper');
+			const video = wrapper.querySelector<HTMLElement>('video');
+			if (plyr) plyr.removeAttribute('style');
+			if (videoWrapper) videoWrapper.removeAttribute('style');
+			if (video) video.removeAttribute('style');
+		};
+
 		const onChange = () => {
 			const isNative = nativeFullscreenElement() === wrapper;
 			const isFake = wrapper.classList.contains('plyr-ios-fullscreen');
@@ -285,6 +312,11 @@ export default function VideoPlayer({
 			if (active) {
 				document.documentElement.classList.add('plyr-is-fullscreen');
 				document.body.style.overflow = 'hidden';
+				applyFsInlineStyles();
+				// Plyr re-applies styles on resize; re-assert ours next tick
+				// and after the transition-end of the fullscreen animation.
+				requestAnimationFrame(applyFsInlineStyles);
+				setTimeout(applyFsInlineStyles, 200);
 				if (isNative) {
 					const orientation = (screen as Screen & {
 						orientation?: ScreenOrientation & { lock?: (o: string) => Promise<void> };
@@ -298,6 +330,7 @@ export default function VideoPlayer({
 			} else {
 				document.documentElement.classList.remove('plyr-is-fullscreen');
 				document.body.style.overflow = '';
+				clearFsInlineStyles();
 				const orientation = (screen as Screen & {
 					orientation?: ScreenOrientation & { unlock?: () => void };
 				}).orientation;
