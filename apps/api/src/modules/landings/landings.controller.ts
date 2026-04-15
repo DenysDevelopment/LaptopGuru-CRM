@@ -13,6 +13,7 @@ import {
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import { Request } from 'express';
+import { ClsService } from 'nestjs-cls';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
@@ -22,7 +23,10 @@ import { LandingsService } from './landings.service';
 @ApiTags('Landings')
 @Controller('landings')
 export class LandingsController {
-  constructor(private readonly landingsService: LandingsService) {}
+  constructor(
+    private readonly landingsService: LandingsService,
+    private readonly cls: ClsService,
+  ) {}
 
   /** Track click — public, no auth */
   @Post(':slug/click')
@@ -66,5 +70,18 @@ export class LandingsController {
   @RequirePermissions(PERMISSIONS.ANALYTICS_READ)
   getAnalytics(@Param('slug') slug: string) {
     return this.landingsService.getAnalytics(slug);
+  }
+
+  /** Get per-visit video playback sessions — requires auth */
+  @Get(':slug/visits/:visitId/playback')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(PERMISSIONS.ANALYTICS_READ)
+  getVisitPlayback(
+    @Param('slug') slug: string,
+    @Param('visitId') visitId: string,
+  ) {
+    const companyId = this.cls.get<string>('companyId');
+    return this.landingsService.getVisitPlayback(slug, visitId, companyId);
   }
 }

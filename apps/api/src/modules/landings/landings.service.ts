@@ -10,6 +10,11 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { parseUA } from '../../common/utils/user-agent';
 import { geolocate } from '../../common/utils/geo';
 import { extractDomain, extractHeaders, extractIP } from '../../common/utils/headers';
+import {
+  decodeTrace,
+  type VisitPlaybackData,
+  type EventTuple,
+} from '@laptopguru-crm/shared';
 
 // Simple in-memory rate limiter for click tracking
 const clickRateMap = new Map<string, { count: number; resetAt: number }>();
@@ -454,6 +459,38 @@ export class LandingsService {
 
         // Extended data
         extendedData: v.extendedData,
+      })),
+    };
+  }
+
+  // GET /landings/:slug/visits/:visitId/playback
+  async getVisitPlayback(
+    slug: string,
+    visitId: string,
+    companyId: string,
+  ): Promise<VisitPlaybackData> {
+    const visit = await this.prisma.landingVisit.findFirst({
+      where: { id: visitId, companyId, landing: { slug } },
+      select: { id: true },
+    });
+    if (!visit) throw new NotFoundException('visit not found');
+
+    const sessions = await this.prisma.videoPlaybackSession.findMany({
+      where: { landingVisitId: visit.id },
+      orderBy: { startedAt: 'asc' },
+    });
+
+    return {
+      sessions: sessions.map((s) => ({
+        id: s.id,
+        videoId: s.videoId,
+        videoDurationMs: s.videoDurationMs,
+        startedAt: s.startedAt.toISOString(),
+        endedAt: s.endedAt?.toISOString() ?? null,
+        endReason: s.endReason ?? 'INCOMPLETE',
+        durationWatchedMs: s.durationWatchedMs ?? 0,
+        completionPercent: s.completionPercent ?? 0,
+        trace: decodeTrace((s.trace as unknown as EventTuple[]) ?? []),
       })),
     };
   }
