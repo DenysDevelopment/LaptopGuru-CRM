@@ -26,85 +26,15 @@
   animation: slide-up 0.3s ease-out;
 }
 
-.plyr-fullscreen-wrapper,
-.plyr-fullscreen-wrapper .plyr,
-.plyr-fullscreen-wrapper .plyr__video-wrapper {
-  width: 100%;
-  height: 100%;
-}
-.plyr-fullscreen-wrapper .plyr__video-wrapper {
-  padding-bottom: 0 !important;
-}
-.plyr-fullscreen-wrapper video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.plyr-fullscreen-wrapper .plyr__poster {
-  background-size: cover;
-}
-
-/*
- * Native fullscreen (Android Chrome, desktop, iOS Safari on iPadOS).
- * We call requestFullscreen() on the wrapper directly in VideoPlayer, so Plyr
- * never toggles its own .plyr--fullscreen-active class — we must force the
- * player chrome to fill the viewport here. Without these rules Plyr keeps its
- * intrinsic 360-px layout and the video ends up small + centred inside a huge
- * fullscreen element.
- *
- * :fullscreen covers standard browsers; :-webkit-full-screen is needed for
- * Safari/WebKit. Rules must be in separate selectors — one browser rejects
- * the whole list if it doesn't understand a single selector.
- */
-.plyr-fullscreen-wrapper:fullscreen {
-  width: 100vw !important;
-  height: 100vh !important;
-  max-width: none !important;
-  max-height: none !important;
-  background: #000 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-.plyr-fullscreen-wrapper:-webkit-full-screen {
-  width: 100vw !important;
-  height: 100vh !important;
-  max-width: none !important;
-  max-height: none !important;
-  background: #000 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-.plyr-fullscreen-wrapper:fullscreen .plyr,
-.plyr-fullscreen-wrapper:fullscreen .plyr__video-wrapper {
-  width: 100% !important;
-  height: 100% !important;
-  max-width: none !important;
-  max-height: none !important;
-  padding-bottom: 0 !important;
-}
-.plyr-fullscreen-wrapper:-webkit-full-screen .plyr,
-.plyr-fullscreen-wrapper:-webkit-full-screen .plyr__video-wrapper {
-  width: 100% !important;
-  height: 100% !important;
-  max-width: none !important;
-  max-height: none !important;
-  padding-bottom: 0 !important;
-}
-.plyr-fullscreen-wrapper:fullscreen video {
-  width: 100% !important;
-  height: 100% !important;
-  max-width: none !important;
-  max-height: none !important;
-  object-fit: contain !important;
-}
-.plyr-fullscreen-wrapper:-webkit-full-screen video {
-  width: 100% !important;
-  height: 100% !important;
-  max-width: none !important;
-  max-height: none !important;
-  object-fit: contain !important;
+/* @videojs/react skin: honor our object-fit var in fullscreen too.
+   The default skin.css hardcodes object-fit: contain on :fullscreen,
+   ignoring the --media-object-fit variable. */
+.media-default-skin:fullscreen video,
+.media-default-skin:fullscreen ::slotted(video),
+.media-default-skin:fullscreen > img,
+.media-default-skin:fullscreen media-poster img,
+.media-default-skin:fullscreen media-poster ::slotted(img) {
+  object-fit: var(--media-object-fit, cover);
 }
 
 @theme inline {

@@ -1,8 +1,12 @@
 'use client';
 
-import { Plyr } from 'plyr-react';
-import 'plyr-react/plyr.css';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import '@videojs/react/video/skin.css';
+
+import { createPlayer } from '@videojs/react';
+import { Video, VideoSkin, videoFeatures } from '@videojs/react/video';
+import { useCallback, useRef, useState, type SyntheticEvent } from 'react';
+
+const Player = createPlayer({ features: videoFeatures });
 
 interface Props {
 	src: string;
@@ -14,16 +18,19 @@ interface Props {
 	onSeeked: (seekFrom: number, seekTo: number) => void;
 	onBufferStart: () => void;
 	onBufferEnd: () => void;
-	onVolumeChange?: (volume: number, muted: boolean, position: number) => void;
-	onRateChange?: (rate: number, position: number) => void;
-	onFullscreenChange?: (isFullscreen: boolean, position: number) => void;
-	onQualityChange?: (quality: number | string, position: number) => void;
-	onError?: (message: string, position: number) => void;
 	productUrl?: string;
 	buyButtonText?: string;
 }
 
-export default function VideoPlayer({
+export default function VideoPlayer(props: Props) {
+	return (
+		<div className='relative h-full w-full'>
+			<PlayerInstance key={props.src} {...props} />
+		</div>
+	);
+}
+
+function PlayerInstance({
 	src,
 	poster,
 	onPlay,
@@ -36,241 +43,86 @@ export default function VideoPlayer({
 	productUrl,
 	buyButtonText,
 }: Props) {
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- plyr-react ref type changes between versions
-	const plyrRef = useRef<any>(null);
-	const callbacksRef = useRef({
-		onPlay,
-		onPause,
-		onEnded,
-		onTimeUpdate,
-		onSeeked,
-		onBufferStart,
-		onBufferEnd,
-	});
-	const isBuffering = useRef(false);
-	const lastKnownTime = useRef(0); // Tracks position before seek (updated by timeupdate)
-	const seekFromCapture = useRef(0); // Captured at 'seeking' before timeupdate overwrites lastKnownTime
+	const lastKnownTime = useRef(0);
+	const seekFromCapture = useRef(0);
 	const isSeeking = useRef(false);
-	const boundRef = useRef(false);
-	const wrapperRef = useRef<HTMLDivElement>(null);
+	const isBuffering = useRef(false);
 
 	const [nearEnd, setNearEnd] = useState(false);
 
-	// Keep callbacks ref up to date without re-subscribing events
-	useEffect(() => {
-		callbacksRef.current = { onPlay, onPause, onEnded, onTimeUpdate, onSeeked, onBufferStart, onBufferEnd };
-	}, [onPlay, onPause, onEnded, onTimeUpdate, onSeeked, onBufferStart, onBufferEnd]);
-
 	const handlePlay = useCallback(() => {
 		setNearEnd(false);
-		callbacksRef.current.onPlay();
-	}, []);
-	const handlePause = useCallback(() => callbacksRef.current.onPause(), []);
-	const handleEnded = useCallback(() => callbacksRef.current.onEnded(), []);
-	const handleTimeUpdate = useCallback(() => {
-		const p = plyrRef.current?.plyr;
-		if (!p) return;
-		if (!isSeeking.current) {
-			lastKnownTime.current = p.currentTime;
-		}
-		callbacksRef.current.onTimeUpdate(p.currentTime);
-		if (p.duration > 0 && p.duration - p.currentTime <= 10) {
-			setNearEnd(true);
-		} else {
-			setNearEnd(false);
-		}
-	}, []);
+		onPlay();
+	}, [onPlay]);
+
+	const handleTimeUpdate = useCallback(
+		(event: SyntheticEvent<HTMLVideoElement>) => {
+			const video = event.currentTarget;
+			const currentTime = video.currentTime;
+			const duration = video.duration;
+			if (!isSeeking.current) lastKnownTime.current = currentTime;
+			onTimeUpdate(currentTime);
+			setNearEnd(
+				Number.isFinite(duration) &&
+					duration > 0 &&
+					duration - currentTime <= 10,
+			);
+		},
+		[onTimeUpdate],
+	);
+
 	const handleSeeking = useCallback(() => {
 		if (!isSeeking.current) {
 			seekFromCapture.current = lastKnownTime.current;
 			isSeeking.current = true;
 		}
 	}, []);
-	const handleSeeked = useCallback(() => {
-		const p = plyrRef.current?.plyr;
-		isSeeking.current = false;
-		if (p) {
-			callbacksRef.current.onSeeked(seekFromCapture.current, p.currentTime);
-			lastKnownTime.current = p.currentTime;
-		}
-	}, []);
+
+	const handleSeeked = useCallback(
+		(event: SyntheticEvent<HTMLVideoElement>) => {
+			isSeeking.current = false;
+			const currentTime = event.currentTarget.currentTime;
+			onSeeked(seekFromCapture.current, currentTime);
+			lastKnownTime.current = currentTime;
+		},
+		[onSeeked],
+	);
+
 	const handleWaiting = useCallback(() => {
 		if (!isBuffering.current) {
 			isBuffering.current = true;
-			callbacksRef.current.onBufferStart();
+			onBufferStart();
 		}
-	}, []);
+	}, [onBufferStart]);
+
 	const handlePlaying = useCallback(() => {
 		if (isBuffering.current) {
 			isBuffering.current = false;
-			callbacksRef.current.onBufferEnd();
+			onBufferEnd();
 		}
-	}, []);
-
-	useEffect(() => {
-		function bind(plyr: {
-			on: (e: string, cb: () => void) => void;
-			off: (e: string, cb: () => void) => void;
-		}) {
-			if (boundRef.current) return; // Prevent double-bind in strict mode
-			boundRef.current = true;
-			plyr.on('play', handlePlay);
-			plyr.on('pause', handlePause);
-			plyr.on('ended', handleEnded);
-			plyr.on('timeupdate', handleTimeUpdate);
-			plyr.on('seeking', handleSeeking);
-			plyr.on('seeked', handleSeeked);
-			plyr.on('waiting', handleWaiting);
-			plyr.on('playing', handlePlaying);
-		}
-
-		function unbind(plyr: { off: (e: string, cb: () => void) => void }) {
-			plyr.off('play', handlePlay);
-			plyr.off('pause', handlePause);
-			plyr.off('ended', handleEnded);
-			plyr.off('timeupdate', handleTimeUpdate);
-			plyr.off('seeking', handleSeeking);
-			plyr.off('seeked', handleSeeked);
-			plyr.off('waiting', handleWaiting);
-			plyr.off('playing', handlePlaying);
-			boundRef.current = false;
-		}
-
-		const player = plyrRef.current?.plyr;
-		if (player && typeof player.on === 'function') {
-			bind(player);
-			return () => unbind(player);
-		}
-
-		// Plyr instance may not be ready on first render — poll until it is
-		const id = setInterval(() => {
-			const p = plyrRef.current?.plyr;
-			if (p && typeof p.on === 'function') {
-				clearInterval(id);
-				bind(p);
-			}
-		}, 200);
-		const currentPlyrRef = plyrRef.current;
-		return () => {
-			clearInterval(id);
-			const p = currentPlyrRef?.plyr;
-			if (p && typeof p.off === 'function') unbind(p);
-		};
-	}, [
-		handlePlay,
-		handlePause,
-		handleEnded,
-		handleTimeUpdate,
-		handleSeeking,
-		handleSeeked,
-		handleWaiting,
-		handlePlaying,
-	]);
-
-	useEffect(() => {
-		const wrapper = wrapperRef.current;
-		if (!wrapper) return;
-
-		const enterFullscreen = () => {
-			// 1. iOS Safari: use the video element's native fullscreen.
-			//    Plyr's container-based fullscreen is a no-op on iOS.
-			const video = wrapper.querySelector('video') as
-				| (HTMLVideoElement & { webkitEnterFullscreen?: () => void })
-				| null;
-			if (video && typeof video.webkitEnterFullscreen === 'function') {
-				try {
-					video.webkitEnterFullscreen();
-					return;
-				} catch {
-					// fall through
-				}
-			}
-			// 2. Other browsers: call the Fullscreen API directly on the
-			//    wrapper, synchronously within the user gesture. Going via
-			//    Plyr's API can lose the gesture on Android Chrome.
-			const el = wrapper as HTMLElement & {
-				webkitRequestFullscreen?: () => Promise<void> | void;
-				mozRequestFullScreen?: () => Promise<void> | void;
-				msRequestFullscreen?: () => Promise<void> | void;
-			};
-			const req =
-				el.requestFullscreen ||
-				el.webkitRequestFullscreen ||
-				el.mozRequestFullScreen ||
-				el.msRequestFullscreen;
-			if (!req) return;
-			try {
-				const result = req.call(el);
-				if (result && typeof (result as Promise<void>).catch === 'function') {
-					(result as Promise<void>).catch(() => {
-						// Gesture lost or blocked — ignore
-					});
-				}
-			} catch {
-				// Fullscreen may be blocked — ignore
-			}
-		};
-
-		const onClickCapture = (e: Event) => {
-			const target = e.target as HTMLElement | null;
-			if (!target) return;
-			// Any click on Plyr's big play button or the small play control
-			// while paused triggers fullscreen entry. Using capture phase so
-			// we run before Plyr's own click handler.
-			const isPlayClick =
-				target.closest('.plyr__control--overlaid') ||
-				target.closest('button[data-plyr="play"]') ||
-				target.closest('.plyr__poster');
-			if (!isPlayClick) return;
-			const p = plyrRef.current?.plyr;
-			if (!p || !p.paused) return;
-			// Check current fullscreen state via DOM (Plyr's state may lag).
-			const doc = document as Document & {
-				webkitFullscreenElement?: Element | null;
-				mozFullScreenElement?: Element | null;
-			};
-			const fsEl =
-				doc.fullscreenElement ??
-				doc.webkitFullscreenElement ??
-				doc.mozFullScreenElement ??
-				null;
-			if (fsEl) return;
-			enterFullscreen();
-		};
-		wrapper.addEventListener('click', onClickCapture, true);
-		return () => wrapper.removeEventListener('click', onClickCapture, true);
-	}, []);
+	}, [onBufferEnd]);
 
 	return (
-		<div
-			ref={wrapperRef}
-			className='plyr-fullscreen-wrapper relative'
-			style={{ '--plyr-color-main': '#fb7830' } as React.CSSProperties}>
-			<Plyr
-				ref={plyrRef}
-				source={{
-					type: 'video' as const,
-					sources: [{ src, type: 'video/mp4' }],
-					poster,
-					title: 'Course Introduction Video',
-				}}
-				options={{
-					ratio: '9:16',
-					controls: [
-						'play-large',
-						'play',
-						'progress',
-						'current-time',
-						'mute',
-						'fullscreen',
-					],
-					fullscreen: {
-						container: '.plyr-fullscreen-wrapper',
-					},
-				}}
-			/>
+		<>
+			<Player.Provider>
+				<VideoSkin poster={poster} className='h-full w-full' style={skinStyle}>
+					<Video
+						src={src}
+						playsInline
+						preload='auto'
+						onPlay={handlePlay}
+						onPause={onPause}
+						onEnded={onEnded}
+						onTimeUpdate={handleTimeUpdate}
+						onSeeking={handleSeeking}
+						onSeeked={handleSeeked}
+						onWaiting={handleWaiting}
+						onPlaying={handlePlaying}
+					/>
+				</VideoSkin>
+			</Player.Provider>
 			{nearEnd && productUrl && (
-				<div className='absolute inset-0 z-[9999] flex items-end justify-center pb-20 pointer-events-none'>
+				<div className='pointer-events-none absolute inset-0 z-[9999] flex items-end justify-center pb-20'>
 					<a
 						href={productUrl}
 						target='_blank'
@@ -279,16 +131,17 @@ export default function VideoPlayer({
 							e.preventDefault();
 							window.open(productUrl, '_blank');
 						}}
-						className='pointer-events-auto px-8 py-4 rounded-xl text-white text-lg font-bold
-							bg-gradient-to-r from-[#fb7830] to-[#e56a25]
-							hover:from-[#e56a25] hover:to-[#d45a15]
-							shadow-[0_6px_28px_rgba(251,120,48,0.5)]
-							transition-all active:scale-[0.98]
-							animate-bounce'>
+						className='pointer-events-auto animate-bounce rounded-xl bg-gradient-to-r from-[#fb7830] to-[#e56a25] px-8 py-4 text-lg font-bold text-white shadow-[0_6px_28px_rgba(251,120,48,0.5)] transition-all hover:from-[#e56a25] hover:to-[#d45a15] active:scale-[0.98]'>
 						{buyButtonText || 'Купити'}
 					</a>
 				</div>
 			)}
-		</div>
+		</>
 	);
 }
+
+const skinStyle = {
+	'--media-object-fit': 'cover',
+	'--media-border-radius': '0',
+	'--media-color-primary': '#fb7830',
+} as React.CSSProperties;
