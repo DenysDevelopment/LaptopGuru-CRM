@@ -57,6 +57,7 @@
     "@types/passport-jwt": "^4.0.1",
     "dotenv-cli": "^11.0.0",
     "eslint": "^9.39.4",
+    "ioredis-mock": "^8.13.1",
     "prisma": "^7.5.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.4"
