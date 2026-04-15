@@ -25,8 +25,11 @@ export class VideoAnalyticsController {
     @Query('to') to?: string,
   ) {
     const companyId = this.cls.get<string>('companyId');
-    const fromDate = from ? new Date(from) : new Date(Date.now() - 30 * 86_400_000);
-    const toDate = to ? new Date(to) : new Date();
-    return this.analyticsService.getFullAnalytics(id, companyId, fromDate, toDate);
+    return this.analyticsService.getAnalytics(
+      id,
+      companyId,
+      from ? new Date(from) : undefined,
+      to ? new Date(to) : undefined,
+    );
   }
 }

@@ -172,6 +172,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get videoWatchEvent() { return this.client.videoWatchEvent; }
   get videoPlaybackSession() { return this.client.videoPlaybackSession; }
   get videoSessionChunk() { return this.client.videoSessionChunk; }
+  get videoSecondStats() { return this.client.videoSecondStats; }
 
   async $queryRaw(query: TemplateStringsArray, ...values: unknown[]) {
     return this.rawClient_.$queryRaw(query, ...values);
