@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/denysdevelopment/shorter-email-laptopguru:latest
+    image: ghcr.io/denysdevelopment/laptopguru-crm:latest
     build: !reset null
     restart: always
     volumes:
@@ -40,7 +40,7 @@ services:
       - VIDEO_PRESIGN_TTL_SECONDS=${VIDEO_PRESIGN_TTL_SECONDS}
       - VIDEO_MIN_WATCH_FOR_VIEW_SECONDS=${VIDEO_MIN_WATCH_FOR_VIEW_SECONDS}
   api:
-    image: ghcr.io/denysdevelopment/shorter-email-laptopguru-api:latest
+    image: ghcr.io/denysdevelopment/laptopguru-crm-api:latest
     build: !reset null
     restart: always
     environment:
