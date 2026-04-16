@@ -92,7 +92,15 @@ async function syncChannelEmails(config: ImapConfig): Promise<number> {
       lock.release();
     }
   } finally {
-    await client.logout();
+    if (client.usable) {
+      try {
+        await client.logout();
+      } catch {
+        // Не маскируем настоящую ошибку (напр. connect timeout) ошибкой logout.
+      }
+    } else {
+      client.close();
+    }
   }
 
   return imported;
