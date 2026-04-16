@@ -24,8 +24,16 @@ function handleCustomDomain(request: NextRequest, host: string): NextResponse {
 		return response;
 	}
 
-	// Root path — no landing to show
+	// Root path — nothing to serve on the custom domain itself. Redirect to
+	// the parent domain (e.g. l.laptopguru.pl → laptopguru.pl) so the user
+	// lands on the brand's main site instead of a 404. Falls back to 404
+	// only when the custom domain is already at the apex (no subdomain).
 	if (pathname === "/") {
+		const parts = host.split(".");
+		if (parts.length > 2) {
+			const parent = parts.slice(1).join(".");
+			return NextResponse.redirect(`https://${parent}/`, 308);
+		}
 		return new NextResponse("Not Found", { status: 404 });
 	}
 

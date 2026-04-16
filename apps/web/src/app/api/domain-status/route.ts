@@ -112,13 +112,17 @@ async function checkHttp(domain: string): Promise<Check> {
 async function checkHttps(domain: string): Promise<Check> {
 	try {
 		const res = await fetchWithTimeout(`https://${domain}/`, 10000);
-		const ok = res.status >= 200 && res.status < 400;
+		// Receiving ANY HTTP response means TLS handshake succeeded — the cert
+		// is valid. 404 on `/` is expected because the custom-domain middleware
+		// only serves /{slug} and /{code}; it returns 404 on root by design
+		// (see apps/web/src/middleware.ts). Flag only 5xx as a real problem.
+		const ok = res.status < 500;
 		return {
 			name: "https",
 			label: "SSL / HTTPS",
 			ok,
 			message: ok
-				? "SSL сертификат валиден, HTTPS работает"
+				? `SSL сертификат валиден (HTTPS ${res.status})`
 				: `HTTPS вернул ${res.status}`,
 		};
 	} catch (err) {

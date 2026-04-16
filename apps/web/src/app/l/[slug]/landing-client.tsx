@@ -1435,29 +1435,30 @@ export function LandingClient({ landing, video }: Props) {
 			/>
 
 			<div className='flex-1 pb-28 '>
-				{/* Header — email-style gradient */}
+				{/* Video — fixed 9:16 aspect, height = viewport minus sticky CTA.
+				    On desktop the inner 9:16 box sits centered with black letterbox
+				    on the sides; on mobile it fills the available width. */}
 				<div
-					className='py-1 px-6 text-center header-shine'
-					style={{
-						background:
-							'linear-gradient(135deg, #fb7830 0%, #f59e0b 50%, #fb7830 100%)',
-						backgroundSize: '200% auto',
-					}}>
-					<Image
-						src='/LG_logo2.webp'
-						alt='Laptop Guru'
-						width={200}
-						height={72}
-						priority
-						className='mx-auto mb-1.5 w-auto'
-						style={{ height: 72, filter: 'brightness(0) invert(1)' }}
-					/>
-				</div>
-
-					{/* Video */}
-					<div data-animate className='px-4 sm:px-6 mt-2 pb-4'>
-						<div className='relative aspect-[9/16] max-w-[360px] mx-auto rounded-xl overflow-hidden bg-gray-900 shadow-[0_4px_20px_rgba(0,0,0,0.15)]'>
-							{video.source === 'S3' && video.videoUrl ? (
+					className='relative flex w-full items-center justify-center overflow-hidden bg-black'
+					style={{ height: 'calc(100dvh - 5rem)' }}>
+					<div className='pointer-events-none absolute top-4 left-4 z-10 opacity-40'>
+						<Image
+							src='/LG_logo2.webp'
+							alt='Laptop Guru'
+							width={120}
+							height={43}
+							priority
+							unoptimized
+							className='w-auto'
+							style={{
+								height: 36,
+								filter:
+									'brightness(0) invert(1) drop-shadow(0 2px 4px rgba(0,0,0,0.6))',
+							}}
+						/>
+					</div>
+					<div className='relative h-full aspect-[9/16] max-w-full'>
+					{video.source === 'S3' && video.videoUrl ? (
 								<VideoPlayer
 									src={video.videoUrl}
 									poster={video.thumbnail}
@@ -1588,10 +1589,10 @@ export function LandingClient({ landing, video }: Props) {
 									className='absolute inset-0 w-full h-full'
 								/>
 							) : null}
-						</div>
 					</div>
+				</div>
 
-					{/* Benefits — 3 columns */}
+				{/* Benefits — 3 columns */}
 					<div data-animate className='max-w-3xl mx-auto px-4 sm:px-6 mb-6'>
 						<div className='bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.08)] border border-gray-100 p-5'>
 							<div className='flex'>

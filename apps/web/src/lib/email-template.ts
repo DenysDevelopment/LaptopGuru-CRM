@@ -21,7 +21,7 @@ const translations = {
 		greeting: 'Witamy',
 		intro:
 			'Nasz ekspert przygotował recenzję wideo specjalnie dla Ciebie — obejrzyj i podejmij najlepszą decyzję!',
-		cta: '▶ Obejrzyj recenzję',
+		cta: 'Obejrzyj recenzję',
 		benefit1Title: 'Gwarancja 12 miesięcy',
 		benefit2Title: 'Darmowa dostawa pojutrze',
 		benefit3Title: 'Zwrot w ciągu 30 dni',
@@ -30,7 +30,7 @@ const translations = {
 		greeting: 'Вітаємо',
 		intro:
 			'Наш експерт підготував відео-огляд спеціально для вас — перегляньте та зробіть найкращий вибір!',
-		cta: '▶ Дивитися огляд',
+		cta: 'Дивитися огляд',
 		benefit1Title: 'Гарантія 12 місяців',
 		benefit2Title: 'Безкоштовна доставка післязавтра',
 		benefit3Title: 'Повернення протягом 30 днів',
@@ -39,7 +39,7 @@ const translations = {
 		greeting: 'Здравствуйте',
 		intro:
 			'Наш эксперт подготовил видеообзор специально для вас — посмотрите и примите лучшее решение!',
-		cta: '▶ Смотреть обзор',
+		cta: 'Смотреть обзор',
 		benefit1Title: 'Гарантия 12 месяцев',
 		benefit2Title: 'Бесплатная доставка послезавтра',
 		benefit3Title: 'Возврат в течение 30 дней',
@@ -48,7 +48,7 @@ const translations = {
 		greeting: 'Hello',
 		intro:
 			'Our expert has prepared a video review especially for you — watch it and make the best decision!',
-		cta: '▶ Watch review',
+		cta: 'Watch review',
 		benefit1Title: '12-month warranty',
 		benefit2Title: 'Free delivery day after tomorrow',
 		benefit3Title: 'Return within 30 days',
@@ -57,7 +57,7 @@ const translations = {
 		greeting: 'Sveiki',
 		intro:
 			'Mūsų ekspertas paruošė vaizdo apžvalgą specialiai jums — pažiūrėkite ir priimkite geriausią sprendimą!',
-		cta: '▶ Žiūrėti apžvalgą',
+		cta: 'Žiūrėti apžvalgą',
 		benefit1Title: '12 mėnesių garantija',
 		benefit2Title: 'Nemokamas pristatymas poryt',
 		benefit3Title: 'Grąžinimas per 30 dienų',
@@ -66,7 +66,7 @@ const translations = {
 		greeting: 'Tere',
 		intro:
 			'Meie ekspert on koostanud videoülevaate spetsiaalselt teile — vaadake ja tehke parim valik!',
-		cta: '▶ Vaata ülevaadet',
+		cta: 'Vaata ülevaadet',
 		benefit1Title: '12 kuu garantii',
 		benefit2Title: 'Tasuta kohaletoimetamine ülehomme',
 		benefit3Title: 'Tagastamine 30 päeva jooksul',
@@ -75,7 +75,7 @@ const translations = {
 		greeting: 'Sveiki',
 		intro:
 			'Mūsu eksperts ir sagatavojis video apskatu speciāli jums — noskatieties un pieņemiet labāko lēmumu!',
-		cta: '▶ Skatīt apskatu',
+		cta: 'Skatīt apskatu',
 		benefit1Title: '12 mēnešu garantija',
 		benefit2Title: 'Bezmaksas piegāde parīt',
 		benefit3Title: 'Atgriešana 30 dienu laikā',
