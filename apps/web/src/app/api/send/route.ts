@@ -49,6 +49,22 @@ export async function POST(request: NextRequest) {
       ? process.env.APP_URL
       : request.nextUrl.origin;
 
+  // Prefer the company's customDomain for public-facing short links and
+  // landing URLs so both email and Allegro flows point customers at the
+  // branded domain (e.g. l.laptopguru.pl) rather than the CRM host. The
+  // custom-domain middleware rewrites /{slug} → /l/{slug} and /{code} →
+  // /r/{code}, so the /l/ and /r/ prefixes are dropped on that domain.
+  const company = session.user.companyId
+    ? await prisma.company.findUnique({
+        where: { id: session.user.companyId },
+        select: { customDomain: true },
+      })
+    : null;
+  const publicBase = company?.customDomain
+    ? `https://${company.customDomain}`
+    : appUrl;
+  const useCustomDomain = Boolean(company?.customDomain);
+
   try {
     let slug = generateSlug();
     while (await prisma.landing.findFirst({ where: { slug, companyId: session.user.companyId ?? "" } })) {
@@ -74,8 +90,12 @@ export async function POST(request: NextRequest) {
     });
 
     const shortCode = await createShortLink(landing.id);
-    const shortUrl = `${appUrl}/r/${shortCode}`;
-    const landingUrl = `${appUrl}/l/${slug}`;
+    const shortUrl = useCustomDomain
+      ? `${publicBase}/${shortCode}`
+      : `${publicBase}/r/${shortCode}`;
+    const landingUrl = useCustomDomain
+      ? `${publicBase}/${slug}`
+      : `${publicBase}/l/${slug}`;
 
     if (mode === "allegro") {
       return NextResponse.json({

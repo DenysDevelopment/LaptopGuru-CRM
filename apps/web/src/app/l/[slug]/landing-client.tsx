@@ -72,7 +72,7 @@ const t = {
 		benefit3Title: 'Найкраща ціна',
 		benefit3Desc: 'Гарантуємо найвигіднішу пропозицію',
 		ctaButton: 'Переглянути пропозицію',
-		ctaButtonAllegro: 'Переглянути пропозицію на Allegro',
+		ctaButtonAllegro: 'Sprawdź ofertę na Allegro',
 		ctaSub: 'Гарантія 12 міс. · Безкоштовна доставка · Повернення 30 днів',
 		trustWarranty: 'Гарантія 12 місяців',
 		trustDelivery: 'Безкоштовна доставка післязавтра',
@@ -102,7 +102,7 @@ const t = {
 		benefit3Title: 'Лучшая цена',
 		benefit3Desc: 'Гарантируем самое выгодное предложение',
 		ctaButton: 'Смотреть предложение',
-		ctaButtonAllegro: 'Смотреть предложение на Allegro',
+		ctaButtonAllegro: 'Sprawdź ofertę na Allegro',
 		ctaSub: 'Гарантия 12 мес. · Бесплатная доставка · Возврат 30 дней',
 		trustWarranty: 'Гарантия 12 месяцев',
 		trustDelivery: 'Бесплатная доставка послезавтра',
@@ -132,7 +132,7 @@ const t = {
 		benefit3Title: 'Best price',
 		benefit3Desc: 'We guarantee the most competitive offer',
 		ctaButton: 'View offer',
-		ctaButtonAllegro: 'View offer on Allegro',
+		ctaButtonAllegro: 'Sprawdź ofertę na Allegro',
 		ctaSub: '12-month warranty · Free delivery · 30-day returns',
 		trustWarranty: '12-month warranty',
 		trustDelivery: 'Free delivery tomorrow',
@@ -162,7 +162,7 @@ const t = {
 		benefit3Title: 'Geriausia kaina',
 		benefit3Desc: 'Garantuojame palankiausią pasiūlymą',
 		ctaButton: 'Peržiūrėti pasiūlymą',
-		ctaButtonAllegro: 'Peržiūrėti pasiūlymą Allegro',
+		ctaButtonAllegro: 'Sprawdź ofertę na Allegro',
 		ctaSub:
 			'12 mėn. garantija · Nemokamas pristatymas · Grąžinimas per 30 dienų',
 		trustWarranty: '12 mėnesių garantija',
@@ -193,7 +193,7 @@ const t = {
 		benefit3Title: 'Parim hind',
 		benefit3Desc: 'Garanteerime soodsaima pakkumise',
 		ctaButton: 'Vaata pakkumist',
-		ctaButtonAllegro: 'Vaata pakkumist Allegros',
+		ctaButtonAllegro: 'Sprawdź ofertę na Allegro',
 		ctaSub: '12 kuu garantii · Tasuta kohaletoimetamine · 30 päeva tagastus',
 		trustWarranty: '12 kuu garantii',
 		trustDelivery: 'Tasuta kohaletoimetamine ülehomme',
@@ -223,7 +223,7 @@ const t = {
 		benefit3Title: 'Labākā cena',
 		benefit3Desc: 'Garantējam visizdevīgāko piedāvājumu',
 		ctaButton: 'Skatīt piedāvājumu',
-		ctaButtonAllegro: 'Skatīt piedāvājumu Allegro',
+		ctaButtonAllegro: 'Sprawdź ofertę na Allegro',
 		ctaSub:
 			'12 mēnešu garantija · Bezmaksas piegāde · Atgriešana 30 dienu laikā',
 		trustWarranty: '12 mēnešu garantija',
@@ -1474,277 +1474,277 @@ export function LandingClient({ landing, video }: Props) {
 							'--header-h': '86px',
 						} as React.CSSProperties
 					}>
-				<div className='relative w-full md:w-auto md:aspect-[9/16] overflow-hidden bg-black h-[calc(100dvh-var(--cta-h))] md:h-[calc(100dvh-var(--cta-h)-var(--header-h)-3rem)] md:rounded-2xl md:shadow-[0_8px_32px_rgba(0,0,0,0.15)]'>
-					<div className='md:hidden pointer-events-none absolute top-3 left-3 z-10 opacity-50'>
-						<Image
-							src='/LG_logo2.webp'
-							alt=''
-							width={120}
-							height={43}
-							priority
-							unoptimized
-							className='w-auto h-10'
-							style={{
-								filter:
-									'brightness(0) invert(1) drop-shadow(0 2px 4px rgba(0,0,0,0.7))',
-							}}
-						/>
+					<div className='relative w-full md:w-auto md:aspect-[9/16] overflow-hidden bg-black h-[calc(100dvh-var(--cta-h))] md:h-[calc(100dvh-var(--cta-h)-var(--header-h)-3rem)] md:rounded-2xl md:shadow-[0_8px_32px_rgba(0,0,0,0.15)]'>
+						<div className='md:hidden pointer-events-none absolute top-3 left-3 z-10 opacity-50'>
+							<Image
+								src='/LG_logo2.webp'
+								alt=''
+								width={120}
+								height={43}
+								priority
+								unoptimized
+								className='w-auto h-20'
+								style={{
+									filter:
+										'brightness(0) invert(1) drop-shadow(0 2px 4px rgba(0,0,0,0.7))',
+								}}
+							/>
+						</div>
+						{video.source === 'S3' && video.videoUrl ? (
+							<VideoPlayer
+								src={video.videoUrl}
+								poster={video.thumbnail}
+								onPlay={() => {
+									videoPlayedRef.current = true;
+									if (!videoWatchStartRef.current)
+										videoWatchStartRef.current = Date.now();
+									// Track time to first play
+									if (firstPlayTimeRef.current == null) {
+										firstPlayTimeRef.current =
+											Date.now() - (startTimeRef.current ?? Date.now());
+									}
+									// Send PLAY event + flush any buffered heartbeats + update engagement
+									flushVideoEvents();
+									const pos = lastHeartbeatRef.current;
+									sendVideoEventNow({
+										clientEventId: crypto.randomUUID(),
+										eventType: 'PLAY',
+										position: pos,
+										clientTimestamp: new Date().toISOString(),
+									});
+									// Anchor heartbeat origin at the play position; the first real HEARTBEAT
+									// will fire after 1s of actual playback. No synthetic heartbeat here.
+									lastSentHeartbeatPos.current = pos;
+									sendUpdate({ videoPlayed: true });
+								}}
+								onPause={() => {
+									if (videoWatchStartRef.current) {
+										videoWatchAccumRef.current += Math.round(
+											(Date.now() - videoWatchStartRef.current) / 1000,
+										);
+										videoWatchStartRef.current = null;
+									}
+									// Flush heartbeats + send PAUSE + update engagement
+									flushVideoEvents();
+									sendVideoEventNow({
+										clientEventId: crypto.randomUUID(),
+										eventType: 'PAUSE',
+										position: lastHeartbeatRef.current,
+										clientTimestamp: new Date().toISOString(),
+									});
+									sendUpdate({
+										videoPlayed: true,
+										videoWatchTime: videoWatchAccumRef.current,
+									});
+								}}
+								onEnded={() => {
+									videoCompletedRef.current = true;
+									if (videoWatchStartRef.current) {
+										videoWatchAccumRef.current += Math.round(
+											(Date.now() - videoWatchStartRef.current) / 1000,
+										);
+										videoWatchStartRef.current = null;
+									}
+									// Flush heartbeats + send ENDED + update engagement
+									flushVideoEvents();
+									sendVideoEventNow({
+										clientEventId: crypto.randomUUID(),
+										eventType: 'ENDED',
+										position: lastHeartbeatRef.current,
+										clientTimestamp: new Date().toISOString(),
+									});
+									sendUpdate({
+										videoPlayed: true,
+										videoWatchTime: videoWatchAccumRef.current,
+										videoCompleted: true,
+									});
+								}}
+								onTimeUpdate={currentTime => {
+									lastHeartbeatRef.current = currentTime;
+									// Buffer HEARTBEAT every 1 second of playback for second-level
+									// position tracking. Plyr fires onTimeUpdate ~4x/sec, so we gate
+									// on video currentTime advancing at least 1s since the last send.
+									if (currentTime - lastSentHeartbeatPos.current >= 1) {
+										lastSentHeartbeatPos.current = currentTime;
+										videoEventsBuffer.current.push({
+											clientEventId: crypto.randomUUID(),
+											eventType: 'HEARTBEAT',
+											position: currentTime,
+											clientTimestamp: new Date().toISOString(),
+										});
+									}
+									// Flush every 10 buffered heartbeats (≈10s) to stay well under the
+									// 60 requests/min per-visit rate limit while keeping data fresh.
+									if (videoEventsBuffer.current.length >= 10)
+										flushVideoEvents();
+								}}
+								onSeeked={(seekFrom, seekTo) => {
+									// Flush heartbeats + send SEEK. Do NOT push a synthetic HEARTBEAT —
+									// a real one will come once playback has advanced 1s past seekTo.
+									flushVideoEvents();
+									lastHeartbeatRef.current = seekTo;
+									lastSentHeartbeatPos.current = seekTo;
+									sendVideoEventNow({
+										clientEventId: crypto.randomUUID(),
+										eventType: 'SEEK',
+										position: seekTo,
+										seekFrom,
+										seekTo,
+										clientTimestamp: new Date().toISOString(),
+									});
+								}}
+								onBufferStart={() => {
+									bufferStartRef.current = Date.now();
+									bufferCountRef.current++;
+									sendVideoEventNow({
+										clientEventId: crypto.randomUUID(),
+										eventType: 'BUFFERING',
+										position: lastHeartbeatRef.current,
+										clientTimestamp: new Date().toISOString(),
+									});
+								}}
+								onBufferEnd={() => {
+									if (bufferStartRef.current) {
+										bufferTotalMsRef.current +=
+											Date.now() - bufferStartRef.current;
+										bufferStartRef.current = null;
+									}
+								}}
+							/>
+						) : video.youtubeId ? (
+							<iframe
+								id='yt-player'
+								src={`https://www.youtube.com/embed/${video.youtubeId}?rel=0&enablejsapi=1`}
+								title={video.title}
+								allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
+								allowFullScreen
+								className='absolute inset-0 w-full h-full'
+							/>
+						) : null}
 					</div>
-					{video.source === 'S3' && video.videoUrl ? (
-								<VideoPlayer
-									src={video.videoUrl}
-									poster={video.thumbnail}
-									onPlay={() => {
-										videoPlayedRef.current = true;
-										if (!videoWatchStartRef.current)
-											videoWatchStartRef.current = Date.now();
-										// Track time to first play
-										if (firstPlayTimeRef.current == null) {
-											firstPlayTimeRef.current =
-												Date.now() - (startTimeRef.current ?? Date.now());
-										}
-										// Send PLAY event + flush any buffered heartbeats + update engagement
-										flushVideoEvents();
-										const pos = lastHeartbeatRef.current;
-										sendVideoEventNow({
-											clientEventId: crypto.randomUUID(),
-											eventType: 'PLAY',
-											position: pos,
-											clientTimestamp: new Date().toISOString(),
-										});
-										// Anchor heartbeat origin at the play position; the first real HEARTBEAT
-										// will fire after 1s of actual playback. No synthetic heartbeat here.
-										lastSentHeartbeatPos.current = pos;
-										sendUpdate({ videoPlayed: true });
-									}}
-									onPause={() => {
-										if (videoWatchStartRef.current) {
-											videoWatchAccumRef.current += Math.round(
-												(Date.now() - videoWatchStartRef.current) / 1000,
-											);
-											videoWatchStartRef.current = null;
-										}
-										// Flush heartbeats + send PAUSE + update engagement
-										flushVideoEvents();
-										sendVideoEventNow({
-											clientEventId: crypto.randomUUID(),
-											eventType: 'PAUSE',
-											position: lastHeartbeatRef.current,
-											clientTimestamp: new Date().toISOString(),
-										});
-										sendUpdate({
-											videoPlayed: true,
-											videoWatchTime: videoWatchAccumRef.current,
-										});
-									}}
-									onEnded={() => {
-										videoCompletedRef.current = true;
-										if (videoWatchStartRef.current) {
-											videoWatchAccumRef.current += Math.round(
-												(Date.now() - videoWatchStartRef.current) / 1000,
-											);
-											videoWatchStartRef.current = null;
-										}
-										// Flush heartbeats + send ENDED + update engagement
-										flushVideoEvents();
-										sendVideoEventNow({
-											clientEventId: crypto.randomUUID(),
-											eventType: 'ENDED',
-											position: lastHeartbeatRef.current,
-											clientTimestamp: new Date().toISOString(),
-										});
-										sendUpdate({
-											videoPlayed: true,
-											videoWatchTime: videoWatchAccumRef.current,
-											videoCompleted: true,
-										});
-									}}
-									onTimeUpdate={currentTime => {
-										lastHeartbeatRef.current = currentTime;
-										// Buffer HEARTBEAT every 1 second of playback for second-level
-										// position tracking. Plyr fires onTimeUpdate ~4x/sec, so we gate
-										// on video currentTime advancing at least 1s since the last send.
-										if (currentTime - lastSentHeartbeatPos.current >= 1) {
-											lastSentHeartbeatPos.current = currentTime;
-											videoEventsBuffer.current.push({
-												clientEventId: crypto.randomUUID(),
-												eventType: 'HEARTBEAT',
-												position: currentTime,
-												clientTimestamp: new Date().toISOString(),
-											});
-										}
-										// Flush every 10 buffered heartbeats (≈10s) to stay well under the
-										// 60 requests/min per-visit rate limit while keeping data fresh.
-										if (videoEventsBuffer.current.length >= 10)
-											flushVideoEvents();
-									}}
-									onSeeked={(seekFrom, seekTo) => {
-										// Flush heartbeats + send SEEK. Do NOT push a synthetic HEARTBEAT —
-										// a real one will come once playback has advanced 1s past seekTo.
-										flushVideoEvents();
-										lastHeartbeatRef.current = seekTo;
-										lastSentHeartbeatPos.current = seekTo;
-										sendVideoEventNow({
-											clientEventId: crypto.randomUUID(),
-											eventType: 'SEEK',
-											position: seekTo,
-											seekFrom,
-											seekTo,
-											clientTimestamp: new Date().toISOString(),
-										});
-									}}
-									onBufferStart={() => {
-										bufferStartRef.current = Date.now();
-										bufferCountRef.current++;
-										sendVideoEventNow({
-											clientEventId: crypto.randomUUID(),
-											eventType: 'BUFFERING',
-											position: lastHeartbeatRef.current,
-											clientTimestamp: new Date().toISOString(),
-										});
-									}}
-									onBufferEnd={() => {
-										if (bufferStartRef.current) {
-											bufferTotalMsRef.current +=
-												Date.now() - bufferStartRef.current;
-											bufferStartRef.current = null;
-										}
-									}}
-								/>
-							) : video.youtubeId ? (
-								<iframe
-									id='yt-player'
-									src={`https://www.youtube.com/embed/${video.youtubeId}?rel=0&enablejsapi=1`}
-									title={video.title}
-									allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
-									allowFullScreen
-									className='absolute inset-0 w-full h-full'
-								/>
-							) : null}
-				</div>
 				</div>
 
 				{/* Benefits — 3 columns */}
-					<div data-animate className='max-w-3xl mx-auto px-4 sm:px-6 mb-6'>
-						<div className='bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.08)] border border-gray-100 p-5'>
-							<div className='flex'>
-								<div
-									data-animate
-									data-animate-delay='4'
-									className='benefit-icon flex-1 text-center px-2'>
-									<img
-										src='https://www.laptopguru.pl/cdn/shop/files/gg2.png?v=1767364526&width=400'
-										alt=''
-										className='anim-icon-float block mx-auto mb-2 h-8 sm:h-11'
-									/>
-									<p className='text-xs sm:text-sm font-bold text-[#333] m-0'>
-										{tr.trustWarranty}
-									</p>
-								</div>
-								<div
-									data-animate
-									data-animate-delay='5'
-									className='benefit-icon flex-1 text-center px-2'>
-									<img
-										src='https://www.laptopguru.pl/cdn/shop/files/dd1.png?v=1767364860&width=400'
-										alt=''
-										className='anim-icon-float block mx-auto mb-2 h-8 sm:h-11'
-									/>
-									<p className='text-xs sm:text-sm font-bold text-[#333] m-0'>
-										{tr.trustDelivery}
-									</p>
-								</div>
-								<div
-									data-animate
-									data-animate-delay='6'
-									className='benefit-icon flex-1 text-center px-2'>
-									<img
-										src='https://www.laptopguru.pl/cdn/shop/files/vv1.png?v=1767365084&width=400'
-										alt=''
-										className='anim-icon-float block mx-auto mb-2 h-8 sm:h-11'
-									/>
-									<p className='text-xs sm:text-sm font-bold text-[#333] m-0'>
-										{tr.trustReturn}
-									</p>
-								</div>
+				<div data-animate className='max-w-3xl mx-auto px-4 sm:px-6 mb-6'>
+					<div className='bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.08)] border border-gray-100 p-5'>
+						<div className='flex'>
+							<div
+								data-animate
+								data-animate-delay='4'
+								className='benefit-icon flex-1 text-center px-2'>
+								<img
+									src='https://www.laptopguru.pl/cdn/shop/files/gg2.png?v=1767364526&width=400'
+									alt=''
+									className='anim-icon-float block mx-auto mb-2 h-8 sm:h-11'
+								/>
+								<p className='text-xs sm:text-sm font-bold text-[#333] m-0'>
+									{tr.trustWarranty}
+								</p>
+							</div>
+							<div
+								data-animate
+								data-animate-delay='5'
+								className='benefit-icon flex-1 text-center px-2'>
+								<img
+									src='https://www.laptopguru.pl/cdn/shop/files/dd1.png?v=1767364860&width=400'
+									alt=''
+									className='anim-icon-float block mx-auto mb-2 h-8 sm:h-11'
+								/>
+								<p className='text-xs sm:text-sm font-bold text-[#333] m-0'>
+									{tr.trustDelivery}
+								</p>
+							</div>
+							<div
+								data-animate
+								data-animate-delay='6'
+								className='benefit-icon flex-1 text-center px-2'>
+								<img
+									src='https://www.laptopguru.pl/cdn/shop/files/vv1.png?v=1767365084&width=400'
+									alt=''
+									className='anim-icon-float block mx-auto mb-2 h-8 sm:h-11'
+								/>
+								<p className='text-xs sm:text-sm font-bold text-[#333] m-0'>
+									{tr.trustReturn}
+								</p>
 							</div>
 						</div>
 					</div>
+				</div>
 
-					{/* Specs */}
-					{specs && landing.type !== 'allegro' && (
-						<div data-animate className='max-w-3xl mx-auto px-4 sm:px-6 mb-6'>
-							<div className='bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.08)] border border-gray-100 p-6'>
-								<h2 className='text-lg font-bold text-gray-900 mb-4 flex items-center gap-2'>
-									<svg
-										className='w-5 h-5 text-[#fb7830]'
-										fill='none'
-										viewBox='0 0 24 24'
-										stroke='currentColor'
-										strokeWidth={2}>
-										<path
-											strokeLinecap='round'
-											strokeLinejoin='round'
-											d='M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25h-13.5A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0V12a2.25 2.25 0 0 1-2.25 2.25h-13.5A2.25 2.25 0 0 1 3 12V5.25'
-										/>
-									</svg>
-									{tr.specsTitle}
-								</h2>
-								<div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
-									{specs.model && (
-										<SpecRow
-											icon={<Laptop className='w-5 h-5 text-[#fb7830]' />}
-											label={tr.specModel}
-											value={specs.model}
-											delay={1}
-										/>
-									)}
-									{specs.cpu && (
-										<SpecRow
-											icon={<Cpu className='w-5 h-5 text-[#fb7830]' />}
-											label={tr.specCpu}
-											value={specs.cpu}
-											delay={2}
-										/>
-									)}
-									{specs.ram && (
-										<SpecRow
-											icon={<MemoryStick className='w-5 h-5 text-[#fb7830]' />}
-											label={tr.specRam}
-											value={specs.ram}
-											delay={3}
-										/>
-									)}
-									{specs.storage && (
-										<SpecRow
-											icon={<HardDrive className='w-5 h-5 text-[#fb7830]' />}
-											label={tr.specStorage}
-											value={specs.storage}
-											delay={4}
-										/>
-									)}
-									{specs.gpu && (
-										<SpecRow
-											icon={<Monitor className='w-5 h-5 text-[#fb7830]' />}
-											label={tr.specGpu}
-											value={specs.gpu}
-											delay={5}
-										/>
-									)}
-									{specs.display && (
-										<SpecRow
-											icon={
-												<MonitorSmartphone className='w-5 h-5 text-[#fb7830]' />
-											}
-											label={tr.specDisplay}
-											value={specs.display}
-											delay={6}
-										/>
-									)}
-								</div>
+				{/* Specs */}
+				{specs && landing.type !== 'allegro' && (
+					<div data-animate className='max-w-3xl mx-auto px-4 sm:px-6 mb-6'>
+						<div className='bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.08)] border border-gray-100 p-6'>
+							<h2 className='text-lg font-bold text-gray-900 mb-4 flex items-center gap-2'>
+								<svg
+									className='w-5 h-5 text-[#fb7830]'
+									fill='none'
+									viewBox='0 0 24 24'
+									stroke='currentColor'
+									strokeWidth={2}>
+									<path
+										strokeLinecap='round'
+										strokeLinejoin='round'
+										d='M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25h-13.5A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0V12a2.25 2.25 0 0 1-2.25 2.25h-13.5A2.25 2.25 0 0 1 3 12V5.25'
+									/>
+								</svg>
+								{tr.specsTitle}
+							</h2>
+							<div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
+								{specs.model && (
+									<SpecRow
+										icon={<Laptop className='w-5 h-5 text-[#fb7830]' />}
+										label={tr.specModel}
+										value={specs.model}
+										delay={1}
+									/>
+								)}
+								{specs.cpu && (
+									<SpecRow
+										icon={<Cpu className='w-5 h-5 text-[#fb7830]' />}
+										label={tr.specCpu}
+										value={specs.cpu}
+										delay={2}
+									/>
+								)}
+								{specs.ram && (
+									<SpecRow
+										icon={<MemoryStick className='w-5 h-5 text-[#fb7830]' />}
+										label={tr.specRam}
+										value={specs.ram}
+										delay={3}
+									/>
+								)}
+								{specs.storage && (
+									<SpecRow
+										icon={<HardDrive className='w-5 h-5 text-[#fb7830]' />}
+										label={tr.specStorage}
+										value={specs.storage}
+										delay={4}
+									/>
+								)}
+								{specs.gpu && (
+									<SpecRow
+										icon={<Monitor className='w-5 h-5 text-[#fb7830]' />}
+										label={tr.specGpu}
+										value={specs.gpu}
+										delay={5}
+									/>
+								)}
+								{specs.display && (
+									<SpecRow
+										icon={
+											<MonitorSmartphone className='w-5 h-5 text-[#fb7830]' />
+										}
+										label={tr.specDisplay}
+										value={specs.display}
+										delay={6}
+									/>
+								)}
 							</div>
 						</div>
-					)}
+					</div>
+				)}
 
 				<div className='py-2 text-center'>
 					<p className='text-xs mt-3 m-0' style={{ color: 'rgba(0,0,0,0.55)' }}>
@@ -1774,7 +1774,9 @@ export function LandingClient({ landing, video }: Props) {
 							className='cursor-pointer group relative w-full bg-gradient-to-r from-[#fb7830] to-[#e56a25] hover:from-[#e56a25] hover:to-[#d45a15] text-white py-4 rounded-xl text-lg font-bold anim-border-glow hover:shadow-[0_6px_28px_rgba(251,120,48,0.5)] transition-all active:scale-[0.98] overflow-hidden'>
 							<span className='absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent' />
 							<span className='relative'>
-								{landing.type === 'allegro' ? tr.ctaButtonAllegro : tr.ctaButton}
+								{landing.type === 'allegro'
+									? tr.ctaButtonAllegro
+									: tr.ctaButton}
 							</span>
 						</button>
 					</div>
