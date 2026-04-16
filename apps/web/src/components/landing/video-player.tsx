@@ -245,7 +245,7 @@ function PlayerInstance({
 					onClick={handleTogglePlay}
 					aria-label='Play'
 					className='absolute inset-0 z-[50] flex items-center justify-center'>
-					<span className='flex h-20 w-20 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-transform active:scale-95'>
+					<span className='flex h-20 w-20 items-center justify-center rounded-full bg-[#fb7830] text-white shadow-[0_8px_24px_rgba(251,120,48,0.5)] transition-transform active:scale-95'>
 						<svg
 							xmlns='http://www.w3.org/2000/svg'
 							viewBox='0 0 24 24'

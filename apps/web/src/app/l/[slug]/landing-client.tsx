@@ -1299,6 +1299,7 @@ export function LandingClient({ landing, video }: Props) {
 
 	// Scroll-reveal animations via IntersectionObserver
 	const [showCta, setShowCta] = useState(false);
+	const [isVideoPlaying, setIsVideoPlaying] = useState(false);
 	useEffect(() => {
 		const timer = setTimeout(() => {
 			const els = document.querySelectorAll('[data-animate]');
@@ -1496,6 +1497,7 @@ export function LandingClient({ landing, video }: Props) {
 								poster={video.thumbnail}
 								onPlay={() => {
 									videoPlayedRef.current = true;
+									setIsVideoPlaying(true);
 									if (!videoWatchStartRef.current)
 										videoWatchStartRef.current = Date.now();
 									// Track time to first play
@@ -1518,6 +1520,7 @@ export function LandingClient({ landing, video }: Props) {
 									sendUpdate({ videoPlayed: true });
 								}}
 								onPause={() => {
+									setIsVideoPlaying(false);
 									if (videoWatchStartRef.current) {
 										videoWatchAccumRef.current += Math.round(
 											(Date.now() - videoWatchStartRef.current) / 1000,
@@ -1539,6 +1542,7 @@ export function LandingClient({ landing, video }: Props) {
 								}}
 								onEnded={() => {
 									videoCompletedRef.current = true;
+									setIsVideoPlaying(false);
 									if (videoWatchStartRef.current) {
 										videoWatchAccumRef.current += Math.round(
 											(Date.now() - videoWatchStartRef.current) / 1000,
@@ -1621,51 +1625,47 @@ export function LandingClient({ landing, video }: Props) {
 								className='absolute inset-0 w-full h-full'
 							/>
 						) : null}
-					</div>
-				</div>
 
-				{/* Benefits — 3 columns */}
-				<div data-animate className='max-w-3xl mx-auto px-4 sm:px-6 mb-6'>
-					<div className='bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.08)] border border-gray-100 p-5'>
-						<div className='flex'>
-							<div
-								data-animate
-								data-animate-delay='4'
-								className='benefit-icon flex-1 text-center px-2'>
-								<img
-									src='https://www.laptopguru.pl/cdn/shop/files/gg2.png?v=1767364526&width=400'
-									alt=''
-									className='anim-icon-float block mx-auto mb-2 h-8 sm:h-11'
-								/>
-								<p className='text-xs sm:text-sm font-bold text-[#333] m-0'>
-									{tr.trustWarranty}
-								</p>
-							</div>
-							<div
-								data-animate
-								data-animate-delay='5'
-								className='benefit-icon flex-1 text-center px-2'>
-								<img
-									src='https://www.laptopguru.pl/cdn/shop/files/dd1.png?v=1767364860&width=400'
-									alt=''
-									className='anim-icon-float block mx-auto mb-2 h-8 sm:h-11'
-								/>
-								<p className='text-xs sm:text-sm font-bold text-[#333] m-0'>
-									{tr.trustDelivery}
-								</p>
-							</div>
-							<div
-								data-animate
-								data-animate-delay='6'
-								className='benefit-icon flex-1 text-center px-2'>
-								<img
-									src='https://www.laptopguru.pl/cdn/shop/files/vv1.png?v=1767365084&width=400'
-									alt=''
-									className='anim-icon-float block mx-auto mb-2 h-8 sm:h-11'
-								/>
-								<p className='text-xs sm:text-sm font-bold text-[#333] m-0'>
-									{tr.trustReturn}
-								</p>
+						{/* Benefits overlay — visible when paused (S3 player only) */}
+						<div
+							className={`pointer-events-none absolute inset-x-3 bottom-16 md:bottom-20 z-20 ${
+								video.source === 'S3' && !isVideoPlaying
+									? 'opacity-100'
+									: 'opacity-0'
+							}`}>
+							<div className='mx-auto max-w-md rounded-2xl bg-white/70 backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.25)] border border-white/50 p-3 sm:p-4'>
+								<div className='flex'>
+									<div className='benefit-icon flex-1 text-center px-1'>
+										<img
+											src='https://www.laptopguru.pl/cdn/shop/files/gg2.png?v=1767364526&width=400'
+											alt=''
+											className='block mx-auto mb-1.5 h-8 sm:h-10'
+										/>
+										<p className='text-xs sm:text-sm font-bold text-[#333] m-0 leading-tight'>
+											{tr.trustWarranty}
+										</p>
+									</div>
+									<div className='benefit-icon flex-1 text-center px-1'>
+										<img
+											src='https://www.laptopguru.pl/cdn/shop/files/dd1.png?v=1767364860&width=400'
+											alt=''
+											className='block mx-auto mb-1.5 h-8 sm:h-10'
+										/>
+										<p className='text-xs sm:text-sm font-bold text-[#333] m-0 leading-tight'>
+											{tr.trustDelivery}
+										</p>
+									</div>
+									<div className='benefit-icon flex-1 text-center px-1'>
+										<img
+											src='https://www.laptopguru.pl/cdn/shop/files/vv1.png?v=1767365084&width=400'
+											alt=''
+											className='block mx-auto mb-1.5 h-8 sm:h-10'
+										/>
+										<p className='text-xs sm:text-sm font-bold text-[#333] m-0 leading-tight'>
+											{tr.trustReturn}
+										</p>
+									</div>
+								</div>
 							</div>
 						</div>
 					</div>
