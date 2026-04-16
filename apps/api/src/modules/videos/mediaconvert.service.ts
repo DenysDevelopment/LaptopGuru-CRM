@@ -57,7 +57,11 @@ export class MediaConvertService {
               AudioSelectors: {
                 'Audio Selector 1': { DefaultSelection: 'DEFAULT' },
               },
-              VideoSelector: {},
+              // Read rotation metadata (iPhone .mov stores orientation as a
+              // flag, not in pixels) and physically rotate before encode so
+              // output MP4 plays correctly everywhere — Chrome, Android,
+              // embedded players — not just iOS Safari.
+              VideoSelector: { Rotate: 'AUTO' },
             },
           ],
           OutputGroups: [
@@ -87,8 +91,9 @@ export class MediaConvertService {
                         CodecLevel: 'AUTO',
                       },
                     },
-                    Width: 1280,
-                    Height: 720,
+                    // No fixed Width/Height — preserve source aspect ratio so
+                    // vertical (9:16) iPhone videos stay vertical after the
+                    // encode. CBR bitrate already caps file size.
                     ScalingBehavior: 'DEFAULT',
                   },
                   AudioDescriptions: [

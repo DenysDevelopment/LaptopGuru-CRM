@@ -19,8 +19,6 @@ interface Props {
 	onSeeked: (seekFrom: number, seekTo: number) => void;
 	onBufferStart: () => void;
 	onBufferEnd: () => void;
-	productUrl?: string;
-	buyButtonText?: string;
 }
 
 export default function VideoPlayer(props: Props) {
@@ -41,8 +39,6 @@ function PlayerInstance({
 	onSeeked,
 	onBufferStart,
 	onBufferEnd,
-	productUrl,
-	buyButtonText,
 }: Props) {
 	const videoRef = useRef<HTMLVideoElement>(null);
 	const barRef = useRef<HTMLDivElement>(null);
@@ -58,7 +54,6 @@ function PlayerInstance({
 	const [currentTime, setCurrentTime] = useState(0);
 	const [duration, setDuration] = useState(0);
 	const [controlsVisible, setControlsVisible] = useState(true);
-	const [nearEnd, setNearEnd] = useState(false);
 	const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const isScrubbingRef = useRef(false);
 
@@ -99,7 +94,6 @@ function PlayerInstance({
 
 	const handlePlay = useCallback(() => {
 		setIsPlaying(true);
-		setNearEnd(false);
 		onPlay();
 		scheduleHide();
 	}, [onPlay, scheduleHide]);
@@ -121,7 +115,6 @@ function PlayerInstance({
 			setCurrentTime(t);
 			if (Number.isFinite(d) && d > 0) setDuration(d);
 			onTimeUpdate(t);
-			setNearEnd(Number.isFinite(d) && d > 0 && d - t <= 10);
 		},
 		[onTimeUpdate],
 	);
@@ -317,23 +310,6 @@ function PlayerInstance({
 					</span>
 				</div>
 			</div>
-
-			{/* CTA: visible in the last 10s of playback. */}
-			{nearEnd && productUrl && (
-				<div className='pointer-events-none absolute inset-0 z-[70] flex items-end justify-center pb-20'>
-					<a
-						href={productUrl}
-						target='_blank'
-						rel='noopener noreferrer'
-						onClick={e => {
-							e.preventDefault();
-							window.open(productUrl, '_blank');
-						}}
-						className='pointer-events-auto rounded-xl bg-gradient-to-r from-[#fb7830] to-[#e56a25] px-8 py-4 text-lg font-bold text-white shadow-[0_6px_28px_rgba(251,120,48,0.5)] transition-all hover:from-[#e56a25] hover:to-[#d45a15] active:scale-[0.98]'>
-						{buyButtonText || 'Купити'}
-					</a>
-				</div>
-			)}
 		</>
 	);
 }

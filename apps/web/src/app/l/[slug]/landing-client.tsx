@@ -1461,12 +1461,6 @@ export function LandingClient({ landing, video }: Props) {
 								<VideoPlayer
 									src={video.videoUrl}
 									poster={video.thumbnail}
-									productUrl={landing.productUrl}
-									buyButtonText={
-										landing.type === 'allegro'
-											? 'Przejdź do oferty na Allegro'
-											: tr.ctaButton
-									}
 									onPlay={() => {
 										videoPlayedRef.current = true;
 										if (!videoWatchStartRef.current)
