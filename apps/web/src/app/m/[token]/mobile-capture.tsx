@@ -137,12 +137,12 @@ export function MobileCapture({ token, title }: Props) {
                 ref={fileInputRef}
                 type="file"
                 accept="video/*"
-                capture="environment"
                 onChange={handlePick}
                 className="hidden"
               />
               <p className="mt-3 text-center text-xs text-gray-500">
-                Откроется камера телефона.
+                Выберите «Снять видео» — для лучшего качества снимайте через
+                системную Камеру.
               </p>
             </>
           )}
