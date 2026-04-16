@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 const { auth } = NextAuth(authConfig);
 
 /** Paths that should pass through unchanged on custom domains */
-const PASSTHROUGH_PREFIXES = ["/api/", "/r/", "/go/", "/_next/", "/favicon"];
+const PASSTHROUGH_PREFIXES = ["/api/", "/r/", "/go/", "/m/", "/_next/", "/favicon"];
 
 function isPassthrough(pathname: string): boolean {
 	return PASSTHROUGH_PREFIXES.some((p) => pathname.startsWith(p));

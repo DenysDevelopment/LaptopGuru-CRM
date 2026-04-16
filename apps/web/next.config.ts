@@ -42,6 +42,14 @@ const nextConfig: NextConfig = {
           : []),
       ],
     },
+    {
+      // Mobile-upload page needs camera access. Overrides the blanket
+      // Permissions-Policy above — this route is token-gated and short-lived.
+      source: "/m/:token*",
+      headers: [
+        { key: "Permissions-Policy", value: "camera=(self), microphone=(self)" },
+      ],
+    },
   ],
 };
 

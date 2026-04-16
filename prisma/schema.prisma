@@ -62,6 +62,7 @@ model Company {
   landingVisits      LandingVisit[]
   quickLinkVisits    QuickLinkVisit[]
   videoWatchEvents   VideoWatchEvent[]
+  mobileUploadTokens MobileUploadToken[]
 }
 
 model User {
@@ -83,6 +84,8 @@ model User {
   sentEmails      SentEmail[]
   processedEmails IncomingEmail[]
   quickLinks      QuickLink[]
+
+  mobileUploadTokens MobileUploadToken[]
 
   // Messaging relations
   contactMerges              ContactMerge[]             @relation("ContactMerges")
@@ -204,10 +207,33 @@ model Video {
 
   landings            Landing[]
   watchEvents         VideoWatchEvent[]
+  mobileUploadToken   MobileUploadToken?
 
   @@unique([youtubeId, companyId], name: "youtubeId_companyId")
   @@index([companyId])
   @@index([companyId, status])
+}
+
+/// Ephemeral one-time token granting camera-recorded video upload from a mobile
+/// device. Generated on the desktop when the user clicks "+" in the video
+/// selector, encoded in a QR, consumed once (or after TTL expires, whichever
+/// comes first). Never exposes companyId via URL — it's read from this row.
+model MobileUploadToken {
+  token       String    @id
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId   String
+  title       String
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  video       Video?    @relation(fields: [videoId], references: [id], onDelete: SetNull)
+  videoId     String?   @unique
+  createdAt   DateTime  @default(now())
+
+  @@index([expiresAt])
+  @@index([companyId])
+  @@index([userId])
 }
 
 model VideoWatchEvent {

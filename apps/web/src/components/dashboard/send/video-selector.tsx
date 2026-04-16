@@ -1,19 +1,51 @@
 "use client";
 
 import Image from "next/image";
+import { useState } from "react";
 import type { Video } from "@/types";
+import { AddVideoModal } from "./add-video-modal";
 
 interface VideoSelectorProps {
   videos: Video[];
   loading: boolean;
   selectedId: string;
   onSelect: (id: string) => void;
+  /** Called when a brand-new video has been created via the "+" modal. */
+  onVideoCreated?: (videoId: string) => void;
 }
 
-export function VideoSelector({ videos, loading, selectedId, onSelect }: VideoSelectorProps) {
+export function VideoSelector({
+  videos,
+  loading,
+  selectedId,
+  onSelect,
+  onVideoCreated,
+}: VideoSelectorProps) {
+  const [modalOpen, setModalOpen] = useState(false);
+
   return (
     <div>
-      <h2 className="text-sm font-semibold text-gray-900 mb-3">2. Выберите видео</h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-semibold text-gray-900">2. Выберите видео</h2>
+        <button
+          type="button"
+          onClick={() => setModalOpen(true)}
+          className="flex items-center gap-1 text-xs font-medium text-brand hover:text-brand/80 rounded-md px-2 py-1 hover:bg-brand/5 transition-colors"
+          aria-label="Добавить новое видео"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+          Добавить
+        </button>
+      </div>
+      <AddVideoModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onCreated={(videoId) => {
+          onVideoCreated?.(videoId);
+        }}
+      />
       {loading ? (
         <div className="grid grid-cols-2 gap-2">
           {[1, 2, 3, 4].map((i) => (

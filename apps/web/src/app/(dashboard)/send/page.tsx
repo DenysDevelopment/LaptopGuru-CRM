@@ -97,6 +97,16 @@ export default function SendPage() {
     },
   });
 
+  async function refetchVideos() {
+    try {
+      const r = await fetch("/api/videos");
+      const d = r.ok ? await r.json() : [];
+      setVideos(Array.isArray(d) ? d : []);
+    } catch {
+      // ignore
+    }
+  }
+
   // Load data
   useEffect(() => {
     fetch("/api/emails?filter=new&page=1")
@@ -118,6 +128,15 @@ export default function SendPage() {
     fetch("/api/emails/sync", { method: "POST" }).catch(() => {});
     fetch("/api/videos/sync", { method: "POST" }).catch(() => {});
   }, []);
+
+  async function handleNewVideo(videoId: string, which: "email" | "allegro") {
+    await refetchVideos();
+    if (which === "email") {
+      emailForm.setValue("videoId", videoId, { shouldValidate: true });
+    } else {
+      allegroForm.setValue("videoId", videoId, { shouldValidate: true });
+    }
+  }
 
   const [selectedEmailId, setSelectedEmailId] = useState("");
   const [selectedVideoIdEmail, setSelectedVideoIdEmail] = useState("");
@@ -284,6 +303,7 @@ export default function SendPage() {
                           shouldValidate: true,
                         })
                       }
+                      onVideoCreated={(id) => handleNewVideo(id, "allegro")}
                     />
                     <FormMessage />
                   </FormItem>
@@ -374,6 +394,7 @@ export default function SendPage() {
                           shouldValidate: true,
                         })
                       }
+                      onVideoCreated={(id) => handleNewVideo(id, "email")}
                     />
                     <FormMessage />
                   </FormItem>

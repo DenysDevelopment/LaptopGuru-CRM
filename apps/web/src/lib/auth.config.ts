@@ -10,6 +10,7 @@ const PUBLIC_PREFIXES = [
   "/api/domain-check",
   "/l/",
   "/r/",
+  "/m/",
   "/_next",
   "/favicon",
 ];
@@ -20,6 +21,13 @@ const PUBLIC_PREFIXES = [
  * Matches `/api/landings/<slug>/track|click|video-events` with any slug value.
  */
 const PUBLIC_LANDING_API_RE = /^\/api\/landings\/[^/]+\/(track|click|video-events)$/;
+
+/**
+ * Mobile-upload public endpoints: everything under /api/videos/mobile-upload/<token>/*
+ * uses the token itself as the authz proof. `/init` (which creates a token) is
+ * excluded — that one requires a logged-in CRM user.
+ */
+const PUBLIC_MOBILE_UPLOAD_RE = /^\/api\/videos\/mobile-upload\/(?!init(?:$|\/))[^/]+/;
 
 export const authConfig: NextAuthConfig = {
   secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
@@ -38,6 +46,7 @@ export const authConfig: NextAuthConfig = {
       const isPublic =
         PUBLIC_PREFIXES.some((p) => pathname.startsWith(p)) ||
         PUBLIC_LANDING_API_RE.test(pathname) ||
+        PUBLIC_MOBILE_UPLOAD_RE.test(pathname) ||
         pathname === '/';
 
       if (isPublic) return true;
