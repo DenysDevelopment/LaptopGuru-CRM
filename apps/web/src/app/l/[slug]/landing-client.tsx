@@ -1435,29 +1435,53 @@ export function LandingClient({ landing, video }: Props) {
 			/>
 
 			<div className='flex-1 pb-28 '>
-				{/* Video — fixed 9:16 aspect, height = viewport minus sticky CTA.
-				    On desktop the inner 9:16 box sits centered with black letterbox
-				    on the sides; on mobile it fills the available width. */}
+				{/* Header — desktop only, orange gradient with logo */}
 				<div
-					className='relative flex w-full items-center justify-center overflow-hidden bg-black'
-					style={{ height: 'calc(100dvh - 5rem)' }}>
-					<div className='pointer-events-none absolute top-4 left-4 z-10 opacity-40'>
+					className='hidden md:block py-1 px-6 text-center header-shine'
+					style={{
+						background:
+							'linear-gradient(135deg, #fb7830 0%, #f59e0b 50%, #fb7830 100%)',
+						backgroundSize: '200% auto',
+					}}>
+					<Image
+						src='/LG_logo2.webp'
+						alt='Laptop Guru'
+						width={200}
+						height={72}
+						priority
+						className='mx-auto mb-1.5 w-auto'
+						style={{ height: 72, filter: 'brightness(0) invert(1)' }}
+					/>
+				</div>
+
+				{/* Video — fills viewport minus sticky CTA. Video element uses
+				    object-cover so it crops to fit the viewport aspect instead of
+				    showing letterbox bars. Mobile-only watermark sits in the
+				    middle (desktop has the header logo above instead). */}
+				<div
+					className='w-full flex items-center justify-center md:py-6'
+					style={
+						{
+							'--cta-h': 'calc(85px + env(safe-area-inset-bottom, 0px))',
+							'--header-h': '86px',
+						} as React.CSSProperties
+					}>
+				<div className='relative w-full md:w-auto md:aspect-[9/16] overflow-hidden bg-black h-[calc(100dvh-var(--cta-h))] md:h-[calc(100dvh-var(--cta-h)-var(--header-h)-3rem)] md:rounded-2xl md:shadow-[0_8px_32px_rgba(0,0,0,0.15)]'>
+					<div className='md:hidden pointer-events-none absolute inset-0 z-10 flex items-center justify-center opacity-15'>
 						<Image
 							src='/LG_logo2.webp'
-							alt='Laptop Guru'
-							width={120}
-							height={43}
+							alt=''
+							width={240}
+							height={86}
 							priority
 							unoptimized
-							className='w-auto'
+							className='w-1/2 max-w-[220px] h-auto'
 							style={{
-								height: 36,
 								filter:
-									'brightness(0) invert(1) drop-shadow(0 2px 4px rgba(0,0,0,0.6))',
+									'brightness(0) invert(1) drop-shadow(0 2px 6px rgba(0,0,0,0.7))',
 							}}
 						/>
 					</div>
-					<div className='relative h-full aspect-[9/16] max-w-full'>
 					{video.source === 'S3' && video.videoUrl ? (
 								<VideoPlayer
 									src={video.videoUrl}
@@ -1589,7 +1613,7 @@ export function LandingClient({ landing, video }: Props) {
 									className='absolute inset-0 w-full h-full'
 								/>
 							) : null}
-					</div>
+				</div>
 				</div>
 
 				{/* Benefits — 3 columns */}
@@ -1730,7 +1754,11 @@ export function LandingClient({ landing, video }: Props) {
 
 			{landing.productUrl && (
 				<div
-					className={`fixed bottom-0 inset-x-0 z-50 bg-white/95 backdrop-blur-md border-t border-gray-100 shadow-[0_-4px_24px_rgba(0,0,0,0.1)] ${showCta ? 'anim-slide-up' : 'opacity-0 translate-y-full'}`}>
+					className={`fixed bottom-0 inset-x-0 z-[100] bg-white/95 backdrop-blur-md border-t border-gray-100 shadow-[0_-4px_24px_rgba(0,0,0,0.1)] ${showCta ? 'anim-slide-up' : 'opacity-0 translate-y-full'}`}
+					style={{
+						paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+						willChange: 'transform',
+					}}>
 					<div className='max-w-3xl mx-auto px-4 py-3'>
 						<button
 							onClick={handleBuyClick}

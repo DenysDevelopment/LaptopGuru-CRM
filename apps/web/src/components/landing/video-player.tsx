@@ -223,7 +223,8 @@ function PlayerInstance({
 				disablePictureInPicture
 				disableRemotePlayback
 				preload='auto'
-				className='absolute inset-0 h-full w-full object-contain'
+				className='absolute inset-0 h-full w-full'
+				style={{ objectFit: 'cover' }}
 				onClick={handleTogglePlay}
 				onPlay={handlePlay}
 				onPause={handlePause}
