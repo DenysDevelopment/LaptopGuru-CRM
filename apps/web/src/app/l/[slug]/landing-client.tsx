@@ -1455,7 +1455,7 @@ export function LandingClient({ landing, video }: Props) {
 						alt='Laptop Guru'
 						width={200}
 						height={72}
-						priority
+						loading='lazy'
 						className='mx-auto mb-1.5 w-auto'
 						style={{ height: 72, filter: 'brightness(0) invert(1)' }}
 					/>
@@ -1481,7 +1481,7 @@ export function LandingClient({ landing, video }: Props) {
 								alt=''
 								width={120}
 								height={43}
-								priority
+								loading='lazy'
 								unoptimized
 								className='w-auto h-20'
 								style={{

@@ -35,7 +35,16 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  const origin = request.nextUrl.origin;
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const hostHeader = forwardedHost || request.headers.get("host") || "";
+  const forwardedProto = request.headers.get("x-forwarded-proto");
+  const proto = forwardedProto || (hostHeader.includes("localhost") ? "http" : "https");
+  const publicOrigin = hostHeader ? `${proto}://${hostHeader}` : "";
+  const envOrigin =
+    process.env.APP_URL && !process.env.APP_URL.includes("localhost")
+      ? process.env.APP_URL
+      : "";
+  const origin = envOrigin || publicOrigin || request.nextUrl.origin;
   const mobileUrl = `${origin}/m/${token}`;
 
   return NextResponse.json({
