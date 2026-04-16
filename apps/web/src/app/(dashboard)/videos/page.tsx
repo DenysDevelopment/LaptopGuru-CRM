@@ -8,6 +8,13 @@ import type { Video } from '@/types';
 import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+function formatFileSize(bytes: number): string {
+	const mb = bytes / (1024 * 1024);
+	if (mb < 1) return `${Math.round(mb * 1024)} KB`;
+	if (mb < 1024) return `${mb.toFixed(1)} MB`;
+	return `${(mb / 1024).toFixed(2)} GB`;
+}
+
 export default function VideosPage() {
 	const [videos, setVideos] = useState<Video[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -134,17 +141,13 @@ export default function VideosPage() {
 								{video.thumbnail &&
 								video.status !== 'UPLOADING' &&
 								video.status !== 'PROCESSING' ? (
-									video.thumbnail.includes('ytimg') ? (
-										<Image
-											src={video.thumbnail}
-											alt={video.title}
-											fill
-											className='object-cover'
-											sizes='(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw'
-										/>
-									) : (
-										<p>фото</p>
-									)
+									<Image
+										src={video.thumbnail}
+										alt={video.title}
+										fill
+										className='object-cover'
+										sizes='(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw'
+									/>
 								) : (
 									<div className='absolute inset-0 flex flex-col items-center justify-center text-gray-400'>
 										<svg
@@ -175,6 +178,11 @@ export default function VideosPage() {
 								{video.duration && (
 									<span className='absolute bottom-2 right-2 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded'>
 										{video.duration}
+									</span>
+								)}
+								{video.fileSize != null && video.fileSize > 0 && (
+									<span className='absolute bottom-2 left-2 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded'>
+										{formatFileSize(video.fileSize)}
 									</span>
 								)}
 							</div>

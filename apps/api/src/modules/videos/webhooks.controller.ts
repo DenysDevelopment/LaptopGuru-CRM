@@ -12,6 +12,7 @@ import { Queue } from 'bullmq';
 import { createHmac } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CloudFrontSignerService } from './cloudfront-signer.service';
+import { S3Service } from './s3.service';
 
 function formatDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600);
@@ -30,6 +31,7 @@ export class VideoWebhooksController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cfSigner: CloudFrontSignerService,
+    private readonly s3Service: S3Service,
     @InjectQueue('youtube-upload') private readonly youtubeUploadQueue: Queue,
   ) {}
 
@@ -99,6 +101,21 @@ export class VideoWebhooksController {
       const s3KeyThumb = `outputs/${video.companyId}/${video.id}/${inputBase}thumb.0000000.jpg`;
       const cloudFrontThumbUrl = this.cfSigner.getPublicThumbUrl(s3KeyThumb);
 
+      // Pull the transcoded MP4 size from S3 so the dashboard shows what
+      // customers actually download (the original fileSize was the source
+      // upload size). Non-fatal on failure — leave the old value in place.
+      let transcodedSize: bigint | null = null;
+      try {
+        const head = await this.s3Service.headObject(s3KeyOutput);
+        if (head.ContentLength) {
+          transcodedSize = BigInt(head.ContentLength);
+        }
+      } catch (err) {
+        this.logger.warn(
+          `Failed to read transcoded size for ${videoId}: ${err instanceof Error ? err.message : err}`,
+        );
+      }
+
       await this.prisma.video.update({
         where: { id: videoId },
         data: {
@@ -109,6 +126,7 @@ export class VideoWebhooksController {
           thumbnail: cloudFrontThumbUrl,
           durationSeconds,
           duration,
+          ...(transcodedSize !== null && { fileSize: transcodedSize }),
         },
       });
 

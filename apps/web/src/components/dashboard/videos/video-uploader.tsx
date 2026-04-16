@@ -5,6 +5,37 @@ import { VideoUploadModal } from './video-upload-modal';
 
 const MAX_BYTES = 2_147_483_648; // 2 GB
 
+// Landing pages render videos inside a fixed 9:16 frame; anything off-ratio
+// gets letterboxed or cropped, which looks bad. Reject on upload instead.
+const EXPECTED_ASPECT = 9 / 16; // 0.5625
+const ASPECT_TOLERANCE = 0.05; // accept roughly 0.51 – 0.61 (covers iPhone, Samsung, GoPro portrait)
+
+function readVideoDimensions(file: File): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.muted = true;
+    video.playsInline = true;
+    const cleanup = () => URL.revokeObjectURL(url);
+    video.onloadedmetadata = () => {
+      const width = video.videoWidth;
+      const height = video.videoHeight;
+      cleanup();
+      if (!width || !height) {
+        reject(new Error('Не удалось прочитать размеры видео'));
+        return;
+      }
+      resolve({ width, height });
+    };
+    video.onerror = () => {
+      cleanup();
+      reject(new Error('Не удалось прочитать метаданные видео'));
+    };
+    video.src = url;
+  });
+}
+
 interface Props {
   onUploadComplete: () => void;
 }
@@ -32,6 +63,21 @@ export function VideoUploader({ onUploadComplete }: Props) {
     }
     if (file.size > MAX_BYTES) {
       setError('Максимальный размер — 2 GB');
+      return;
+    }
+
+    // Verify portrait 9:16 aspect ratio before we waste time uploading.
+    try {
+      const { width, height } = await readVideoDimensions(file);
+      const aspect = width / height;
+      if (Math.abs(aspect - EXPECTED_ASPECT) > ASPECT_TOLERANCE) {
+        setError(
+          `Видео должно быть вертикальным (9:16). Загруженное: ${width}×${height}.`,
+        );
+        return;
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось проверить формат');
       return;
     }
 

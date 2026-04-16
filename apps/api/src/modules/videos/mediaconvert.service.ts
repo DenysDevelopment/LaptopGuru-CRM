@@ -79,24 +79,47 @@ export class MediaConvertService {
                   NameModifier: 'video',
                   ContainerSettings: {
                     Container: 'MP4',
-                    Mp4Settings: {},
+                    // MoovPlacement: PROGRESSIVE_DOWNLOAD puts the moov
+                    // atom at the start of the file instead of the end.
+                    // Browsers can then start playback after reading a few
+                    // hundred KB instead of having to buffer the whole MP4
+                    // before the first frame shows.
+                    Mp4Settings: { MoovPlacement: 'PROGRESSIVE_DOWNLOAD' },
                   },
                   VideoDescription: {
                     CodecSettings: {
                       Codec: 'H_264',
                       H264Settings: {
-                        // QVBR (Quality-defined Variable Bitrate) gives
-                        // noticeably better visual quality than CBR at the
-                        // same average bitrate by spending bits where the
-                        // scene needs them. Level 8 = "high quality" (recs:
-                        // 7 for web, 9 for broadcast). maxBitrate caps the
-                        // burst so files don't blow up on complex footage.
+                        // QVBR level 9 (max) with a 10 Mbps cap and 2-pass
+                        // HQ encoding — visibly cleaner on detail-heavy
+                        // footage where single-pass leaves blockiness.
                         RateControlMode: 'QVBR',
-                        QvbrSettings: { QvbrQualityLevel: 8 },
-                        MaxBitrate: 6_000_000,
-                        QualityTuningLevel: 'SINGLE_PASS_HQ',
+                        QvbrSettings: { QvbrQualityLevel: 9 },
+                        MaxBitrate: 10_000_000,
+                        QualityTuningLevel: 'MULTI_PASS_HQ',
                         CodecProfile: 'HIGH',
                         CodecLevel: 'AUTO',
+                        // Perceptual quality knobs. The three AQ modes tell
+                        // the encoder to spend more bits on regions where
+                        // artifacts are most visible (sharp edges, slow
+                        // motion, frame-to-frame flicker on static shots)
+                        // and fewer on flat/blurry areas — noticeably less
+                        // blockiness on MacBook lid textures, logos, skin.
+                        AdaptiveQuantization: 'HIGH',
+                        SpatialAdaptiveQuantization: 'ENABLED',
+                        TemporalAdaptiveQuantization: 'ENABLED',
+                        FlickerAdaptiveQuantization: 'ENABLED',
+                        // CABAC (arithmetic entropy coding) gives ~10-15%
+                        // better compression efficiency than CAVLC. It's
+                        // the default for HIGH profile but set explicitly
+                        // so future profile changes don't silently regress.
+                        EntropyEncoding: 'CABAC',
+                        // More reference frames + B-frames = better
+                        // compression efficiency at the cost of ~10%
+                        // encode time. Decoder support is universal on
+                        // anything from 2013+.
+                        NumberReferenceFrames: 4,
+                        NumberBFramesBetweenReferenceFrames: 3,
                       },
                     },
                     // No fixed Width/Height — preserve source aspect ratio so

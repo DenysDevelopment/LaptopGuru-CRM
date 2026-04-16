@@ -74,6 +74,7 @@ export interface Video {
   youtubeUploadStatus?: string | null;
   s3KeyOutput?: string | null;
   cloudFrontThumbUrl?: string | null;
+  fileSize?: number | null;
   createdAt?: string;
 }
 

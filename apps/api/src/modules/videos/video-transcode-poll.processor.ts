@@ -4,6 +4,7 @@ import { Job, Queue } from 'bullmq';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MediaConvertService } from './mediaconvert.service';
 import { CloudFrontSignerService } from './cloudfront-signer.service';
+import { S3Service } from './s3.service';
 
 function formatDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600);
@@ -28,6 +29,7 @@ export class VideoTranscodePollProcessor extends WorkerHost {
     private readonly prisma: PrismaService,
     private readonly mediaConvertService: MediaConvertService,
     private readonly cfSigner: CloudFrontSignerService,
+    private readonly s3Service: S3Service,
     @InjectQueue('youtube-upload') private readonly youtubeUploadQueue: Queue,
   ) {
     super();
@@ -55,6 +57,22 @@ export class VideoTranscodePollProcessor extends WorkerHost {
       const s3KeyThumb = `outputs/${video.companyId}/${video.id}/${inputBase}thumb.0000000.jpg`;
       const cloudFrontThumbUrl = this.cfSigner.getPublicThumbUrl(s3KeyThumb);
 
+      // Replace fileSize (originally set to the uploaded source size) with
+      // the transcoded MP4 size so the dashboard shows what customers
+      // actually download. Non-fatal if the head call fails — we fall back
+      // to the original source size.
+      let transcodedSize: bigint | null = null;
+      try {
+        const head = await this.s3Service.headObject(s3KeyOutput);
+        if (head.ContentLength) {
+          transcodedSize = BigInt(head.ContentLength);
+        }
+      } catch (err) {
+        this.logger.warn(
+          `Failed to read transcoded size for ${videoId}: ${err instanceof Error ? err.message : err}`,
+        );
+      }
+
       await this.prisma.video.update({
         where: { id: videoId },
         data: {
@@ -65,6 +83,7 @@ export class VideoTranscodePollProcessor extends WorkerHost {
           thumbnail: cloudFrontThumbUrl,
           durationSeconds,
           duration,
+          ...(transcodedSize !== null && { fileSize: transcodedSize }),
         },
       });
 
