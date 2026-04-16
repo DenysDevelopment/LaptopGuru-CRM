@@ -42,6 +42,7 @@ const t = {
 		benefit3Title: 'Najlepsza cena',
 		benefit3Desc: 'Gwarantujemy najkorzystniejszą ofertę',
 		ctaButton: 'Sprawdź ofertę',
+		ctaButtonAllegro: 'Sprawdź ofertę na Allegro',
 		ctaSub: 'Gwarancja 12 mies. · Darmowa dostawa · Zwrot 30 dni',
 		trustWarranty: 'Gwarancja 12 miesięcy',
 		trustDelivery: 'Darmowa dostawa pojutrze',
@@ -71,6 +72,7 @@ const t = {
 		benefit3Title: 'Найкраща ціна',
 		benefit3Desc: 'Гарантуємо найвигіднішу пропозицію',
 		ctaButton: 'Переглянути пропозицію',
+		ctaButtonAllegro: 'Переглянути пропозицію на Allegro',
 		ctaSub: 'Гарантія 12 міс. · Безкоштовна доставка · Повернення 30 днів',
 		trustWarranty: 'Гарантія 12 місяців',
 		trustDelivery: 'Безкоштовна доставка післязавтра',
@@ -100,6 +102,7 @@ const t = {
 		benefit3Title: 'Лучшая цена',
 		benefit3Desc: 'Гарантируем самое выгодное предложение',
 		ctaButton: 'Смотреть предложение',
+		ctaButtonAllegro: 'Смотреть предложение на Allegro',
 		ctaSub: 'Гарантия 12 мес. · Бесплатная доставка · Возврат 30 дней',
 		trustWarranty: 'Гарантия 12 месяцев',
 		trustDelivery: 'Бесплатная доставка послезавтра',
@@ -129,6 +132,7 @@ const t = {
 		benefit3Title: 'Best price',
 		benefit3Desc: 'We guarantee the most competitive offer',
 		ctaButton: 'View offer',
+		ctaButtonAllegro: 'View offer on Allegro',
 		ctaSub: '12-month warranty · Free delivery · 30-day returns',
 		trustWarranty: '12-month warranty',
 		trustDelivery: 'Free delivery tomorrow',
@@ -158,6 +162,7 @@ const t = {
 		benefit3Title: 'Geriausia kaina',
 		benefit3Desc: 'Garantuojame palankiausią pasiūlymą',
 		ctaButton: 'Peržiūrėti pasiūlymą',
+		ctaButtonAllegro: 'Peržiūrėti pasiūlymą Allegro',
 		ctaSub:
 			'12 mėn. garantija · Nemokamas pristatymas · Grąžinimas per 30 dienų',
 		trustWarranty: '12 mėnesių garantija',
@@ -188,6 +193,7 @@ const t = {
 		benefit3Title: 'Parim hind',
 		benefit3Desc: 'Garanteerime soodsaima pakkumise',
 		ctaButton: 'Vaata pakkumist',
+		ctaButtonAllegro: 'Vaata pakkumist Allegros',
 		ctaSub: '12 kuu garantii · Tasuta kohaletoimetamine · 30 päeva tagastus',
 		trustWarranty: '12 kuu garantii',
 		trustDelivery: 'Tasuta kohaletoimetamine ülehomme',
@@ -217,6 +223,7 @@ const t = {
 		benefit3Title: 'Labākā cena',
 		benefit3Desc: 'Garantējam visizdevīgāko piedāvājumu',
 		ctaButton: 'Skatīt piedāvājumu',
+		ctaButtonAllegro: 'Skatīt piedāvājumu Allegro',
 		ctaSub:
 			'12 mēnešu garantija · Bezmaksas piegāde · Atgriešana 30 dienu laikā',
 		trustWarranty: '12 mēnešu garantija',
@@ -1468,18 +1475,18 @@ export function LandingClient({ landing, video }: Props) {
 						} as React.CSSProperties
 					}>
 				<div className='relative w-full md:w-auto md:aspect-[9/16] overflow-hidden bg-black h-[calc(100dvh-var(--cta-h))] md:h-[calc(100dvh-var(--cta-h)-var(--header-h)-3rem)] md:rounded-2xl md:shadow-[0_8px_32px_rgba(0,0,0,0.15)]'>
-					<div className='md:hidden pointer-events-none absolute inset-0 z-10 flex items-center justify-center opacity-15'>
+					<div className='md:hidden pointer-events-none absolute top-3 left-3 z-10 opacity-50'>
 						<Image
 							src='/LG_logo2.webp'
 							alt=''
-							width={240}
-							height={86}
+							width={120}
+							height={43}
 							priority
 							unoptimized
-							className='w-1/2 max-w-[220px] h-auto'
+							className='w-auto h-10'
 							style={{
 								filter:
-									'brightness(0) invert(1) drop-shadow(0 2px 6px rgba(0,0,0,0.7))',
+									'brightness(0) invert(1) drop-shadow(0 2px 4px rgba(0,0,0,0.7))',
 							}}
 						/>
 					</div>
@@ -1767,9 +1774,7 @@ export function LandingClient({ landing, video }: Props) {
 							className='cursor-pointer group relative w-full bg-gradient-to-r from-[#fb7830] to-[#e56a25] hover:from-[#e56a25] hover:to-[#d45a15] text-white py-4 rounded-xl text-lg font-bold anim-border-glow hover:shadow-[0_6px_28px_rgba(251,120,48,0.5)] transition-all active:scale-[0.98] overflow-hidden'>
 							<span className='absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent' />
 							<span className='relative'>
-								{landing.type === 'allegro'
-									? 'Przejdź do oferty na Allegro'
-									: tr.ctaButton}
+								{landing.type === 'allegro' ? tr.ctaButtonAllegro : tr.ctaButton}
 							</span>
 						</button>
 					</div>
