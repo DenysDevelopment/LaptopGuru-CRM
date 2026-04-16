@@ -1434,10 +1434,10 @@ export function LandingClient({ landing, video }: Props) {
 				}}
 			/>
 
-			<div className='flex-1 pb-28'>
+			<div className='flex-1 pb-28 '>
 				{/* Header — email-style gradient */}
 				<div
-					className='py-4 px-6 text-center header-shine'
+					className='py-1 px-6 text-center header-shine'
 					style={{
 						background:
 							'linear-gradient(135deg, #fb7830 0%, #f59e0b 50%, #fb7830 100%)',
@@ -1457,13 +1457,13 @@ export function LandingClient({ landing, video }: Props) {
 				{/* Body */}
 				<div>
 					{/* Hero card */}
-					<div className='max-w-3xl mx-auto px-4 sm:px-6 mt-6 mb-6'>
+					<div className='max-w-3xl mx-auto px-4 sm:px-6 mt-2 mb-6'>
 						<div
 							data-animate
 							className='bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.08)] border border-gray-100 overflow-hidden'>
 							{/* Greeting */}
-							<div className='px-6 pt-6 pb-4'>
-								<p className='text-2xl sm:text-3xl font-bold text-[#222] leading-tight m-0 mb-3'>
+							<div className='px-6 pt-2'>
+								{/* <p className='text-2xl sm:text-3xl font-bold text-[#222] leading-tight m-0 mb-3'>
 									{tr.greeting}
 									{landing.customerName
 										? `, ${landing.customerName}`
@@ -1471,7 +1471,7 @@ export function LandingClient({ landing, video }: Props) {
 									<span className='inline-block animate-[wave_1.5s_ease-in-out_infinite]'>
 										&#128075;
 									</span>
-								</p>
+								</p> */}
 							</div>
 							{/* Intro text */}
 							<div data-animate data-animate-delay='2' className='px-6 pb-5'>
@@ -1490,144 +1490,149 @@ export function LandingClient({ landing, video }: Props) {
 									</div>
 								</div>
 							)}
-							{/* Video */}
-							<div data-animate className='px-4 sm:px-6 pb-4'>
-								<div className='relative aspect-[9/16] max-w-[360px] mx-auto rounded-xl overflow-hidden bg-gray-900 shadow-[0_4px_20px_rgba(0,0,0,0.15)]'>
-									{video.source === 'S3' && video.videoUrl ? (
-										<VideoPlayer
-											src={video.videoUrl}
-											poster={video.thumbnail}
-											productUrl={landing.productUrl}
-											buyButtonText={landing.buyButtonText || tr.ctaButton}
-											onPlay={() => {
-												videoPlayedRef.current = true;
-												if (!videoWatchStartRef.current)
-													videoWatchStartRef.current = Date.now();
-												// Track time to first play
-												if (firstPlayTimeRef.current == null) {
-													firstPlayTimeRef.current =
-														Date.now() - (startTimeRef.current ?? Date.now());
-												}
-												// Send PLAY event + flush any buffered heartbeats + update engagement
-												flushVideoEvents();
-												const pos = lastHeartbeatRef.current;
-												sendVideoEventNow({
-													clientEventId: crypto.randomUUID(),
-													eventType: 'PLAY',
-													position: pos,
-													clientTimestamp: new Date().toISOString(),
-												});
-												// Anchor heartbeat origin at the play position; the first real HEARTBEAT
-												// will fire after 1s of actual playback. No synthetic heartbeat here.
-												lastSentHeartbeatPos.current = pos;
-												sendUpdate({ videoPlayed: true });
-											}}
-											onPause={() => {
-												if (videoWatchStartRef.current) {
-													videoWatchAccumRef.current += Math.round(
-														(Date.now() - videoWatchStartRef.current) / 1000,
-													);
-													videoWatchStartRef.current = null;
-												}
-												// Flush heartbeats + send PAUSE + update engagement
-												flushVideoEvents();
-												sendVideoEventNow({
-													clientEventId: crypto.randomUUID(),
-													eventType: 'PAUSE',
-													position: lastHeartbeatRef.current,
-													clientTimestamp: new Date().toISOString(),
-												});
-												sendUpdate({
-													videoPlayed: true,
-													videoWatchTime: videoWatchAccumRef.current,
-												});
-											}}
-											onEnded={() => {
-												videoCompletedRef.current = true;
-												if (videoWatchStartRef.current) {
-													videoWatchAccumRef.current += Math.round(
-														(Date.now() - videoWatchStartRef.current) / 1000,
-													);
-													videoWatchStartRef.current = null;
-												}
-												// Flush heartbeats + send ENDED + update engagement
-												flushVideoEvents();
-												sendVideoEventNow({
-													clientEventId: crypto.randomUUID(),
-													eventType: 'ENDED',
-													position: lastHeartbeatRef.current,
-													clientTimestamp: new Date().toISOString(),
-												});
-												sendUpdate({
-													videoPlayed: true,
-													videoWatchTime: videoWatchAccumRef.current,
-													videoCompleted: true,
-												});
-											}}
-											onTimeUpdate={currentTime => {
-												lastHeartbeatRef.current = currentTime;
-												// Buffer HEARTBEAT every 1 second of playback for second-level
-												// position tracking. Plyr fires onTimeUpdate ~4x/sec, so we gate
-												// on video currentTime advancing at least 1s since the last send.
-												if (currentTime - lastSentHeartbeatPos.current >= 1) {
-													lastSentHeartbeatPos.current = currentTime;
-													videoEventsBuffer.current.push({
-														clientEventId: crypto.randomUUID(),
-														eventType: 'HEARTBEAT',
-														position: currentTime,
-														clientTimestamp: new Date().toISOString(),
-													});
-												}
-												// Flush every 10 buffered heartbeats (≈10s) to stay well under the
-												// 60 requests/min per-visit rate limit while keeping data fresh.
-												if (videoEventsBuffer.current.length >= 10)
-													flushVideoEvents();
-											}}
-											onSeeked={(seekFrom, seekTo) => {
-												// Flush heartbeats + send SEEK. Do NOT push a synthetic HEARTBEAT —
-												// a real one will come once playback has advanced 1s past seekTo.
-												flushVideoEvents();
-												lastHeartbeatRef.current = seekTo;
-												lastSentHeartbeatPos.current = seekTo;
-												sendVideoEventNow({
-													clientEventId: crypto.randomUUID(),
-													eventType: 'SEEK',
-													position: seekTo,
-													seekFrom,
-													seekTo,
-													clientTimestamp: new Date().toISOString(),
-												});
-											}}
-											onBufferStart={() => {
-												bufferStartRef.current = Date.now();
-												bufferCountRef.current++;
-												sendVideoEventNow({
-													clientEventId: crypto.randomUUID(),
-													eventType: 'BUFFERING',
-													position: lastHeartbeatRef.current,
-													clientTimestamp: new Date().toISOString(),
-												});
-											}}
-											onBufferEnd={() => {
-												if (bufferStartRef.current) {
-													bufferTotalMsRef.current +=
-														Date.now() - bufferStartRef.current;
-													bufferStartRef.current = null;
-												}
-											}}
-										/>
-									) : video.youtubeId ? (
-										<iframe
-											id='yt-player'
-											src={`https://www.youtube.com/embed/${video.youtubeId}?rel=0&enablejsapi=1`}
-											title={video.title}
-											allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
-											allowFullScreen
-											className='absolute inset-0 w-full h-full'
-										/>
-									) : null}
-								</div>
-							</div>
+						</div>
+					</div>
+
+					{/* Video */}
+					<div data-animate className='px-4 sm:px-6 mt-2 pb-4'>
+						<div className='relative aspect-[9/16] max-w-[360px] mx-auto rounded-xl overflow-hidden bg-gray-900 shadow-[0_4px_20px_rgba(0,0,0,0.15)]'>
+							{video.source === 'S3' && video.videoUrl ? (
+								<VideoPlayer
+									src={video.videoUrl}
+									poster={video.thumbnail}
+									productUrl={landing.productUrl}
+									buyButtonText={
+										landing.type === 'allegro'
+											? 'Przejdź do oferty na Allegro'
+											: tr.ctaButton
+									}
+									onPlay={() => {
+										videoPlayedRef.current = true;
+										if (!videoWatchStartRef.current)
+											videoWatchStartRef.current = Date.now();
+										// Track time to first play
+										if (firstPlayTimeRef.current == null) {
+											firstPlayTimeRef.current =
+												Date.now() - (startTimeRef.current ?? Date.now());
+										}
+										// Send PLAY event + flush any buffered heartbeats + update engagement
+										flushVideoEvents();
+										const pos = lastHeartbeatRef.current;
+										sendVideoEventNow({
+											clientEventId: crypto.randomUUID(),
+											eventType: 'PLAY',
+											position: pos,
+											clientTimestamp: new Date().toISOString(),
+										});
+										// Anchor heartbeat origin at the play position; the first real HEARTBEAT
+										// will fire after 1s of actual playback. No synthetic heartbeat here.
+										lastSentHeartbeatPos.current = pos;
+										sendUpdate({ videoPlayed: true });
+									}}
+									onPause={() => {
+										if (videoWatchStartRef.current) {
+											videoWatchAccumRef.current += Math.round(
+												(Date.now() - videoWatchStartRef.current) / 1000,
+											);
+											videoWatchStartRef.current = null;
+										}
+										// Flush heartbeats + send PAUSE + update engagement
+										flushVideoEvents();
+										sendVideoEventNow({
+											clientEventId: crypto.randomUUID(),
+											eventType: 'PAUSE',
+											position: lastHeartbeatRef.current,
+											clientTimestamp: new Date().toISOString(),
+										});
+										sendUpdate({
+											videoPlayed: true,
+											videoWatchTime: videoWatchAccumRef.current,
+										});
+									}}
+									onEnded={() => {
+										videoCompletedRef.current = true;
+										if (videoWatchStartRef.current) {
+											videoWatchAccumRef.current += Math.round(
+												(Date.now() - videoWatchStartRef.current) / 1000,
+											);
+											videoWatchStartRef.current = null;
+										}
+										// Flush heartbeats + send ENDED + update engagement
+										flushVideoEvents();
+										sendVideoEventNow({
+											clientEventId: crypto.randomUUID(),
+											eventType: 'ENDED',
+											position: lastHeartbeatRef.current,
+											clientTimestamp: new Date().toISOString(),
+										});
+										sendUpdate({
+											videoPlayed: true,
+											videoWatchTime: videoWatchAccumRef.current,
+											videoCompleted: true,
+										});
+									}}
+									onTimeUpdate={currentTime => {
+										lastHeartbeatRef.current = currentTime;
+										// Buffer HEARTBEAT every 1 second of playback for second-level
+										// position tracking. Plyr fires onTimeUpdate ~4x/sec, so we gate
+										// on video currentTime advancing at least 1s since the last send.
+										if (currentTime - lastSentHeartbeatPos.current >= 1) {
+											lastSentHeartbeatPos.current = currentTime;
+											videoEventsBuffer.current.push({
+												clientEventId: crypto.randomUUID(),
+												eventType: 'HEARTBEAT',
+												position: currentTime,
+												clientTimestamp: new Date().toISOString(),
+											});
+										}
+										// Flush every 10 buffered heartbeats (≈10s) to stay well under the
+										// 60 requests/min per-visit rate limit while keeping data fresh.
+										if (videoEventsBuffer.current.length >= 10)
+											flushVideoEvents();
+									}}
+									onSeeked={(seekFrom, seekTo) => {
+										// Flush heartbeats + send SEEK. Do NOT push a synthetic HEARTBEAT —
+										// a real one will come once playback has advanced 1s past seekTo.
+										flushVideoEvents();
+										lastHeartbeatRef.current = seekTo;
+										lastSentHeartbeatPos.current = seekTo;
+										sendVideoEventNow({
+											clientEventId: crypto.randomUUID(),
+											eventType: 'SEEK',
+											position: seekTo,
+											seekFrom,
+											seekTo,
+											clientTimestamp: new Date().toISOString(),
+										});
+									}}
+									onBufferStart={() => {
+										bufferStartRef.current = Date.now();
+										bufferCountRef.current++;
+										sendVideoEventNow({
+											clientEventId: crypto.randomUUID(),
+											eventType: 'BUFFERING',
+											position: lastHeartbeatRef.current,
+											clientTimestamp: new Date().toISOString(),
+										});
+									}}
+									onBufferEnd={() => {
+										if (bufferStartRef.current) {
+											bufferTotalMsRef.current +=
+												Date.now() - bufferStartRef.current;
+											bufferStartRef.current = null;
+										}
+									}}
+								/>
+							) : video.youtubeId ? (
+								<iframe
+									id='yt-player'
+									src={`https://www.youtube.com/embed/${video.youtubeId}?rel=0&enablejsapi=1`}
+									title={video.title}
+									allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
+									allowFullScreen
+									className='absolute inset-0 w-full h-full'
+								/>
+							) : null}
 						</div>
 					</div>
 
@@ -1774,6 +1779,7 @@ export function LandingClient({ landing, video }: Props) {
 					<div className='max-w-3xl mx-auto px-4 py-3'>
 						<button
 							onClick={handleBuyClick}
+							style={{ backgroundColor: '#fb7830' }}
 							className='cursor-pointer group relative w-full bg-gradient-to-r from-[#fb7830] to-[#e56a25] hover:from-[#e56a25] hover:to-[#d45a15] text-white py-4 rounded-xl text-lg font-bold anim-border-glow hover:shadow-[0_6px_28px_rgba(251,120,48,0.5)] transition-all active:scale-[0.98] overflow-hidden'>
 							<span className='absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent' />
 							<span className='relative'>

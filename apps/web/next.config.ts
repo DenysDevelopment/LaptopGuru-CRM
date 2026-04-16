@@ -8,6 +8,8 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_BUILD_VERSION: buildVersion,
   },
   output: "standalone",
+  // Hide the floating "N" Dev Tools indicator (only visible in `next dev`).
+  devIndicators: false,
   // React Compiler is incompatible with react-hook-form's watch/Controller pattern.
   // Disable it to avoid stale onChange handlers breaking form inputs.
   reactCompiler: false,

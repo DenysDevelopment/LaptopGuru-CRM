@@ -4,6 +4,12 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Prevent Android Chrome / Samsung Internet "Force Dark" from inverting
+   gradients and white text (causes invisible buttons on landing pages). */
+html {
+	color-scheme: light;
+}
+
 @theme {
 	--color-brand: #fb7830;
 	--color-brand-hover: #e56a25;
@@ -26,26 +32,26 @@
 	animation: slide-up 0.3s ease-out;
 }
 
-/* @videojs/react skin: honor our object-fit var in fullscreen too.
-   The default skin.css hardcodes object-fit: contain on :fullscreen,
-   ignoring the --media-object-fit variable. */
-.media-default-skin:fullscreen video,
-.media-default-skin:fullscreen ::slotted(video),
-.media-default-skin:fullscreen > img,
-.media-default-skin:fullscreen media-poster img,
-.media-default-skin:fullscreen media-poster ::slotted(img) {
-	/* object-fit: var(--media-object-fit, cover); */
+/* Pseudo-fullscreen: covers the viewport without triggering iOS native
+   player, so our React overlays (buy CTA, custom controls) remain rendered.
+   iPhone Safari gives the native player on Fullscreen API for <video>, so
+   we avoid it entirely and fake a fullscreen with fixed positioning. */
+.video-pseudo-fs {
+	position: fixed !important;
+	inset: 0 !important;
+	z-index: 9999 !important;
+	background: #000;
+	border-radius: 0 !important;
+	max-width: none !important;
+	aspect-ratio: auto !important;
 }
-
-/* @videojs/react skin: hide controls we don't want on the landing page.
-   Keep only play, time/progress, fullscreen. */
-.media-default-skin .media-button--seek,
-.media-default-skin .media-button--playback-rate,
-.media-default-skin .media-button--mute,
-.media-default-skin .media-popover--volume,
-.media-default-skin .media-button--pip,
-.media-default-skin .media-button--captions {
-	display: none !important;
+.video-pseudo-fs video {
+	object-fit: cover !important;
+	width: 100% !important;
+	height: 100% !important;
+}
+body:has(.video-pseudo-fs) {
+	overflow: hidden;
 }
 
 @theme inline {
