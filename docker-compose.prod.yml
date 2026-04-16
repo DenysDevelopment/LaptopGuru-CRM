@@ -1,72 +1,44 @@
-# Production overlay — blue/green for the web app so deploys are
-# zero-downtime. Caddy load-balances between app-blue and app-green using
-# health checks (see Caddyfile.prod). The CI deploy script restarts one
-# replica at a time and waits for it to report healthy before touching
-# the other one, so there is always at least one healthy instance.
-
-x-app-base: &app-base
-  image: ghcr.io/denysdevelopment/laptopguru-crm:latest
-  build: !reset null
-  restart: always
-  volumes:
-    - uploads:/app/public/uploads
-  environment:
-    - DATABASE_URL=${DATABASE_URL}
-    - AUTH_SECRET=${AUTH_SECRET}
-    - AUTH_URL=${AUTH_URL}
-    - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-    - NEXTAUTH_URL=${NEXTAUTH_URL}
-    - IMAP_HOST=${IMAP_HOST}
-    - IMAP_PORT=${IMAP_PORT}
-    - IMAP_USER=${IMAP_USER}
-    - IMAP_PASSWORD=${IMAP_PASSWORD}
-    - SMTP_HOST=${SMTP_HOST}
-    - SMTP_PORT=${SMTP_PORT}
-    - SMTP_USER=${SMTP_USER}
-    - SMTP_PASSWORD=${SMTP_PASSWORD}
-    - SMTP_FROM=${SMTP_FROM}
-    - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
-    - YOUTUBE_CHANNEL_HANDLE=${YOUTUBE_CHANNEL_HANDLE}
-    - APP_URL=${APP_URL}
-    - INVITE_CODE=${INVITE_CODE}
-    - HOSTNAME=0.0.0.0
-    - JWT_SECRET=${JWT_SECRET}
-    - DOMAIN=${DOMAIN}
-    - AWS_REGION=${AWS_REGION}
-    - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-    - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-    - AWS_S3_VIDEO_BUCKET=${AWS_S3_VIDEO_BUCKET}
-    - AWS_CLOUDFRONT_DOMAIN=${AWS_CLOUDFRONT_DOMAIN}
-    - AWS_CLOUDFRONT_DISTRIBUTION_ID=${AWS_CLOUDFRONT_DISTRIBUTION_ID}
-    - AWS_CLOUDFRONT_KEY_PAIR_ID=${AWS_CLOUDFRONT_KEY_PAIR_ID}
-    - AWS_CLOUDFRONT_PRIVATE_KEY_BASE64=${AWS_CLOUDFRONT_PRIVATE_KEY_BASE64}
-    - CLOUDFRONT_SIGNED_URL_TTL_SECONDS=${CLOUDFRONT_SIGNED_URL_TTL_SECONDS}
-    - VIDEO_UPLOAD_MAX_BYTES=${VIDEO_UPLOAD_MAX_BYTES}
-    - VIDEO_PRESIGN_TTL_SECONDS=${VIDEO_PRESIGN_TTL_SECONDS}
-    - VIDEO_MIN_WATCH_FOR_VIEW_SECONDS=${VIDEO_MIN_WATCH_FOR_VIEW_SECONDS}
-  healthcheck:
-    test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
-    interval: 10s
-    timeout: 5s
-    start_period: 60s
-    retries: 5
-  depends_on:
-    db:
-      condition: service_healthy
-    api:
-      condition: service_healthy
-
 services:
-  # Disable the single-instance app from the base compose; prod uses
-  # blue/green pair instead.
-  app: !reset null
-
-  app-blue:
-    <<: *app-base
-
-  app-green:
-    <<: *app-base
-
+  app:
+    image: ghcr.io/denysdevelopment/laptopguru-crm:latest
+    build: !reset null
+    restart: always
+    volumes:
+      - uploads:/app/public/uploads
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - AUTH_SECRET=${AUTH_SECRET}
+      - AUTH_URL=${AUTH_URL}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - IMAP_HOST=${IMAP_HOST}
+      - IMAP_PORT=${IMAP_PORT}
+      - IMAP_USER=${IMAP_USER}
+      - IMAP_PASSWORD=${IMAP_PASSWORD}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_FROM=${SMTP_FROM}
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
+      - YOUTUBE_CHANNEL_HANDLE=${YOUTUBE_CHANNEL_HANDLE}
+      - APP_URL=${APP_URL}
+      - INVITE_CODE=${INVITE_CODE}
+      - HOSTNAME=0.0.0.0
+      - JWT_SECRET=${JWT_SECRET}
+      - DOMAIN=${DOMAIN}
+      - AWS_REGION=${AWS_REGION}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_S3_VIDEO_BUCKET=${AWS_S3_VIDEO_BUCKET}
+      - AWS_CLOUDFRONT_DOMAIN=${AWS_CLOUDFRONT_DOMAIN}
+      - AWS_CLOUDFRONT_DISTRIBUTION_ID=${AWS_CLOUDFRONT_DISTRIBUTION_ID}
+      - AWS_CLOUDFRONT_KEY_PAIR_ID=${AWS_CLOUDFRONT_KEY_PAIR_ID}
+      - AWS_CLOUDFRONT_PRIVATE_KEY_BASE64=${AWS_CLOUDFRONT_PRIVATE_KEY_BASE64}
+      - CLOUDFRONT_SIGNED_URL_TTL_SECONDS=${CLOUDFRONT_SIGNED_URL_TTL_SECONDS}
+      - VIDEO_UPLOAD_MAX_BYTES=${VIDEO_UPLOAD_MAX_BYTES}
+      - VIDEO_PRESIGN_TTL_SECONDS=${VIDEO_PRESIGN_TTL_SECONDS}
+      - VIDEO_MIN_WATCH_FOR_VIEW_SECONDS=${VIDEO_MIN_WATCH_FOR_VIEW_SECONDS}
   api:
     image: ghcr.io/denysdevelopment/laptopguru-crm-api:latest
     build: !reset null
@@ -99,17 +71,5 @@ services:
       - YOUTUBE_OAUTH_CLIENT_SECRET=${YOUTUBE_OAUTH_CLIENT_SECRET}
       - YOUTUBE_OAUTH_REFRESH_TOKEN=${YOUTUBE_OAUTH_REFRESH_TOKEN}
       - YOUTUBE_DEFAULT_PRIVACY_STATUS=${YOUTUBE_DEFAULT_PRIVACY_STATUS}
-
-  caddy:
-    # Use the prod Caddyfile that knows about app-blue/app-green and does
-    # health-checked load-balancing.
-    volumes: !override
-      - ./Caddyfile.prod:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on: !override
-      - app-blue
-      - app-green
-
 volumes:
   uploads:

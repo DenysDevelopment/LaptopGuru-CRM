@@ -116,6 +116,9 @@ jobs:
     needs: build-and-push
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
 
     steps:
       - uses: actions/checkout@v5
@@ -126,73 +129,50 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          source: "docker-compose.yml,docker-compose.prod.yml,Caddyfile,Caddyfile.prod"
+          source: "docker-compose.yml,docker-compose.prod.yml,Caddyfile"
           target: ${{ secrets.VPS_DEPLOY_PATH }}
 
-      - name: Deploy (zero-downtime blue/green)
+      - name: Deploy
         uses: appleboy/ssh-action@v1
+        env:
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          command_timeout: 15m
+          envs: GHCR_USERNAME,GHCR_TOKEN
           script: |
             set -e
             cd ${{ secrets.VPS_DEPLOY_PATH }}
             COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
 
-            # Login and pull new images
-            echo ${{ secrets.GHCR_TOKEN }} | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
+            # Sanitize ~/.docker/config.json: a previously copied Docker Desktop
+            # config can contain credsStore:"desktop" / currentContext pointing
+            # at desktop-linux. On a headless Linux VPS the docker-credential-
+            # desktop helper doesn't exist, so "docker login" silently stores
+            # nothing and "docker pull" gets "denied: denied" on private images.
+            # Reset to a minimal config so creds land in plain auths.
+            mkdir -p "$HOME/.docker"
+            printf '%s\n' '{"auths":{}}' > "$HOME/.docker/config.json"
+
+            # Login with the job-scoped GITHUB_TOKEN (packages:read) — same
+            # mechanism the build-and-push job already uses to push. No PAT.
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
             docker pull ghcr.io/denysdevelopment/laptopguru-crm:latest
             docker pull ghcr.io/denysdevelopment/laptopguru-crm-api:latest
 
-            # Bring up everything that's not yet running (db, redis, caddy,
-            # both app replicas, api). On the very first run after the
-            # blue/green migration this creates app-blue and app-green from
-            # scratch; on subsequent runs it's a no-op for unchanged services.
-            $COMPOSE up -d --no-build
-
-            # Reload Caddy with the (possibly updated) Caddyfile.prod so it
-            # picks up any LB/health-check changes without dropping connections.
-            $COMPOSE exec -T caddy caddy reload --config /etc/caddy/Caddyfile || \
-              $COMPOSE up -d --no-deps --force-recreate caddy
-
-            # --- Rolling restart of the web app, one replica at a time ---
-            wait_healthy() {
-              local svc="$1"
-              local cid
-              cid=$($COMPOSE ps -q "$svc")
-              if [ -z "$cid" ]; then
-                echo "ERROR: no container for $svc"
-                return 1
-              fi
-              echo "Waiting for $svc ($cid) to become healthy..."
-              for i in $(seq 1 60); do
-                status=$(docker inspect -f '{{.State.Health.Status}}' "$cid" 2>/dev/null || echo "missing")
-                if [ "$status" = "healthy" ]; then
-                  echo "$svc is healthy"
-                  return 0
-                fi
-                sleep 3
-              done
-              echo "ERROR: $svc did not become healthy in time"
-              docker logs --tail=80 "$cid" || true
-              return 1
-            }
-
-            for replica in app-blue app-green; do
-              echo "=== Rolling: $replica ==="
-              $COMPOSE up -d --no-deps --force-recreate --no-build "$replica"
-              wait_healthy "$replica"
-            done
-
-            # API is single-instance — short restart is acceptable for the backend.
-            $COMPOSE up -d --no-deps --force-recreate --no-build api
+            # Stop and recreate app + api with new images, keep db/redis/caddy
+            # running. --remove-orphans on the full "up -d" below cleans up
+            # legacy app-blue / app-green containers left over from the
+            # short-lived blue/green attempt.
+            $COMPOSE up -d --force-recreate --no-build app api
+            $COMPOSE up -d --remove-orphans
 
             # Clean up old images
             docker image prune -f
 
-            # Final health check (Caddy → load-balanced upstreams)
-            sleep 5
+            # Health check
+            sleep 20
             curl -sf http://localhost:4000/api/health || echo "WARNING: API health check failed"
-            curl -sf http://localhost/api/health -H "Host: ${{ secrets.DOMAIN || 'localhost' }}" || echo "WARNING: App health check via Caddy failed"
+            curl -sf http://localhost:3000/api/health || echo "WARNING: App health check failed"
