@@ -1459,10 +1459,11 @@ export function LandingClient({ landing, video }: Props) {
 				    showing letterbox bars. Mobile-only watermark sits in the
 				    middle (desktop has the header logo above instead). */}
 				<div
-					className='w-full flex items-center justify-center md:py-6'
+					className='w-full flex items-center justify-center md:py-6 mb-6'
 					style={
 						{
-							'--cta-h': 'calc(85px + env(safe-area-inset-bottom, 0px))',
+							'--cta-h':
+								'calc(85px + max(env(safe-area-inset-bottom, 0px), 12px))',
 							'--header-h': '86px',
 						} as React.CSSProperties
 					}>
@@ -1756,7 +1757,7 @@ export function LandingClient({ landing, video }: Props) {
 				<div
 					className={`fixed bottom-0 inset-x-0 z-[100] bg-white/95 backdrop-blur-md border-t border-gray-100 shadow-[0_-4px_24px_rgba(0,0,0,0.1)] ${showCta ? 'anim-slide-up' : 'opacity-0 translate-y-full'}`}
 					style={{
-						paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+						paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 12px)',
 						willChange: 'transform',
 					}}>
 					<div className='max-w-3xl mx-auto px-4 py-3'>
