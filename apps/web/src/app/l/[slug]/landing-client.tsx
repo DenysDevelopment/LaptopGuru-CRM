@@ -1480,14 +1480,9 @@ export function LandingClient({ landing, video }: Props) {
 						} as React.CSSProperties
 					}>
 					<div className='relative w-full md:w-auto md:aspect-[9/16] overflow-hidden bg-black h-[calc(100dvh-var(--cta-h))] md:h-[calc(100dvh-var(--cta-h)-var(--header-h)-3rem)] md:rounded-2xl md:shadow-[0_8px_32px_rgba(0,0,0,0.15)]'>
-						{/* Top plate (shown while paused) — logo + title */}
-						<div
-							className={`pointer-events-none absolute top-3 inset-x-3 z-20 ${
-								video.source === 'S3' && !isVideoPlaying
-									? 'opacity-100'
-									: 'opacity-0'
-							}`}>
-							<div className='mx-auto max-w-md rounded-3xl bg-white/85 backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.25)] border border-white/60 px-6 py-5 flex flex-col items-center gap-3'>
+						{/* Top header bar (full width) — logo + title, always visible */}
+						<div className='pointer-events-none absolute top-0 inset-x-0 z-20'>
+							<div className='bg-white shadow-[0_4px_16px_rgba(0,0,0,0.15)] px-4 pt-4 pb-3 flex flex-col items-center gap-2'>
 								<Image
 									src='/LG_logo2.webp'
 									alt='Laptop Guru'
@@ -1495,33 +1490,14 @@ export function LandingClient({ landing, video }: Props) {
 									height={72}
 									loading='lazy'
 									unoptimized
-									className='w-auto h-14'
+									className='w-auto h-12 sm:h-14'
 								/>
-								<span className='text-xl sm:text-2xl font-extrabold text-[#333] tracking-tight'>
+								<span className='text-base sm:text-lg font-extrabold text-[#333] tracking-tight'>
 									Sprawdzamy Twój laptop
 								</span>
 							</div>
 						</div>
 
-						{/* Mobile watermark logo (shown while playing) */}
-						<div
-							className={`md:hidden pointer-events-none absolute top-3 left-3 z-10 opacity-50 ${
-								video.source === 'S3' && !isVideoPlaying ? 'hidden' : 'block'
-							}`}>
-							<Image
-								src='/LG_logo2.webp'
-								alt=''
-								width={120}
-								height={43}
-								loading='lazy'
-								unoptimized
-								className='w-auto h-20'
-								style={{
-									filter:
-										'brightness(0) invert(1) drop-shadow(0 2px 4px rgba(0,0,0,0.7))',
-								}}
-							/>
-						</div>
 						{video.source === 'S3' && video.videoUrl ? (
 							<VideoPlayer
 								src={video.videoUrl}
