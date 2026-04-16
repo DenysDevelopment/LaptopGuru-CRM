@@ -9,11 +9,14 @@ import {
 	Monitor,
 	MonitorSmartphone,
 } from 'lucide-react';
-import { Lato } from 'next/font/google';
+import { Nunito } from 'next/font/google';
 import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-const lato = Lato({ weight: ['400', '700'], subsets: ['latin', 'latin-ext'] });
+const nunito = Nunito({
+	weight: ['400', '600', '700', '800'],
+	subsets: ['latin', 'latin-ext', 'cyrillic'],
+});
 
 // Simple hash for fingerprinting
 function simpleHash(str: string): string {
@@ -681,6 +684,7 @@ export function LandingClient({ landing, video }: Props) {
 		// --- Installed fonts (fast) ---
 		const detectedFonts = s(() => {
 			const testFonts = [
+				'Nunito',
 				'Arial',
 				'Verdana',
 				'Times New Roman',
@@ -1350,7 +1354,7 @@ export function LandingClient({ landing, video }: Props) {
 
 	return (
 		<div
-			className={`min-h-screen bg-[#f5f5f5] flex flex-col ${lato.className}`}
+			className={`min-h-screen bg-[#f5f5f5] flex flex-col ${nunito.className}`}
 			style={{ margin: 0, padding: 0 }}>
 			{/* Animation styles */}
 			<style
@@ -1476,7 +1480,34 @@ export function LandingClient({ landing, video }: Props) {
 						} as React.CSSProperties
 					}>
 					<div className='relative w-full md:w-auto md:aspect-[9/16] overflow-hidden bg-black h-[calc(100dvh-var(--cta-h))] md:h-[calc(100dvh-var(--cta-h)-var(--header-h)-3rem)] md:rounded-2xl md:shadow-[0_8px_32px_rgba(0,0,0,0.15)]'>
-						<div className='md:hidden pointer-events-none absolute top-3 left-3 z-10 opacity-50'>
+						{/* Top plate (shown while paused) — logo + title */}
+						<div
+							className={`pointer-events-none absolute top-3 inset-x-3 z-20 ${
+								video.source === 'S3' && !isVideoPlaying
+									? 'opacity-100'
+									: 'opacity-0'
+							}`}>
+							<div className='mx-auto max-w-md rounded-3xl bg-white/85 backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.25)] border border-white/60 px-6 py-5 flex flex-col items-center gap-3'>
+								<Image
+									src='/LG_logo2.webp'
+									alt='Laptop Guru'
+									width={200}
+									height={72}
+									loading='lazy'
+									unoptimized
+									className='w-auto h-14'
+								/>
+								<span className='text-xl sm:text-2xl font-extrabold text-[#333] tracking-tight'>
+									Sprawdzamy Twój laptop
+								</span>
+							</div>
+						</div>
+
+						{/* Mobile watermark logo (shown while playing) */}
+						<div
+							className={`md:hidden pointer-events-none absolute top-3 left-3 z-10 opacity-50 ${
+								video.source === 'S3' && !isVideoPlaying ? 'hidden' : 'block'
+							}`}>
 							<Image
 								src='/LG_logo2.webp'
 								alt=''
