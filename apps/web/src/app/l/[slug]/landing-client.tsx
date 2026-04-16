@@ -1454,45 +1454,6 @@ export function LandingClient({ landing, video }: Props) {
 					/>
 				</div>
 
-				{/* Body */}
-				<div>
-					{/* Hero card */}
-					<div className='max-w-3xl mx-auto px-4 sm:px-6 mt-2 mb-6'>
-						<div
-							data-animate
-							className='bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.08)] border border-gray-100 overflow-hidden'>
-							{/* Greeting */}
-							<div className='px-6 pt-2'>
-								{/* <p className='text-2xl sm:text-3xl font-bold text-[#222] leading-tight m-0 mb-3'>
-									{tr.greeting}
-									{landing.customerName
-										? `, ${landing.customerName}`
-										: ''}!{' '}
-									<span className='inline-block animate-[wave_1.5s_ease-in-out_infinite]'>
-										&#128075;
-									</span>
-								</p> */}
-							</div>
-							{/* Intro text */}
-							<div data-animate data-animate-delay='2' className='px-6 pb-5'>
-								<p className='text-[15px] text-[#555] leading-relaxed m-0'>
-									{tr.intro}
-								</p>
-							</div>
-							{/* Personal note */}
-							{landing.personalNote && (
-								<div data-animate className='px-6 pb-5'>
-									<div className='flex gap-3 items-start bg-[#f8f5f1] rounded-xl p-4'>
-										<span className='text-xl flex-shrink-0'>💬</span>
-										<p className='text-[14px] text-[#555] leading-relaxed italic m-0'>
-											{landing.personalNote}
-										</p>
-									</div>
-								</div>
-							)}
-						</div>
-					</div>
-
 					{/* Video */}
 					<div data-animate className='px-4 sm:px-6 mt-2 pb-4'>
 						<div className='relative aspect-[9/16] max-w-[360px] mx-auto rounded-xl overflow-hidden bg-gray-900 shadow-[0_4px_20px_rgba(0,0,0,0.15)]'>
@@ -1757,7 +1718,6 @@ export function LandingClient({ landing, video }: Props) {
 							</div>
 						</div>
 					)}
-				</div>
 
 				<div className='py-2 text-center'>
 					<p className='text-xs mt-3 m-0' style={{ color: 'rgba(0,0,0,0.55)' }}>

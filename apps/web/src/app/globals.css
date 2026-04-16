@@ -32,28 +32,6 @@ html {
 	animation: slide-up 0.3s ease-out;
 }
 
-/* Pseudo-fullscreen: covers the viewport without triggering iOS native
-   player, so our React overlays (buy CTA, custom controls) remain rendered.
-   iPhone Safari gives the native player on Fullscreen API for <video>, so
-   we avoid it entirely and fake a fullscreen with fixed positioning. */
-.video-pseudo-fs {
-	position: fixed !important;
-	inset: 0 !important;
-	z-index: 9999 !important;
-	background: #000;
-	border-radius: 0 !important;
-	max-width: none !important;
-	aspect-ratio: auto !important;
-}
-.video-pseudo-fs video {
-	object-fit: cover !important;
-	width: 100% !important;
-	height: 100% !important;
-}
-body:has(.video-pseudo-fs) {
-	overflow: hidden;
-}
-
 @theme inline {
 	--font-heading: var(--font-sans);
 	--font-sans: var(--font-sans);

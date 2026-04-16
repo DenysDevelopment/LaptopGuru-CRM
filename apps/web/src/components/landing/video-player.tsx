@@ -24,108 +24,9 @@ interface Props {
 }
 
 export default function VideoPlayer(props: Props) {
-	const wrapperRef = useRef<HTMLDivElement>(null);
-	const [isFs, setIsFs] = useState(false);
-
-	const toggleFs = useCallback(() => {
-		setIsFs(v => !v);
-	}, []);
-
-	// Exit on Escape
-	useEffect(() => {
-		if (!isFs) return;
-		const onKey = (e: KeyboardEvent) => {
-			if (e.key === 'Escape') setIsFs(false);
-		};
-		window.addEventListener('keydown', onKey);
-		return () => window.removeEventListener('keydown', onKey);
-	}, [isFs]);
-
-	// Neutralize `transform` / `filter` / `perspective` on ancestors while in
-	// pseudo-fullscreen. Any such property creates a containing block for
-	// position: fixed, which would pin our overlay to that ancestor instead of
-	// the viewport (see CSS Transforms spec §6, "Transformed elements"). The
-	// landing page uses `[data-animate] { transform: translateY(...) }` as an
-	// intersection-observer animation, which triggers this exact issue.
-	useEffect(() => {
-		if (!isFs) return;
-		const wrapper = wrapperRef.current;
-		if (!wrapper) return;
-
-		const touched: Array<{ el: HTMLElement; prop: string; prev: string }> = [];
-		const neutralize = (el: HTMLElement, prop: 'transform' | 'filter' | 'perspective') => {
-			touched.push({ el, prop, prev: el.style.getPropertyValue(prop) });
-			el.style.setProperty(prop, 'none', 'important');
-		};
-
-		let node: HTMLElement | null = wrapper.parentElement;
-		while (node && node !== document.body && node !== document.documentElement) {
-			const cs = getComputedStyle(node);
-			if (cs.transform !== 'none') neutralize(node, 'transform');
-			if (cs.filter !== 'none') neutralize(node, 'filter');
-			if (cs.perspective !== 'none') neutralize(node, 'perspective');
-			node = node.parentElement;
-		}
-
-		return () => {
-			for (const { el, prop, prev } of touched) {
-				if (prev) el.style.setProperty(prop, prev);
-				else el.style.removeProperty(prop);
-			}
-		};
-	}, [isFs]);
-
-	const requestFullscreen = useCallback(() => {
-		setIsFs(true);
-	}, []);
-
 	return (
-		<div
-			ref={wrapperRef}
-			className={`relative h-full w-full ${isFs ? 'video-pseudo-fs' : ''}`}>
-			<PlayerInstance
-				key={props.src}
-				{...props}
-				isFs={isFs}
-				onRequestFullscreen={isFs ? undefined : requestFullscreen}
-			/>
-			<button
-				type='button'
-				onClick={toggleFs}
-				aria-label={isFs ? 'Exit fullscreen' : 'Enter fullscreen'}
-				className='absolute bottom-14 right-2 z-[10000] flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-colors hover:bg-black/70 active:scale-95'>
-				{isFs ? (
-					<svg
-						xmlns='http://www.w3.org/2000/svg'
-						viewBox='0 0 24 24'
-						fill='none'
-						stroke='currentColor'
-						strokeWidth={2}
-						strokeLinecap='round'
-						strokeLinejoin='round'
-						className='h-5 w-5'>
-						<path d='M8 3v4a1 1 0 0 1-1 1H3' />
-						<path d='M21 8h-4a1 1 0 0 1-1-1V3' />
-						<path d='M3 16h4a1 1 0 0 1 1 1v4' />
-						<path d='M16 21v-4a1 1 0 0 1 1-1h4' />
-					</svg>
-				) : (
-					<svg
-						xmlns='http://www.w3.org/2000/svg'
-						viewBox='0 0 24 24'
-						fill='none'
-						stroke='currentColor'
-						strokeWidth={2}
-						strokeLinecap='round'
-						strokeLinejoin='round'
-						className='h-5 w-5'>
-						<path d='M3 7V5a2 2 0 0 1 2-2h2' />
-						<path d='M17 3h2a2 2 0 0 1 2 2v2' />
-						<path d='M21 17v2a2 2 0 0 1-2 2h-2' />
-						<path d='M7 21H5a2 2 0 0 1-2-2v-2' />
-					</svg>
-				)}
-			</button>
+		<div className='relative h-full w-full'>
+			<PlayerInstance key={props.src} {...props} />
 		</div>
 	);
 }
@@ -142,9 +43,7 @@ function PlayerInstance({
 	onBufferEnd,
 	productUrl,
 	buyButtonText,
-	onRequestFullscreen,
-	isFs,
-}: Props & { onRequestFullscreen?: () => void; isFs: boolean }) {
+}: Props) {
 	const videoRef = useRef<HTMLVideoElement>(null);
 	const barRef = useRef<HTMLDivElement>(null);
 
@@ -192,15 +91,11 @@ function PlayerInstance({
 			void video.play().catch(() => {
 				/* autoplay policy / interrupted — ignore */
 			});
-			// Auto-enter pseudo-fullscreen on any play action (big center
-			// button, bottom bar, tap on video). Parent passes undefined when
-			// already in fs, so this is a no-op in that case.
-			onRequestFullscreen?.();
 		} else {
 			video.pause();
 		}
 		showControls();
-	}, [showControls, onRequestFullscreen]);
+	}, [showControls]);
 
 	const handlePlay = useCallback(() => {
 		setIsPlaying(true);
@@ -423,8 +318,8 @@ function PlayerInstance({
 				</div>
 			</div>
 
-			{/* CTA: always visible in fullscreen, last 10s in inline mode. */}
-			{(isFs || nearEnd) && productUrl && (
+			{/* CTA: visible in the last 10s of playback. */}
+			{nearEnd && productUrl && (
 				<div className='pointer-events-none absolute inset-0 z-[70] flex items-end justify-center pb-20'>
 					<a
 						href={productUrl}
