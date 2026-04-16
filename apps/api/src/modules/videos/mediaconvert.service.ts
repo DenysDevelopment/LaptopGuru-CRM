@@ -85,15 +85,23 @@ export class MediaConvertService {
                     CodecSettings: {
                       Codec: 'H_264',
                       H264Settings: {
-                        RateControlMode: 'CBR',
-                        Bitrate: 2_500_000,
+                        // QVBR (Quality-defined Variable Bitrate) gives
+                        // noticeably better visual quality than CBR at the
+                        // same average bitrate by spending bits where the
+                        // scene needs them. Level 8 = "high quality" (recs:
+                        // 7 for web, 9 for broadcast). maxBitrate caps the
+                        // burst so files don't blow up on complex footage.
+                        RateControlMode: 'QVBR',
+                        QvbrSettings: { QvbrQualityLevel: 8 },
+                        MaxBitrate: 6_000_000,
+                        QualityTuningLevel: 'SINGLE_PASS_HQ',
                         CodecProfile: 'HIGH',
                         CodecLevel: 'AUTO',
                       },
                     },
                     // No fixed Width/Height — preserve source aspect ratio so
                     // vertical (9:16) iPhone videos stay vertical after the
-                    // encode. CBR bitrate already caps file size.
+                    // encode. QVBR + MaxBitrate bounds the final file size.
                     ScalingBehavior: 'DEFAULT',
                   },
                   AudioDescriptions: [
