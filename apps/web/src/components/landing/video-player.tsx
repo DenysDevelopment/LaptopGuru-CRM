@@ -159,21 +159,15 @@ function PlayerInstance({
 	);
 
 	// --- Seek via progress bar (pointer events: touch + mouse unified) ---
-	const seekFromPointer = useCallback(
-		(clientX: number) => {
-			const bar = barRef.current;
-			const video = videoRef.current;
-			if (!bar || !video || !Number.isFinite(video.duration)) return;
-			const rect = bar.getBoundingClientRect();
-			const pct = Math.max(
-				0,
-				Math.min(1, (clientX - rect.left) / rect.width),
-			);
-			video.currentTime = pct * video.duration;
-			setCurrentTime(video.currentTime);
-		},
-		[],
-	);
+	const seekFromPointer = useCallback((clientX: number) => {
+		const bar = barRef.current;
+		const video = videoRef.current;
+		if (!bar || !video || !Number.isFinite(video.duration)) return;
+		const rect = bar.getBoundingClientRect();
+		const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+		video.currentTime = pct * video.duration;
+		setCurrentTime(video.currentTime);
+	}, []);
 
 	const handleBarPointerDown = useCallback(
 		(e: ReactPointerEvent<HTMLDivElement>) => {
@@ -257,9 +251,11 @@ function PlayerInstance({
 				</button>
 			)}
 
-			{/* Bottom controls — auto-hide after 2.5s of inactivity while playing */}
+			{/* Bottom controls — auto-hide after 2.5s of inactivity while playing.
+			    On mobile, sits above the sticky CTA using the inherited --cta-h
+			    variable; desktop uses bottom-0 since CTA has its own layout. */}
 			<div
-				className={`pointer-events-none absolute inset-x-0 bottom-0 z-[60] bg-gradient-to-t from-black/70 to-transparent px-3 pt-8 pb-3 transition-opacity duration-200 ${
+				className={`pointer-events-none absolute inset-x-0 bottom-[var(--cta-h,0px)] md:bottom-0 z-[60]  to-transparent px-3 pt-8 pb-3 transition-opacity duration-200 ${
 					controlsVisible ? 'opacity-100' : 'opacity-0'
 				}`}>
 				<div className='pointer-events-auto flex items-center gap-3'>

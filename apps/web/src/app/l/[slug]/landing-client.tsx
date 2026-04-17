@@ -1471,7 +1471,7 @@ export function LandingClient({ landing, video }: Props) {
 				    showing letterbox bars. Mobile-only watermark sits in the
 				    middle (desktop has the header logo above instead). */}
 				<div
-					className='w-full flex items-center justify-center md:py-6 mb-6'
+					className='w-full flex items-center justify-center md:py-6 md:mb-6'
 					style={
 						{
 							'--cta-h':
@@ -1479,10 +1479,13 @@ export function LandingClient({ landing, video }: Props) {
 							'--header-h': '86px',
 						} as React.CSSProperties
 					}>
-					<div className='relative w-full md:w-auto md:aspect-[9/16] overflow-hidden bg-black h-[calc(100dvh-var(--cta-h))] md:h-[calc(100dvh-var(--cta-h)-var(--header-h)-3rem)] md:rounded-2xl md:shadow-[0_8px_32px_rgba(0,0,0,0.15)]'>
-						{/* Top header bar (full width) — white logo band + brand-orange title band */}
-						<div className='pointer-events-none absolute top-0 inset-x-0 z-20 shadow-[0_4px_16px_rgba(0,0,0,0.15)]'>
-							<div className='bg-white px-4 pt-4 pb-3 flex items-center justify-center'>
+					<div className='relative w-full md:w-auto md:aspect-[9/16] overflow-hidden bg-black h-[100dvh] md:h-[calc(100dvh-var(--cta-h)-var(--header-h)-3rem)] md:rounded-2xl md:shadow-[0_8px_32px_rgba(0,0,0,0.15)]'>
+						{/* Top header bar — hidden while playing */}
+						<div
+							className={`pointer-events-none absolute top-0 inset-x-0 z-20 shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-opacity duration-300 ${
+								isVideoPlaying ? 'opacity-0' : 'opacity-100'
+							}`}>
+							<div className='md:hidden bg-white px-4 pt-4 pb-3 flex items-center justify-center'>
 								<Image
 									src='/LG_logo2.webp'
 									alt='Laptop Guru'
@@ -1490,12 +1493,17 @@ export function LandingClient({ landing, video }: Props) {
 									height={72}
 									loading='lazy'
 									unoptimized
-									className='w-auto h-20 sm:h-24'
+									className='w-auto h-12 sm:h-14'
 								/>
 							</div>
-							<div className='bg-[#fb7830] px-4 py-2 flex items-center justify-center'>
+							<div className='bg-[#fb7830] px-4 py-3 flex items-center justify-center'>
 								<span className='text-base sm:text-lg font-extrabold text-white tracking-tight'>
 									Sprawdzamy Twój laptop
+								</span>
+							</div>
+							<div className='bg-white/95 backdrop-blur-sm px-4 py-2 flex items-center justify-center border-t border-white/60'>
+								<span className='text-sm sm:text-base font-bold text-[#333] tracking-tight text-center line-clamp-1 max-w-full'>
+									{video.title}
 								</span>
 							</div>
 						</div>
@@ -1637,7 +1645,7 @@ export function LandingClient({ landing, video }: Props) {
 
 						{/* Benefits overlay — visible when paused (S3 player only) */}
 						<div
-							className={`pointer-events-none absolute inset-x-3 bottom-16 md:bottom-20 z-20 ${
+							className={`pointer-events-none absolute inset-x-3 bottom-[calc(var(--cta-h,0px)+5rem)] md:bottom-32 z-20 ${
 								video.source === 'S3' && !isVideoPlaying
 									? 'opacity-100'
 									: 'opacity-0'
@@ -1771,12 +1779,12 @@ export function LandingClient({ landing, video }: Props) {
 
 			{landing.productUrl && (
 				<div
-					className={`fixed bottom-0 inset-x-0 z-[100] bg-white/95 backdrop-blur-md border-t border-gray-100 shadow-[0_-4px_24px_rgba(0,0,0,0.1)] ${showCta ? 'anim-slide-up' : 'opacity-0 translate-y-full'}`}
+					className={`pointer-events-none fixed bottom-0 inset-x-0 z-[100] to-transparent pt-16 ${showCta ? 'anim-slide-up' : 'opacity-0 translate-y-full'}`}
 					style={{
 						paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 12px)',
 						willChange: 'transform',
 					}}>
-					<div className='max-w-3xl mx-auto px-4 py-3'>
+					<div className='pointer-events-auto max-w-3xl mx-auto px-4 py-3'>
 						<button
 							onClick={handleBuyClick}
 							style={{ backgroundColor: '#fb7830' }}
