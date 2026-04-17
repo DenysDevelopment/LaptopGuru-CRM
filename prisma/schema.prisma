@@ -1236,6 +1236,7 @@ model VideoPlaybackSession {
 
   videoDurationMs  Int
 
+  /// JSONB array of EventTuple — see packages/shared/src/video-analytics.ts
   trace            Json     @default("[]")
   chunksReceived   Int      @default(0)
 
@@ -1282,5 +1283,4 @@ model VideoSecondStats {
   video  Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
 
   @@id([videoId, second])
-  @@index([videoId])
 }
