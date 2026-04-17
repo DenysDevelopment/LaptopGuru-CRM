@@ -18,9 +18,9 @@ const PUBLIC_PREFIXES = [
 /**
  * Tracking/telemetry endpoints the public landing pages POST to. These MUST
  * accept anonymous traffic — they're hit by every real visitor, not authors.
- * Matches `/api/landings/<slug>/track|click|video-events` with any slug value.
+ * Matches `/api/landings/<slug>/track|click` with any slug value.
  */
-const PUBLIC_LANDING_API_RE = /^\/api\/landings\/[^/]+\/(track|click|video-events)$/;
+const PUBLIC_LANDING_API_RE = /^\/api\/landings\/[^/]+\/(track|click)$/;
 
 /**
  * Mobile-upload public endpoints: everything under /api/videos/mobile-upload/<token>/*
