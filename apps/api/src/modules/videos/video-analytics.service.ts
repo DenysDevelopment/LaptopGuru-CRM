@@ -6,12 +6,13 @@ import type { VideoAnalyticsData } from '@laptopguru-crm/shared';
 export class VideoAnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // Rewritten in Task 14 (stage 5) against the new schema.
   async getFullAnalytics(
     videoId: string,
     companyId: string,
     from: Date,
     to: Date,
-  ): Promise<VideoAnalyticsData> {
+  ): Promise<any> {
     const video = await this.prisma.video.findUnique({ where: { id: videoId } });
     if (!video || video.companyId !== companyId) throw new NotFoundException();
     if (video.source !== 'S3') {
