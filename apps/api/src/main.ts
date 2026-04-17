@@ -16,6 +16,8 @@ async function bootstrap() {
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  app.enableShutdownHooks();
+
   // Disable X-Powered-By header
   app.getHttpAdapter().getInstance().disable('x-powered-by');
 

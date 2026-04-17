@@ -1,13 +1,15 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Redis from 'ioredis-mock';
 import { RateLimitService } from './rate-limit.service';
+import type { RedisProvider } from './redis-provider.service';
 
 describe('RateLimitService', () => {
   let service: RateLimitService;
 
   beforeEach(() => {
-    const redis = new Redis();
-    service = new RateLimitService(redis as unknown as import('ioredis').Redis);
+    const client = new Redis();
+    const provider = { client } as unknown as RedisProvider;
+    service = new RateLimitService(provider);
   });
 
   it('allows requests up to the limit', async () => {
