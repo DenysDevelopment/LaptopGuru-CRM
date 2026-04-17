@@ -341,6 +341,7 @@ export function LandingClient({ landing, video }: Props) {
 	const videoWatchAccumRef = useRef(0);
 	const videoCompletedRef = useRef(false);
 	const firstPlayTimeRef = useRef<number | null>(null);
+	const lastYouTubeStateRef = useRef<number | null>(null);
 
 	// Create a promise that resolves when visitId is ready
 	if (visitIdPromise.current == null) {
@@ -359,7 +360,7 @@ export function LandingClient({ landing, video }: Props) {
 		visitReady: visitIdPromise.current!.promise,
 		videoId: video.id,
 		videoSource: video.source as 'S3' | 'YOUTUBE',
-		videoElement: videoElRef.current,
+		videoElementRef: videoElRef,
 	});
 
 	// PATCH engagement — waits for visitId if not ready
@@ -1078,6 +1079,8 @@ export function LandingClient({ landing, video }: Props) {
 				data.info.playerState !== undefined
 			) {
 				const state = data.info.playerState;
+				if (state === lastYouTubeStateRef.current) return;
+				lastYouTubeStateRef.current = state;
 				if (state === 1) {
 					// playing
 					videoPlayedRef.current = true;
@@ -1119,6 +1122,8 @@ export function LandingClient({ landing, video }: Props) {
 					typeof data.info === 'number'
 						? data.info
 						: (data.info as { playerState?: number })?.playerState;
+				if (state === lastYouTubeStateRef.current) return;
+				lastYouTubeStateRef.current = state ?? null;
 				if (state === 1) {
 					videoPlayedRef.current = true;
 					if (!videoWatchStartRef.current)

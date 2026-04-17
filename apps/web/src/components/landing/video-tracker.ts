@@ -16,7 +16,7 @@ interface UseVideoTrackerOpts {
   visitReady: Promise<string>;
   videoId: string;
   videoSource: 'S3' | 'YOUTUBE';
-  videoElement?: HTMLVideoElement | null;
+  videoElementRef?: React.MutableRefObject<HTMLVideoElement | null>;
   // YouTube iframe Player API instance — see YouTube adapter below
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ytPlayer?: any;
@@ -81,7 +81,8 @@ export function useVideoTracker(opts: UseVideoTrackerOpts) {
   });
 
   const getDuration = (): number => {
-    if (opts.videoElement) return Math.round((opts.videoElement.duration || 0) * 1000);
+    const el = opts.videoElementRef?.current;
+    if (el) return Math.round((el.duration || 0) * 1000);
     if (opts.ytPlayer && typeof opts.ytPlayer.getDuration === 'function') {
       return Math.round((opts.ytPlayer.getDuration() || 0) * 1000);
     }
@@ -89,7 +90,8 @@ export function useVideoTracker(opts: UseVideoTrackerOpts) {
   };
 
   const getCurrentTimeMs = (): number => {
-    if (opts.videoElement) return Math.round(opts.videoElement.currentTime * 1000);
+    const el = opts.videoElementRef?.current;
+    if (el) return Math.round(el.currentTime * 1000);
     if (opts.ytPlayer && typeof opts.ytPlayer.getCurrentTime === 'function') {
       return Math.round(opts.ytPlayer.getCurrentTime() * 1000);
     }
