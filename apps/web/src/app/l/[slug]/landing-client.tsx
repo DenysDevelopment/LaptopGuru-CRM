@@ -1480,9 +1480,9 @@ export function LandingClient({ landing, video }: Props) {
 						} as React.CSSProperties
 					}>
 					<div className='relative w-full md:w-auto md:aspect-[9/16] overflow-hidden bg-black h-[calc(100dvh-var(--cta-h))] md:h-[calc(100dvh-var(--cta-h)-var(--header-h)-3rem)] md:rounded-2xl md:shadow-[0_8px_32px_rgba(0,0,0,0.15)]'>
-						{/* Top header bar (full width) — logo + title, always visible */}
-						<div className='pointer-events-none absolute top-0 inset-x-0 z-20'>
-							<div className='bg-white shadow-[0_4px_16px_rgba(0,0,0,0.15)] px-4 pt-4 pb-3 flex flex-col items-center gap-2'>
+						{/* Top header bar (full width) — white logo band + brand-orange title band */}
+						<div className='pointer-events-none absolute top-0 inset-x-0 z-20 shadow-[0_4px_16px_rgba(0,0,0,0.15)]'>
+							<div className='bg-white px-4 pt-4 pb-3 flex items-center justify-center'>
 								<Image
 									src='/LG_logo2.webp'
 									alt='Laptop Guru'
@@ -1492,7 +1492,9 @@ export function LandingClient({ landing, video }: Props) {
 									unoptimized
 									className='w-auto h-12 sm:h-14'
 								/>
-								<span className='text-base sm:text-lg font-extrabold text-[#333] tracking-tight'>
+							</div>
+							<div className='bg-[#fb7830] px-4 py-2 flex items-center justify-center'>
+								<span className='text-base sm:text-lg font-extrabold text-white tracking-tight'>
 									Sprawdzamy Twój laptop
 								</span>
 							</div>
