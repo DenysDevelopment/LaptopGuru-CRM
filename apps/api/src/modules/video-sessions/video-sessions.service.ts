@@ -3,12 +3,14 @@ import {
   BadRequestException,
   HttpException,
   HttpStatus,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RateLimitService } from '../../common/services/rate-limit.service';
 import type { PublicContext } from '../../common/guards/public-landing.guard';
+import type { EndReason } from './dto/append-chunk.dto';
 
 @Injectable()
 export class VideoSessionsService {
@@ -59,5 +61,90 @@ export class VideoSessionsService {
     return { sessionId: row.id };
   }
 
-  // appendChunk is implemented in Task 8
+  async appendChunk(
+    ctx: PublicContext,
+    body: {
+      seq: number;
+      events: unknown[];
+      final: boolean;
+      endReason?: EndReason;
+    },
+    opts: { beacon: boolean },
+  ): Promise<{ deduped?: true; accepted?: true }> {
+    if (!ctx.sessionId) throw new BadRequestException('Missing sessionId');
+
+    if (!opts.beacon) {
+      const ok = await this.rateLimit.check(`ratelimit:chunk:${ctx.sessionId}`, 120, 60);
+      if (!ok) throw new HttpException('Too many requests', HttpStatus.TOO_MANY_REQUESTS);
+    } else {
+      // Flood guard by visit even for beacons
+      const ok = await this.rateLimit.check(`ratelimit:beacon:${ctx.visitId}`, 300, 60);
+      if (!ok) return { accepted: true }; // swallow: beacons cannot retry
+    }
+
+    const session = await this.prisma.raw.videoPlaybackSession.findUnique({
+      where: { id: ctx.sessionId },
+      select: { id: true, finalized: true, videoDurationMs: true },
+    });
+    if (!session) throw new NotFoundException('Session not found');
+    if (session.finalized) throw new HttpException('Session already finalized', HttpStatus.GONE);
+
+    // Validate events. Each must be a tuple [tMs: number, type: number 0..14, pos: number, extra?].
+    const now = Date.now();
+    const maxPos = session.videoDurationMs + 1000;
+    const validated: unknown[] = [];
+    for (const raw of body.events) {
+      if (!Array.isArray(raw) || raw.length < 3 || raw.length > 4) {
+        throw new BadRequestException('Malformed event tuple');
+      }
+      const [tMs, type, pos, extra] = raw as [unknown, unknown, unknown, unknown?];
+      if (
+        typeof tMs !== 'number' || !Number.isFinite(tMs) || tMs < 0 || tMs > now + 60_000 ||
+        typeof type !== 'number' || !Number.isInteger(type) || type < 0 || type > 14 ||
+        typeof pos !== 'number' || !Number.isFinite(pos) || pos < 0 || pos > maxPos
+      ) {
+        throw new BadRequestException('Invalid event values');
+      }
+      // ERROR messages truncated to 500 chars.
+      if (type === 12 && extra && typeof extra === 'object') {
+        const msg = (extra as { message?: unknown }).message;
+        if (typeof msg === 'string') {
+          (extra as { message: string }).message = msg.slice(0, 500);
+        }
+      }
+      validated.push(raw);
+    }
+
+    // Storage-layer dedup: insert the chunk row first; on unique conflict, swallow.
+    try {
+      await this.prisma.raw.videoSessionChunk.create({
+        data: { sessionId: ctx.sessionId, seq: body.seq },
+      });
+    } catch (e) {
+      if ((e as { code?: string }).code === 'P2002') return { deduped: true };
+      throw e;
+    }
+
+    // Append to trace + bump counters. Use raw SQL for JSONB concat.
+    await this.prisma.raw.$executeRaw`
+      UPDATE "VideoPlaybackSession"
+      SET "trace" = "trace" || ${JSON.stringify(validated)}::jsonb,
+          "chunksReceived" = "chunksReceived" + 1,
+          "updatedAt" = NOW()
+      WHERE "id" = ${ctx.sessionId}
+    `;
+
+    if (body.final) {
+      await this.prisma.raw.videoPlaybackSession.update({
+        where: { id: ctx.sessionId },
+        data: {
+          endedAt: new Date(),
+          endReason: (body.endReason as EndReason | undefined) ?? 'CLOSED',
+        },
+      });
+      await this.finalizeQueue.add('finalize', { sessionId: ctx.sessionId, reason: 'CLIENT_FINAL' });
+    }
+
+    return { accepted: true };
+  }
 }

@@ -13,6 +13,7 @@ function mockPrisma() {
         create: vi.fn(),
       },
       $transaction: vi.fn(),
+      $executeRaw: vi.fn(),
     },
   };
 }
@@ -103,5 +104,117 @@ describe('VideoSessionsService.createSession', () => {
         { videoDurationMs: 1000, clientStartedAt: futureFar },
       ),
     ).rejects.toMatchObject({ status: 400 });
+  });
+});
+
+describe('VideoSessionsService.appendChunk', () => {
+  let prisma: ReturnType<typeof mockPrisma>;
+  let queue: ReturnType<typeof mockQueue>;
+  let rate: ReturnType<typeof mockRateLimit>;
+  let service: VideoSessionsService;
+
+  beforeEach(() => {
+    prisma = mockPrisma();
+    queue = mockQueue();
+    rate = mockRateLimit();
+    service = new VideoSessionsService(prisma as never, queue as never, rate as never);
+  });
+
+  const ctx = { companyId: 'c1', landingId: 'l1', visitId: 'v1', videoId: 'vid1', sessionId: 's1' };
+
+  it('rejects events array with invalid tuples', async () => {
+    prisma.raw.videoPlaybackSession.findUnique.mockResolvedValue({
+      id: 's1',
+      finalized: false,
+      videoDurationMs: 10000,
+    });
+    await expect(
+      service.appendChunk(ctx, { seq: 1, events: [['bad']], final: false } as never, { beacon: false }),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('rejects when position exceeds videoDurationMs + 1000', async () => {
+    prisma.raw.videoPlaybackSession.findUnique.mockResolvedValue({
+      id: 's1',
+      finalized: false,
+      videoDurationMs: 10000,
+    });
+    await expect(
+      service.appendChunk(ctx, { seq: 1, events: [[0, 1, 11500]], final: false } as never, { beacon: false }),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('returns 410 for finalized sessions', async () => {
+    prisma.raw.videoPlaybackSession.findUnique.mockResolvedValue({
+      id: 's1',
+      finalized: true,
+      videoDurationMs: 10000,
+    });
+    await expect(
+      service.appendChunk(ctx, { seq: 1, events: [[0, 1, 0]], final: false } as never, { beacon: false }),
+    ).rejects.toMatchObject({ status: 410 });
+  });
+
+  it('inserts chunk row, appends to trace, increments chunksReceived', async () => {
+    prisma.raw.videoPlaybackSession.findUnique.mockResolvedValue({
+      id: 's1',
+      finalized: false,
+      videoDurationMs: 10000,
+    });
+    prisma.raw.videoSessionChunk.create.mockResolvedValue({});
+    await service.appendChunk(
+      ctx,
+      { seq: 1, events: [[0, 1, 0], [250, 0, 250]], final: false } as never,
+      { beacon: false },
+    );
+    expect(prisma.raw.videoSessionChunk.create).toHaveBeenCalledWith({
+      data: { sessionId: 's1', seq: 1 },
+    });
+  });
+
+  it('returns 202 on duplicate seq (unique-conflict swallowed)', async () => {
+    prisma.raw.videoPlaybackSession.findUnique.mockResolvedValue({
+      id: 's1',
+      finalized: false,
+      videoDurationMs: 10000,
+    });
+    const err = new Error('duplicate') as Error & { code?: string };
+    err.code = 'P2002';
+    prisma.raw.videoSessionChunk.create.mockRejectedValue(err);
+    const out = await service.appendChunk(
+      ctx,
+      { seq: 1, events: [[0, 1, 0]], final: false } as never,
+      { beacon: false },
+    );
+    expect(out).toEqual({ deduped: true });
+  });
+
+  it('enqueues finalize job when final=true', async () => {
+    prisma.raw.videoPlaybackSession.findUnique.mockResolvedValue({
+      id: 's1',
+      finalized: false,
+      videoDurationMs: 10000,
+    });
+    await service.appendChunk(
+      ctx,
+      { seq: 1, events: [[0, 1, 0]], final: true, endReason: 'ENDED' } as never,
+      { beacon: false },
+    );
+    expect(queue.add).toHaveBeenCalledWith('finalize', { sessionId: 's1', reason: 'CLIENT_FINAL' });
+  });
+
+  it('beacon mode skips per-session rate limit', async () => {
+    prisma.raw.videoPlaybackSession.findUnique.mockResolvedValue({
+      id: 's1',
+      finalized: false,
+      videoDurationMs: 10000,
+    });
+    rate.check.mockResolvedValue(false);
+    const out = await service.appendChunk(
+      ctx,
+      { seq: 1, events: [[0, 1, 0]], final: true } as never,
+      { beacon: true },
+    );
+    expect(out).toEqual({ accepted: true });
   });
 });
