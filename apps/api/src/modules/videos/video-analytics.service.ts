@@ -1,235 +1,235 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import type { VideoAnalyticsData, SessionEndReason } from '@laptopguru-crm/shared';
 
 @Injectable()
 export class VideoAnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // Rewritten in Task 14 (stage 5) against the new schema.
   async getFullAnalytics(
     videoId: string,
-    companyId: string,
+    companyId: string | null,
     from: Date,
     to: Date,
-  ): Promise<any> {
-    const video = await this.prisma.video.findUnique({ where: { id: videoId } });
-    if (!video || video.companyId !== companyId) throw new NotFoundException();
-    if (video.source !== 'S3') {
-      throw new BadRequestException('Detailed analytics available only for S3 videos');
-    }
+  ): Promise<VideoAnalyticsData> {
+    const video = await this.prisma.raw.video.findUnique({
+      where: { id: videoId },
+      select: { id: true, companyId: true, durationSeconds: true },
+    });
+    if (!video) throw new NotFoundException();
+    if (companyId && video.companyId !== companyId) throw new NotFoundException();
 
-    const [overview, retention, timeSeries, recentWatches] = await Promise.all([
-      this.getOverview(video, from, to),
-      this.getRetentionCurve(video, from, to),
-      this.getViewsTimeSeries(videoId, from, to),
-      this.getRecentWatches(videoId, from, to),
-    ]);
+    const durationSeconds = video.durationSeconds ?? 0;
+
+    const [overview, retention, topPause, topSeek, timeSeries, recentSessions, breakdowns] =
+      await Promise.all([
+        this.getOverview(videoId, from, to),
+        this.getRetention(videoId, durationSeconds),
+        this.getTopSeconds(videoId, 'pauseCount'),
+        this.getTopSeconds(videoId, 'seekAwayCount'),
+        this.getTimeSeries(videoId, from, to),
+        this.getRecentSessions(videoId, from, to),
+        this.getBreakdowns(videoId, from, to),
+      ]);
 
     return {
       overview,
+      durationSeconds,
       retention,
-      dropOffPoints: this.computeDropOff(retention),
+      topSeekAwaySeconds: topSeek,
+      topPauseSeconds: topPause,
       viewsTimeSeries: timeSeries,
-      replayHeatmap: [],
-      geography: [],
-      devices: [],
-      browsers: [],
-      os: [],
-      referrers: [],
-      playbackSpeeds: [],
-      recentWatches,
+      ...breakdowns,
+      recentSessions,
     };
   }
 
-  private async getOverview(video: any, from: Date, to: Date) {
-    const minWatch = Number(process.env.VIDEO_MIN_WATCH_FOR_VIEW_SECONDS || 10);
-
-    // Segment-based aggregation: a PLAY or HEARTBEAT row "opens" a segment that is
-    // closed by the next event for the same visit. We sum (nextPos - pos) across
-    // consecutive pairs where the opener is PLAY or HEARTBEAT. Deltas are clamped
-    // to [0, 600] seconds to guard against clock glitches and single-segment abuse.
-    // This replaces the old COUNT(HEARTBEAT)*5 approximation, which overcounted on
-    // synthetic heartbeats and undercounted the tail of each play segment.
-    const rows = (await this.prisma.$queryRaw`
-      WITH ordered AS (
-        SELECT
-          "landingVisitId",
-          "eventType",
-          "position",
-          LEAD("eventType") OVER w AS next_type,
-          LEAD("position")  OVER w AS next_pos
-        FROM "VideoWatchEvent"
-        WHERE "videoId" = ${video.id}
-          AND "serverTimestamp" BETWEEN ${from} AND ${to}
-          AND "eventType" IN ('PLAY','PAUSE','SEEK','ENDED','HEARTBEAT')
-        WINDOW w AS (PARTITION BY "landingVisitId" ORDER BY "serverTimestamp", "id")
-      )
+  private async getOverview(videoId: string, from: Date, to: Date) {
+    const rows = (await this.prisma.raw.$queryRaw`
       SELECT
-        "landingVisitId",
-        COALESCE(SUM(
-          CASE
-            WHEN "eventType" = 'PLAY' AND next_type IN ('PAUSE','ENDED','SEEK','HEARTBEAT')
-              THEN GREATEST(0, LEAST(next_pos - "position", 600))
-            WHEN "eventType" = 'HEARTBEAT' AND next_type IN ('HEARTBEAT','PAUSE','ENDED')
-              THEN GREATEST(0, LEAST(next_pos - "position", 600))
-            ELSE 0
-          END
-        ), 0)::float AS "totalWatch",
-        BOOL_OR("eventType" = 'ENDED') AS completed
-      FROM ordered
-      GROUP BY "landingVisitId"
-    `) as { landingVisitId: string; totalWatch: number | bigint; completed: boolean }[];
+        COUNT(*)::int AS "sessionCount",
+        COUNT(DISTINCT "landingVisitId")::int AS "uniqueViewers",
+        COALESCE(SUM("durationWatchedMs"), 0)::int AS "totalWatchMs",
+        COALESCE(AVG("durationWatchedMs"), 0)::float AS "avgWatchMs",
+        COALESCE(AVG("completionPercent"), 0)::float AS "avgCompletion",
+        COALESCE(SUM("errorCount"), 0)::int AS "errorCount"
+      FROM "VideoPlaybackSession"
+      WHERE "videoId" = ${videoId}
+        AND "finalized" = true
+        AND "startedAt" BETWEEN ${from} AND ${to}
+    `) as {
+      sessionCount: number;
+      uniqueViewers: number;
+      totalWatchMs: number;
+      avgWatchMs: number;
+      avgCompletion: number;
+      errorCount: number;
+    }[];
 
-    const views = rows.filter((r) => Number(r.totalWatch) >= minWatch).length;
-    const totalWatchTime = rows.reduce((sum, r) => sum + Number(r.totalWatch), 0);
-    const completedCount = rows.filter((r) => r.completed).length;
+    const r = rows[0] ?? { sessionCount: 0, uniqueViewers: 0, totalWatchMs: 0, avgWatchMs: 0, avgCompletion: 0, errorCount: 0 };
 
-    const landingVisits = await this.prisma.landingVisit.count({
-      where: {
-        landing: { videoId: video.id },
-        visitedAt: { gte: from, lte: to },
-      },
-    });
+    const landingVisits = (await this.prisma.raw.$queryRaw`
+      SELECT COUNT(*)::int AS c
+      FROM "LandingVisit" v
+      JOIN "Landing" l ON l.id = v."landingId"
+      WHERE l."videoId" = ${videoId} AND v."visitedAt" BETWEEN ${from} AND ${to}
+    `) as { c: number }[];
+    const visits = landingVisits[0]?.c ?? 0;
 
     return {
-      totalViews: views,
-      uniqueViewers: rows.length,
-      totalWatchTime,
-      avgViewDuration: views > 0 ? Math.round(totalWatchTime / views) : 0,
-      completionRate: rows.length > 0 ? completedCount / rows.length : 0,
-      playRate: landingVisits > 0 ? views / landingVisits : 0,
+      totalViews: r.sessionCount,
+      uniqueViewers: r.uniqueViewers,
+      totalWatchTime: Math.round(r.totalWatchMs / 1000),
+      avgViewDuration: Math.round(r.avgWatchMs / 1000),
+      completionRate: r.avgCompletion,
+      playRate: visits > 0 ? r.sessionCount / visits : 0,
+      errorCount: r.errorCount,
     };
   }
 
-  private async getRetentionCurve(video: any, from: Date, to: Date) {
-    const totalSeconds = video.durationSeconds ?? 0;
-    if (totalSeconds === 0) return [];
-
-    const bucketSize = 5;
-    const buckets = Math.ceil(totalSeconds / bucketSize);
-
-    const result = (await this.prisma.$queryRaw`
-      SELECT
-        FLOOR(position / ${bucketSize})::int AS bucket,
-        COUNT(DISTINCT "landingVisitId") AS viewers
-      FROM "VideoWatchEvent"
-      WHERE "videoId" = ${video.id}
-        AND "eventType" IN ('HEARTBEAT', 'PLAY')
-        AND "serverTimestamp" BETWEEN ${from} AND ${to}
-      GROUP BY bucket
-      ORDER BY bucket
-    `) as { bucket: number; viewers: bigint }[];
-
-    const total = result[0] ? Number(result[0].viewers) : 0;
-
-    return Array.from({ length: buckets }, (_, i) => {
-      const entry = result.find((r) => r.bucket === i);
-      const viewers = entry ? Number(entry.viewers) : 0;
+  private async getRetention(videoId: string, durationSeconds: number) {
+    if (durationSeconds === 0) return [];
+    const rows = (await this.prisma.raw.$queryRaw`
+      SELECT "second", "views", "replays"
+      FROM "VideoSecondStats"
+      WHERE "videoId" = ${videoId}
+      ORDER BY "second"
+    `) as { second: number; views: number; replays: number }[];
+    const bySecond = new Map(rows.map((r) => [r.second, r]));
+    const base = rows[0]?.views ?? 0;
+    return Array.from({ length: durationSeconds }, (_, s) => {
+      const r = bySecond.get(s);
       return {
-        second: i * bucketSize,
-        viewers,
-        viewersPercent: total > 0 ? viewers / total : 0,
+        second: s,
+        views: r?.views ?? 0,
+        replays: r?.replays ?? 0,
+        viewersPercent: base > 0 ? (r?.views ?? 0) / base : 0,
       };
     });
   }
 
-  private computeDropOff(retention: { second: number; viewersPercent: number }[]) {
-    const drops: { second: number; dropPercent: number }[] = [];
-    for (let i = 1; i < retention.length; i++) {
-      const drop = retention[i - 1].viewersPercent - retention[i].viewersPercent;
-      if (drop > 0.05) {
-        drops.push({ second: retention[i].second, dropPercent: drop });
-      }
-    }
-    return drops.sort((a, b) => b.dropPercent - a.dropPercent).slice(0, 5);
+  private async getTopSeconds(videoId: string, col: 'pauseCount' | 'seekAwayCount') {
+    // Two query variants so we never interpolate a raw identifier — avoids any
+    // risk of SQL injection and keeps Prisma's parameterization happy.
+    const rows =
+      col === 'pauseCount'
+        ? ((await this.prisma.raw.$queryRaw`
+            SELECT "second", "pauseCount" AS c
+            FROM "VideoSecondStats"
+            WHERE "videoId" = ${videoId} AND "pauseCount" > 0
+            ORDER BY "pauseCount" DESC
+            LIMIT 5
+          `) as { second: number; c: number }[])
+        : ((await this.prisma.raw.$queryRaw`
+            SELECT "second", "seekAwayCount" AS c
+            FROM "VideoSecondStats"
+            WHERE "videoId" = ${videoId} AND "seekAwayCount" > 0
+            ORDER BY "seekAwayCount" DESC
+            LIMIT 5
+          `) as { second: number; c: number }[]);
+    return rows.map((r) => ({ second: r.second, count: Number(r.c) }));
   }
 
-  private async getViewsTimeSeries(videoId: string, from: Date, to: Date) {
-    const rows = (await this.prisma.$queryRaw`
-      SELECT
-        DATE("serverTimestamp") AS date,
-        COUNT(DISTINCT "landingVisitId") AS views
-      FROM "VideoWatchEvent"
+  private async getTimeSeries(videoId: string, from: Date, to: Date) {
+    const rows = (await this.prisma.raw.$queryRaw`
+      SELECT DATE("startedAt") AS date, COUNT(*)::int AS views
+      FROM "VideoPlaybackSession"
       WHERE "videoId" = ${videoId}
-        AND "eventType" = 'PLAY'
-        AND "serverTimestamp" BETWEEN ${from} AND ${to}
-      GROUP BY DATE("serverTimestamp")
+        AND "finalized" = true
+        AND "startedAt" BETWEEN ${from} AND ${to}
+      GROUP BY DATE("startedAt")
       ORDER BY date
-    `) as { date: Date; views: bigint }[];
-
-    return rows.map((r) => ({
-      date: r.date.toISOString().split('T')[0],
-      views: Number(r.views),
-    }));
+    `) as { date: Date; views: number }[];
+    return rows.map((r) => ({ date: r.date.toISOString().split('T')[0], views: r.views }));
   }
 
-  private async getRecentWatches(videoId: string, from: Date, to: Date) {
-    // Single query: segment-based watch duration joined with LandingVisit metadata.
-    // Eliminates the previous raw SQL + findMany N+1 round trip.
-    const rows = (await this.prisma.$queryRaw`
-      WITH ordered AS (
-        SELECT
-          "landingVisitId",
-          "eventType",
-          "position",
-          "serverTimestamp",
-          LEAD("eventType") OVER w AS next_type,
-          LEAD("position")  OVER w AS next_pos
-        FROM "VideoWatchEvent"
-        WHERE "videoId" = ${videoId}
-          AND "serverTimestamp" BETWEEN ${from} AND ${to}
-          AND "eventType" IN ('PLAY','PAUSE','SEEK','ENDED','HEARTBEAT')
-        WINDOW w AS (PARTITION BY "landingVisitId" ORDER BY "serverTimestamp", "id")
-      ),
-      per_visit AS (
-        SELECT
-          "landingVisitId",
-          MIN("serverTimestamp") AS "startedAt",
-          COALESCE(SUM(
-            CASE
-              WHEN "eventType" = 'PLAY' AND next_type IN ('PAUSE','ENDED','SEEK','HEARTBEAT')
-                THEN GREATEST(0, LEAST(next_pos - "position", 600))
-              WHEN "eventType" = 'HEARTBEAT' AND next_type IN ('HEARTBEAT','PAUSE','ENDED')
-                THEN GREATEST(0, LEAST(next_pos - "position", 600))
-              ELSE 0
-            END
-          ), 0)::float AS "totalWatch",
-          BOOL_OR("eventType" = 'ENDED') AS completed
-        FROM ordered
-        GROUP BY "landingVisitId"
-      )
+  private async getRecentSessions(videoId: string, from: Date, to: Date) {
+    const rows = (await this.prisma.raw.$queryRaw`
       SELECT
-        pv."landingVisitId",
-        pv."startedAt",
-        pv."totalWatch",
-        pv."completed",
-        v."sessionId",
+        s."id" AS "sessionId",
+        s."landingVisitId" AS "visitId",
+        s."startedAt",
+        s."durationWatchedMs",
+        s."completionPercent",
+        s."endReason",
         v."country",
         v."deviceType",
         v."browser"
-      FROM per_visit pv
-      LEFT JOIN "LandingVisit" v ON v."id" = pv."landingVisitId"
-      ORDER BY pv."startedAt" DESC
+      FROM "VideoPlaybackSession" s
+      LEFT JOIN "LandingVisit" v ON v.id = s."landingVisitId"
+      WHERE s."videoId" = ${videoId}
+        AND s."finalized" = true
+        AND s."startedAt" BETWEEN ${from} AND ${to}
+      ORDER BY s."startedAt" DESC
       LIMIT 50
     `) as {
-      landingVisitId: string;
+      sessionId: string;
+      visitId: string;
       startedAt: Date;
-      totalWatch: number | bigint;
-      completed: boolean;
-      sessionId: string | null;
+      durationWatchedMs: number;
+      completionPercent: number;
+      endReason: SessionEndReason | null;
       country: string | null;
       deviceType: string | null;
       browser: string | null;
     }[];
-
     return rows.map((r) => ({
-      sessionId: r.sessionId || r.landingVisitId,
+      sessionId: r.sessionId,
+      visitId: r.visitId,
       startedAt: r.startedAt.toISOString(),
-      duration: Number(r.totalWatch),
-      completed: r.completed,
-      country: r.country || null,
-      device: r.deviceType || null,
-      browser: r.browser || null,
+      durationWatchedMs: r.durationWatchedMs,
+      completionPercent: r.completionPercent,
+      endReason: r.endReason,
+      country: r.country,
+      device: r.deviceType,
+      browser: r.browser,
     }));
+  }
+
+  private async getBreakdowns(videoId: string, from: Date, to: Date) {
+    // Grouped counts via the same JOIN; each runs as its own SELECT for readability.
+    const geoRows = (await this.prisma.raw.$queryRaw`
+      SELECT v."country" AS k, COUNT(DISTINCT s.id)::int AS c
+      FROM "VideoPlaybackSession" s JOIN "LandingVisit" v ON v.id = s."landingVisitId"
+      WHERE s."videoId" = ${videoId} AND s."finalized" = true
+        AND s."startedAt" BETWEEN ${from} AND ${to} AND v."country" IS NOT NULL
+      GROUP BY v."country" ORDER BY c DESC LIMIT 15
+    `) as { k: string; c: number }[];
+    const devRows = (await this.prisma.raw.$queryRaw`
+      SELECT v."deviceType" AS k, COUNT(DISTINCT s.id)::int AS c
+      FROM "VideoPlaybackSession" s JOIN "LandingVisit" v ON v.id = s."landingVisitId"
+      WHERE s."videoId" = ${videoId} AND s."finalized" = true
+        AND s."startedAt" BETWEEN ${from} AND ${to} AND v."deviceType" IS NOT NULL
+      GROUP BY v."deviceType" ORDER BY c DESC
+    `) as { k: string; c: number }[];
+    const browRows = (await this.prisma.raw.$queryRaw`
+      SELECT v."browser" AS k, COUNT(DISTINCT s.id)::int AS c
+      FROM "VideoPlaybackSession" s JOIN "LandingVisit" v ON v.id = s."landingVisitId"
+      WHERE s."videoId" = ${videoId} AND s."finalized" = true
+        AND s."startedAt" BETWEEN ${from} AND ${to} AND v."browser" IS NOT NULL
+      GROUP BY v."browser" ORDER BY c DESC LIMIT 15
+    `) as { k: string; c: number }[];
+    const osRows = (await this.prisma.raw.$queryRaw`
+      SELECT v."os" AS k, COUNT(DISTINCT s.id)::int AS c
+      FROM "VideoPlaybackSession" s JOIN "LandingVisit" v ON v.id = s."landingVisitId"
+      WHERE s."videoId" = ${videoId} AND s."finalized" = true
+        AND s."startedAt" BETWEEN ${from} AND ${to} AND v."os" IS NOT NULL
+      GROUP BY v."os" ORDER BY c DESC LIMIT 15
+    `) as { k: string; c: number }[];
+    const refRows = (await this.prisma.raw.$queryRaw`
+      SELECT v."referrerDomain" AS k, COUNT(DISTINCT s.id)::int AS c
+      FROM "VideoPlaybackSession" s JOIN "LandingVisit" v ON v.id = s."landingVisitId"
+      WHERE s."videoId" = ${videoId} AND s."finalized" = true
+        AND s."startedAt" BETWEEN ${from} AND ${to} AND v."referrerDomain" IS NOT NULL
+      GROUP BY v."referrerDomain" ORDER BY c DESC LIMIT 15
+    `) as { k: string; c: number }[];
+
+    return {
+      geography: geoRows.map((r) => ({ country: r.k, views: r.c })),
+      devices: devRows.map((r) => ({ deviceType: r.k, views: r.c })),
+      browsers: browRows.map((r) => ({ browser: r.k, views: r.c })),
+      os: osRows.map((r) => ({ os: r.k, views: r.c })),
+      referrers: refRows.map((r) => ({ referrerDomain: r.k, views: r.c })),
+    };
   }
 }
