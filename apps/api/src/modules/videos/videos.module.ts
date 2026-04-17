@@ -11,7 +11,6 @@ import { VideoTranscodePollProcessor } from './video-transcode-poll.processor';
 import { VideoTranscodeStartProcessor } from './video-transcode-start.processor';
 import { YouTubeUploadProcessor } from './youtube-upload.processor';
 import { YouTubeUploadRetryProcessor } from './youtube-upload-retry.processor';
-import { AnalyticsCleanupProcessor } from './analytics-cleanup.processor';
 import { S3Service } from './s3.service';
 import { CloudFrontSignerService } from './cloudfront-signer.service';
 import { MediaConvertService } from './mediaconvert.service';
@@ -25,7 +24,6 @@ import { YouTubeUploadService } from './youtube-upload.service';
       { name: 'video-transcode-start' },
       { name: 'youtube-upload' },
       { name: 'youtube-upload-retry' },
-      { name: 'analytics-cleanup' },
     ),
   ],
   controllers: [VideosController, VideoWebhooksController, VideoAnalyticsController],
@@ -37,7 +35,6 @@ import { YouTubeUploadService } from './youtube-upload.service';
     VideoTranscodeStartProcessor,
     YouTubeUploadProcessor,
     YouTubeUploadRetryProcessor,
-    AnalyticsCleanupProcessor,
     S3Service,
     CloudFrontSignerService,
     MediaConvertService,
@@ -50,7 +47,6 @@ export class VideosModule implements OnModuleInit {
     @InjectQueue('youtube-sync') private readonly youtubeSyncQueue: Queue,
     @InjectQueue('video-transcode-start') private readonly transcodeStartQueue: Queue,
     @InjectQueue('youtube-upload-retry') private readonly youtubeUploadRetryQueue: Queue,
-    @InjectQueue('analytics-cleanup') private readonly analyticsCleanupQueue: Queue,
   ) {}
 
   async onModuleInit() {
@@ -71,16 +67,6 @@ export class VideosModule implements OnModuleInit {
       {},
       {
         repeat: { pattern: '5 7 * * *', tz: 'UTC' },
-        removeOnComplete: true,
-      },
-    );
-
-    // Cleanup old analytics events daily at 03:00 UTC
-    await this.analyticsCleanupQueue.add(
-      'cleanup',
-      {},
-      {
-        repeat: { pattern: '0 3 * * *', tz: 'UTC' },
         removeOnComplete: true,
       },
     );

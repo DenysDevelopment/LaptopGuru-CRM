@@ -61,7 +61,6 @@ model Company {
   auditLogs          AuditLog[]
   landingVisits      LandingVisit[]
   quickLinkVisits    QuickLinkVisit[]
-  videoWatchEvents   VideoWatchEvent[]
   mobileUploadTokens MobileUploadToken[]
 }
 
@@ -152,20 +151,6 @@ enum VideoStatus {
   FAILED
 }
 
-enum VideoEventType {
-  PLAY
-  PAUSE
-  SEEK
-  ENDED
-  HEARTBEAT
-  RATE_CHANGE
-  QUALITY_CHANGE
-  FULLSCREEN
-  VOLUME_CHANGE
-  ERROR
-  BUFFERING
-}
-
 enum VideoSessionEndReason {
   ENDED
   PAUSED_LONG
@@ -215,7 +200,6 @@ model Video {
   updatedAt           DateTime     @updatedAt
 
   landings            Landing[]
-  watchEvents         VideoWatchEvent[]
   playbackSessions    VideoPlaybackSession[]
   secondStats         VideoSecondStats[]
   mobileUploadToken   MobileUploadToken?
@@ -245,38 +229,6 @@ model MobileUploadToken {
   @@index([expiresAt])
   @@index([companyId])
   @@index([userId])
-}
-
-model VideoWatchEvent {
-  id              String         @id @default(cuid())
-  landingVisitId  String
-  landingVisit    LandingVisit   @relation(fields: [landingVisitId], references: [id], onDelete: Cascade)
-  videoId         String
-  video           Video          @relation(fields: [videoId], references: [id])
-
-  // Client-generated UUID for idempotent ingestion (retries/dup flushes are safe).
-  clientEventId   String
-
-  eventType       VideoEventType
-  position        Float
-  seekFrom        Float?
-  seekTo          Float?
-  playbackRate    Float          @default(1.0)
-  volume          Float?
-  isFullscreen    Boolean?
-  errorMessage    String?
-
-  clientTimestamp  DateTime
-  serverTimestamp  DateTime       @default(now())
-
-  companyId       String
-  company         Company        @relation(fields: [companyId], references: [id])
-
-  @@unique([landingVisitId, clientEventId])
-  @@index([videoId, serverTimestamp])
-  @@index([videoId, eventType])
-  @@index([landingVisitId])
-  @@index([companyId])
 }
 
 model Landing {
@@ -513,7 +465,6 @@ model LandingVisit {
   // Extended data — all exotic fingerprinting in JSON
   extendedData    Json?
 
-  watchEvents     VideoWatchEvent[]
   playbackSessions VideoPlaybackSession[]
 
   @@index([landingId])

@@ -4,10 +4,10 @@ import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import {
   Eye, User, ShoppingCart, TrendingUp, Clock,
-  ScrollText, Play, Pause, Clapperboard, Hourglass,
+  ScrollText, Play, Clapperboard, Hourglass,
   Globe, Building2, Smartphone, Globe2, Monitor,
   Link2, Megaphone, Settings, Wifi, Palette,
-  BarChart3, Key, SkipForward, CheckCircle, AlertCircle, Gauge, Film,
+  BarChart3, Key, Film,
 } from "lucide-react";
 
 interface VideoAnalytics {
@@ -38,20 +38,6 @@ interface VideoAnalytics {
     country: string | null;
     device: string | null;
     browser: string | null;
-  }[];
-}
-
-interface VisitVideoAnalytics {
-  segments: boolean[];
-  durationSeconds: number;
-  watchPercentage: number;
-  events: {
-    eventType: string;
-    position: number;
-    seekFrom: number | null;
-    seekTo: number | null;
-    playbackRate: number;
-    clientTimestamp: string;
   }[];
 }
 
@@ -375,7 +361,6 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
               v={v}
               slug={slug}
               videoDurationSeconds={data.landing.videoDurationSeconds}
-              isS3Video={data.landing.videoSource === "S3"}
             />
           ))}
           {/* Pagination */}
@@ -437,26 +422,10 @@ function KPI({ label, value, icon, accent }: { label: string; value: number | st
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function VisitCard({ v, slug, videoDurationSeconds, isS3Video }: { v: any; slug: string; videoDurationSeconds: number | null; isS3Video: boolean }) {
+function VisitCard({ v, slug, videoDurationSeconds }: { v: any; slug: string; videoDurationSeconds: number | null }) {
   const [open, setOpen] = useState(false);
-  const [videoData, setVideoData] = useState<VisitVideoAnalytics | null>(null);
-  const [videoLoading, setVideoLoading] = useState(false);
 
-  useEffect(() => {
-    if (open && v.videoPlayed && !videoData && !videoLoading && isS3Video) {
-      let cancelled = false;
-      setVideoLoading(true);
-      fetch(`/api/landings/${slug}/visits/${v.id}/video-events`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((d) => { if (!cancelled && d) setVideoData(d); })
-        .catch(() => {})
-        .finally(() => { if (!cancelled) setVideoLoading(false); });
-      return () => { cancelled = true; };
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, v.videoPlayed, v.id, slug, isS3Video]);
-
-  // Compute video watch percentage from basic data when detailed data not yet loaded
+  // Compute video watch percentage from visit-level aggregates
   const basicWatchPct = v.videoPlayed && videoDurationSeconds && videoDurationSeconds > 0 && v.videoWatchTime
     ? Math.min(100, Math.round((v.videoWatchTime / videoDurationSeconds) * 100))
     : null;
@@ -506,14 +475,22 @@ function VisitCard({ v, slug, videoDurationSeconds, isS3Video }: { v: any; slug:
           {/* Video analytics section — full width above the grid */}
           {v.videoPlayed && (
             <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-              <p className="font-semibold text-gray-900 flex items-center gap-1.5">
-                <Film className="w-4 h-4 text-indigo-500" /> Видео-просмотр
-              </p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-semibold text-gray-900 flex items-center gap-1.5">
+                  <Film className="w-4 h-4 text-indigo-500" /> Видео-просмотр
+                </p>
+                <Link
+                  href={`/analytics/${slug}/${v.id}`}
+                  className="text-xs text-brand hover:text-brand-hover transition-colors"
+                >
+                  Подробнее →
+                </Link>
+              </div>
 
               {/* Basic stats */}
               <div className="flex flex-wrap gap-x-6 gap-y-1">
                 <DataRow label="Время просмотра" value={v.videoWatchTime ? formatTime(v.videoWatchTime) : "—"} />
-                <DataRow label="Просмотрено" value={videoData ? `${videoData.watchPercentage}%` : basicWatchPct != null ? `${basicWatchPct}%` : "—"} />
+                <DataRow label="Просмотрено" value={basicWatchPct != null ? `${basicWatchPct}%` : "—"} />
                 <DataRow label="Досмотрел" value={v.videoCompleted ? "Да" : "Нет"} />
                 {v.videoTimeToPlay != null && <DataRow label="До воспроизв." value={`${(v.videoTimeToPlay / 1000).toFixed(1)}с`} />}
                 {v.videoBufferCount != null && v.videoBufferCount > 0 && (
@@ -523,47 +500,6 @@ function VisitCard({ v, slug, videoDurationSeconds, isS3Video }: { v: any; slug:
                   <DataRow label="Dropped frames" value={String(v.videoDroppedFrames)} />
                 )}
               </div>
-
-              {/* Segment strip */}
-              {videoLoading && (
-                <p className="text-gray-400 text-[11px]">Загрузка...</p>
-              )}
-              {videoData && videoData.segments.length > 0 && (
-                <div>
-                  <p className="text-[11px] text-gray-400 mb-1">Какие части видео смотрел</p>
-                  <div className="flex gap-px h-5 rounded overflow-hidden">
-                    {videoData.segments.map((watched, i) => (
-                      <div
-                        key={i}
-                        className={`flex-1 ${watched ? "bg-indigo-500" : "bg-gray-200"}`}
-                      />
-                    ))}
-                  </div>
-                  <div className="flex justify-between text-[10px] text-gray-400 mt-0.5">
-                    <span>0:00</span>
-                    <span>{formatTimecode(videoData.durationSeconds)}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Event timeline */}
-              {videoData && videoData.events.length > 0 && (
-                <div>
-                  <p className="text-[11px] text-gray-400 mb-1">События</p>
-                  <div className="max-h-40 overflow-y-auto space-y-0">
-                    {videoData.events.map((e, i) => (
-                      <div key={i} className="flex items-center gap-2 text-[11px] py-1 border-b border-gray-100 last:border-0">
-                        <VideoEventIcon type={e.eventType} />
-                        <span className="text-gray-500 w-14 flex-shrink-0">{formatTimecode(Math.round(e.position))}</span>
-                        <span className="text-gray-700">{videoEventLabel(e)}</span>
-                        <span className="text-gray-400 ml-auto flex-shrink-0">
-                          {new Date(e.clientTimestamp).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
@@ -663,32 +599,6 @@ function VisitCard({ v, slug, videoDurationSeconds, isS3Video }: { v: any; slug:
       )}
     </div>
   );
-}
-
-function VideoEventIcon({ type }: { type: string }) {
-  switch (type) {
-    case "PLAY": return <Play className="w-3 h-3 text-green-500 flex-shrink-0" />;
-    case "PAUSE": return <Pause className="w-3 h-3 text-yellow-500 flex-shrink-0" />;
-    case "SEEK": return <SkipForward className="w-3 h-3 text-gray-400 flex-shrink-0" />;
-    case "ENDED": return <CheckCircle className="w-3 h-3 text-green-600 flex-shrink-0" />;
-    case "RATE_CHANGE": return <Gauge className="w-3 h-3 text-gray-400 flex-shrink-0" />;
-    case "ERROR": return <AlertCircle className="w-3 h-3 text-red-500 flex-shrink-0" />;
-    default: return <Play className="w-3 h-3 text-gray-300 flex-shrink-0" />;
-  }
-}
-
-function videoEventLabel(e: { eventType: string; seekFrom: number | null; seekTo: number | null; playbackRate: number }): string {
-  switch (e.eventType) {
-    case "PLAY": return "Воспроизведение";
-    case "PAUSE": return "Пауза";
-    case "SEEK": return `Перемотка ${e.seekFrom != null ? formatTimecode(Math.round(e.seekFrom)) : "?"} → ${e.seekTo != null ? formatTimecode(Math.round(e.seekTo)) : "?"}`;
-    case "ENDED": return "Конец видео";
-    case "RATE_CHANGE": return `Скорость ×${e.playbackRate}`;
-    case "QUALITY_CHANGE": return "Смена качества";
-    case "FULLSCREEN": return "Полный экран";
-    case "ERROR": return "Ошибка";
-    default: return e.eventType;
-  }
 }
 
 function DataSection({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
