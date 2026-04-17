@@ -1532,10 +1532,10 @@ export function LandingClient({ landing, video }: Props) {
 							className={`pointer-events-none absolute inset-x-3 z-20 flex justify-center top-[11rem] sm:top-[12rem] md:top-16 ${
 								isVideoPlaying ? 'opacity-0' : 'opacity-100'
 							}`}>
-							<div className='inline-flex items-center rounded-full bg-white shadow-[0_6px_20px_rgba(0,0,0,0.18)] border border-white/80 px-5 py-2.5 max-w-full'>
-								<span className='text-base sm:text-lg font-bold text-[#333] text-center'>
+							<div className='mx-auto max-w-md rounded-2xl bg-white/70 backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.25)] border border-white/50 px-4 py-2.5 sm:px-5 sm:py-3'>
+								<p className='text-base sm:text-lg font-bold text-[#333] m-0 text-center leading-tight'>
 									{video.title}
-								</span>
+								</p>
 							</div>
 						</div>
 
