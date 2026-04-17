@@ -19,6 +19,7 @@ interface Props {
 	onSeeked: (seekFrom: number, seekTo: number) => void;
 	onBufferStart: () => void;
 	onBufferEnd: () => void;
+	onVideoElement?: (el: HTMLVideoElement | null) => void;
 }
 
 export default function VideoPlayer(props: Props) {
@@ -39,9 +40,14 @@ function PlayerInstance({
 	onSeeked,
 	onBufferStart,
 	onBufferEnd,
+	onVideoElement,
 }: Props) {
 	const videoRef = useRef<HTMLVideoElement>(null);
 	const barRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		onVideoElement?.(videoRef.current);
+	}, [onVideoElement]);
 
 	// --- Analytics refs (preserved from previous implementation) ---
 	const lastKnownTime = useRef(0);

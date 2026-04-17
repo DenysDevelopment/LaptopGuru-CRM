@@ -1,6 +1,7 @@
 'use client';
 
 import VideoPlayer from '@/components/landing/video-player';
+import { useVideoTracker } from '@/components/landing/video-tracker';
 import {
 	Cpu,
 	HardDrive,
@@ -339,22 +340,6 @@ export function LandingClient({ landing, video }: Props) {
 	const videoWatchStartRef = useRef<number | null>(null);
 	const videoWatchAccumRef = useRef(0);
 	const videoCompletedRef = useRef(false);
-	const videoEventsBuffer = useRef<
-		{
-			clientEventId: string;
-			eventType: string;
-			position: number;
-			seekFrom?: number;
-			seekTo?: number;
-			clientTimestamp: string;
-		}[]
-	>([]);
-	const lastHeartbeatRef = useRef(0);
-	const lastSentHeartbeatPos = useRef(-1);
-	// Buffer/quality tracking
-	const bufferStartRef = useRef<number | null>(null);
-	const bufferCountRef = useRef(0);
-	const bufferTotalMsRef = useRef(0);
 	const firstPlayTimeRef = useRef<number | null>(null);
 
 	// Create a promise that resolves when visitId is ready
@@ -366,55 +351,16 @@ export function LandingClient({ landing, video }: Props) {
 		visitIdPromise.current = { resolve: resolve!, promise };
 	}
 
-	// POST video events — waits for visitId if not ready. On page hide / unload,
-	// prefers navigator.sendBeacon (more reliable than fetch keepalive on Safari/Firefox).
-	// Callers on the unload path pass { unload: true } because visibilityState may
-	// still be 'visible' during beforeunload, which would otherwise skip sendBeacon.
-	const postVideoEvents = useCallback(
-		(events: typeof videoEventsBuffer.current, opts?: { unload?: boolean }) => {
-			if (events.length === 0 || video.source !== 'S3') return;
-			const url = `/api/landings/${landing.slug}/video-events`;
-			const doPost = (visitId: string) => {
-				const payload = JSON.stringify({
-					videoId: video.id,
-					landingVisitId: visitId,
-					events,
-				});
-				const unloading =
-					opts?.unload ||
-					(typeof document !== 'undefined' &&
-						document.visibilityState === 'hidden');
-				if (
-					unloading &&
-					typeof navigator !== 'undefined' &&
-					typeof navigator.sendBeacon === 'function'
-				) {
-					try {
-						const blob = new Blob([payload], { type: 'application/json' });
-						if (navigator.sendBeacon(url, blob)) return;
-					} catch {
-						// fall through to fetch
-					}
-				}
-				fetch(url, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: payload,
-					keepalive: true,
-				})
-					.then(r => {
-						if (!r.ok) console.warn('[video-events] POST failed:', r.status);
-					})
-					.catch(e => console.warn('[video-events] POST error:', e));
-			};
-			if (visitIdRef.current) {
-				doPost(visitIdRef.current);
-			} else {
-				visitIdPromise.current!.promise.then(doPost);
-			}
-		},
-		[landing.slug, video.id, video.source],
-	);
+	const videoElRef = useRef<HTMLVideoElement | null>(null);
+
+	const tracker = useVideoTracker({
+		slug: landing.slug,
+		visitIdRef,
+		visitReady: visitIdPromise.current!.promise,
+		videoId: video.id,
+		videoSource: video.source as 'S3' | 'YOUTUBE',
+		videoElement: videoElRef.current,
+	});
 
 	// PATCH engagement — waits for visitId if not ready
 	const sendUpdate = useCallback(
@@ -438,25 +384,6 @@ export function LandingClient({ landing, video }: Props) {
 			}
 		},
 		[landing.slug],
-	);
-
-	// Flush buffered heartbeats
-	const flushVideoEvents = useCallback(
-		(opts?: { unload?: boolean }) => {
-			const events = videoEventsBuffer.current;
-			if (events.length === 0) return;
-			videoEventsBuffer.current = [];
-			postVideoEvents(events, opts);
-		},
-		[postVideoEvents],
-	);
-
-	// Send a single event immediately
-	const sendVideoEventNow = useCallback(
-		(event: (typeof videoEventsBuffer.current)[0]) => {
-			postVideoEvents([event]);
-		},
-		[postVideoEvents],
 	);
 
 	// Initial visit registration — collect ABSOLUTELY EVERYTHING
@@ -1156,15 +1083,33 @@ export function LandingClient({ landing, video }: Props) {
 					videoPlayedRef.current = true;
 					if (!videoWatchStartRef.current)
 						videoWatchStartRef.current = Date.now();
+					tracker.onPlay();
+					sendUpdate({ videoPlayed: true });
 				}
-				if (state === 0 || state === 2) {
-					// ended or paused
+				if (state === 2) {
+					// paused
 					if (videoWatchStartRef.current) {
 						videoWatchAccumRef.current += Math.round(
 							(Date.now() - videoWatchStartRef.current) / 1000,
 						);
 						videoWatchStartRef.current = null;
 					}
+					tracker.onPause();
+				}
+				if (state === 0) {
+					// ended
+					if (videoWatchStartRef.current) {
+						videoWatchAccumRef.current += Math.round(
+							(Date.now() - videoWatchStartRef.current) / 1000,
+						);
+						videoWatchStartRef.current = null;
+					}
+					videoCompletedRef.current = true;
+					tracker.onEnded();
+				}
+				if (state === 3) {
+					// buffering
+					tracker.onBufferStart();
 				}
 			}
 
@@ -1178,14 +1123,30 @@ export function LandingClient({ landing, video }: Props) {
 					videoPlayedRef.current = true;
 					if (!videoWatchStartRef.current)
 						videoWatchStartRef.current = Date.now();
+					tracker.onPlay();
+					sendUpdate({ videoPlayed: true });
 				}
-				if (state === 0 || state === 2) {
+				if (state === 2) {
 					if (videoWatchStartRef.current) {
 						videoWatchAccumRef.current += Math.round(
 							(Date.now() - videoWatchStartRef.current) / 1000,
 						);
 						videoWatchStartRef.current = null;
 					}
+					tracker.onPause();
+				}
+				if (state === 0) {
+					if (videoWatchStartRef.current) {
+						videoWatchAccumRef.current += Math.round(
+							(Date.now() - videoWatchStartRef.current) / 1000,
+						);
+						videoWatchStartRef.current = null;
+					}
+					videoCompletedRef.current = true;
+					tracker.onEnded();
+				}
+				if (state === 3) {
+					tracker.onBufferStart();
 				}
 			}
 		}
@@ -1220,6 +1181,9 @@ export function LandingClient({ landing, video }: Props) {
 			window.removeEventListener('message', onMessage);
 			observer.disconnect();
 		};
+		// tracker/sendUpdate are closures that read from refs; pinning to video.source
+		// avoids tearing down the iframe listener on each render.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [video.source]);
 
 	// Periodic engagement updates + final update on unload
@@ -1258,10 +1222,6 @@ export function LandingClient({ landing, video }: Props) {
 				...(firstPlayTimeRef.current != null && {
 					videoTimeToPlay: firstPlayTimeRef.current,
 				}),
-				...(bufferCountRef.current > 0 && {
-					videoBufferCount: bufferCountRef.current,
-					videoBufferTime: bufferTotalMsRef.current,
-				}),
 				...(droppedFrames != null && { videoDroppedFrames: droppedFrames }),
 			};
 		}
@@ -1269,25 +1229,21 @@ export function LandingClient({ landing, video }: Props) {
 		// First update after 5 seconds, then every 10 seconds
 		const firstTimeout = setTimeout(() => {
 			sendUpdate(buildEngagement());
-			flushVideoEvents();
 		}, 5000);
 		const interval = setInterval(() => {
 			sendUpdate(buildEngagement());
-			flushVideoEvents();
 		}, 10000);
 
 		// On unload — final send. pagehide is the only reliable signal on iOS Safari
 		// (beforeunload often doesn't fire on swipe-close), so we listen for both.
 		function onUnload() {
 			sendUpdate(buildEngagement());
-			flushVideoEvents({ unload: true });
 		}
 		window.addEventListener('beforeunload', onUnload);
 		window.addEventListener('pagehide', onUnload);
 		const onVisChange = () => {
 			if (document.hidden) {
 				sendUpdate(buildEngagement());
-				flushVideoEvents({ unload: true });
 			}
 		};
 		document.addEventListener('visibilitychange', onVisChange);
@@ -1299,7 +1255,7 @@ export function LandingClient({ landing, video }: Props) {
 			window.removeEventListener('pagehide', onUnload);
 			document.removeEventListener('visibilitychange', onVisChange);
 		};
-	}, [sendUpdate, flushVideoEvents]);
+	}, [sendUpdate]);
 
 	// Scroll-reveal animations via IntersectionObserver
 	const [showCta, setShowCta] = useState(false);
@@ -1546,28 +1502,19 @@ export function LandingClient({ landing, video }: Props) {
 							<VideoPlayer
 								src={video.videoUrl}
 								poster='/poster.webp'
+								onVideoElement={el => {
+									videoElRef.current = el;
+								}}
 								onPlay={() => {
 									videoPlayedRef.current = true;
 									setIsVideoPlaying(true);
 									if (!videoWatchStartRef.current)
 										videoWatchStartRef.current = Date.now();
-									// Track time to first play
 									if (firstPlayTimeRef.current == null) {
 										firstPlayTimeRef.current =
 											Date.now() - (startTimeRef.current ?? Date.now());
 									}
-									// Send PLAY event + flush any buffered heartbeats + update engagement
-									flushVideoEvents();
-									const pos = lastHeartbeatRef.current;
-									sendVideoEventNow({
-										clientEventId: crypto.randomUUID(),
-										eventType: 'PLAY',
-										position: pos,
-										clientTimestamp: new Date().toISOString(),
-									});
-									// Anchor heartbeat origin at the play position; the first real HEARTBEAT
-									// will fire after 1s of actual playback. No synthetic heartbeat here.
-									lastSentHeartbeatPos.current = pos;
+									tracker.onPlay();
 									sendUpdate({ videoPlayed: true });
 								}}
 								onPause={() => {
@@ -1578,18 +1525,7 @@ export function LandingClient({ landing, video }: Props) {
 										);
 										videoWatchStartRef.current = null;
 									}
-									// Flush heartbeats + send PAUSE + update engagement
-									flushVideoEvents();
-									sendVideoEventNow({
-										clientEventId: crypto.randomUUID(),
-										eventType: 'PAUSE',
-										position: lastHeartbeatRef.current,
-										clientTimestamp: new Date().toISOString(),
-									});
-									sendUpdate({
-										videoPlayed: true,
-										videoWatchTime: videoWatchAccumRef.current,
-									});
+									tracker.onPause();
 								}}
 								onEnded={() => {
 									videoCompletedRef.current = true;
@@ -1600,71 +1536,19 @@ export function LandingClient({ landing, video }: Props) {
 										);
 										videoWatchStartRef.current = null;
 									}
-									// Flush heartbeats + send ENDED + update engagement
-									flushVideoEvents();
-									sendVideoEventNow({
-										clientEventId: crypto.randomUUID(),
-										eventType: 'ENDED',
-										position: lastHeartbeatRef.current,
-										clientTimestamp: new Date().toISOString(),
-									});
-									sendUpdate({
-										videoPlayed: true,
-										videoWatchTime: videoWatchAccumRef.current,
-										videoCompleted: true,
-									});
+									tracker.onEnded();
 								}}
-								onTimeUpdate={currentTime => {
-									lastHeartbeatRef.current = currentTime;
-									// Buffer HEARTBEAT every 1 second of playback for second-level
-									// position tracking. Plyr fires onTimeUpdate ~4x/sec, so we gate
-									// on video currentTime advancing at least 1s since the last send.
-									if (currentTime - lastSentHeartbeatPos.current >= 1) {
-										lastSentHeartbeatPos.current = currentTime;
-										videoEventsBuffer.current.push({
-											clientEventId: crypto.randomUUID(),
-											eventType: 'HEARTBEAT',
-											position: currentTime,
-											clientTimestamp: new Date().toISOString(),
-										});
-									}
-									// Flush every 10 buffered heartbeats (≈10s) to stay well under the
-									// 60 requests/min per-visit rate limit while keeping data fresh.
-									if (videoEventsBuffer.current.length >= 10)
-										flushVideoEvents();
+								onTimeUpdate={() => {
+									// Tracker owns TICK generation on its own timer — nothing to do here.
 								}}
 								onSeeked={(seekFrom, seekTo) => {
-									// Flush heartbeats + send SEEK. Do NOT push a synthetic HEARTBEAT —
-									// a real one will come once playback has advanced 1s past seekTo.
-									flushVideoEvents();
-									lastHeartbeatRef.current = seekTo;
-									lastSentHeartbeatPos.current = seekTo;
-									sendVideoEventNow({
-										clientEventId: crypto.randomUUID(),
-										eventType: 'SEEK',
-										position: seekTo,
-										seekFrom,
-										seekTo,
-										clientTimestamp: new Date().toISOString(),
-									});
+									tracker.onSeek(
+										Math.round(seekFrom * 1000),
+										Math.round(seekTo * 1000),
+									);
 								}}
-								onBufferStart={() => {
-									bufferStartRef.current = Date.now();
-									bufferCountRef.current++;
-									sendVideoEventNow({
-										clientEventId: crypto.randomUUID(),
-										eventType: 'BUFFERING',
-										position: lastHeartbeatRef.current,
-										clientTimestamp: new Date().toISOString(),
-									});
-								}}
-								onBufferEnd={() => {
-									if (bufferStartRef.current) {
-										bufferTotalMsRef.current +=
-											Date.now() - bufferStartRef.current;
-										bufferStartRef.current = null;
-									}
-								}}
+								onBufferStart={() => tracker.onBufferStart()}
+								onBufferEnd={() => tracker.onBufferEnd(0)}
 							/>
 						) : video.youtubeId ? (
 							<iframe
