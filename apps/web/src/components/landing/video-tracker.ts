@@ -33,6 +33,7 @@ type TrackerState = {
   flushTimer: ReturnType<typeof setInterval> | null;
   tickTimer: ReturnType<typeof setInterval> | null;
   finalized: boolean;
+  inFlightChunk: Promise<void> | null;
 };
 
 const FLUSH_INTERVAL_MS = 3000;
@@ -76,6 +77,7 @@ export function useVideoTracker(opts: UseVideoTrackerOpts) {
     flushTimer: null,
     tickTimer: null,
     finalized: false,
+    inFlightChunk: null,
   });
 
   const getDuration = (): number => {
@@ -129,42 +131,63 @@ export function useVideoTracker(opts: UseVideoTrackerOpts) {
     if (s.finalized) return;
     if (s.buffer.length === 0 && !opts2?.final) return;
 
-    const sessionId = s.sessionId || (await ensureSession());
-    if (!sessionId) return;
-
-    const events = s.buffer;
-    s.buffer = [];
-    const body: AppendChunkRequest = {
-      seq: s.seq++,
-      events,
-      final: !!opts2?.final,
-      endReason: opts2?.endReason,
-    };
-    const url = opts2?.useBeacon
-      ? `/api/public/video-sessions/${sessionId}/chunks/beacon`
-      : `/api/public/video-sessions/${sessionId}/chunks`;
-
-    if (opts2?.useBeacon && beacon(url, body)) return;
-
-    try {
-      const r = await post(url, body);
-      if (!r.ok && r.status !== 202) {
-        // Put events back to retry on next flush, except on 410 (session gone).
-        if (r.status !== 410) {
-          s.buffer = events.concat(s.buffer);
-          if (s.buffer.length > MAX_MEM_BUFFER) {
-            // Drop oldest TICKs (never structured events).
-            s.buffer = s.buffer.filter((e) => e[1] !== EventCode.TICK).slice(-MAX_MEM_BUFFER);
-          }
-          s.seq--; // didn't accept
-        }
-      }
-    } catch {
-      s.buffer = events.concat(s.buffer);
-      s.seq--;
+    // Serialize concurrent flushes. A second call returns the first's promise so
+    // seq/buffer updates stay consistent.
+    if (s.inFlightChunk) {
+      await s.inFlightChunk;
+      // After the prior flush resolves, fall through only if there's still work
+      // to do. This matters because the first flush may have drained the buffer.
+      if (s.buffer.length === 0 && !opts2?.final) return;
     }
 
-    if (opts2?.final) s.finalized = true;
+    const promise = (async () => {
+      const sessionId = s.sessionId || (await ensureSession());
+      if (!sessionId) return;
+
+      const events = s.buffer;
+      s.buffer = [];
+      const body: AppendChunkRequest = {
+        seq: s.seq++,
+        events,
+        final: !!opts2?.final,
+        endReason: opts2?.endReason,
+      };
+      const url = opts2?.useBeacon
+        ? `/api/public/video-sessions/${sessionId}/chunks/beacon`
+        : `/api/public/video-sessions/${sessionId}/chunks`;
+
+      if (opts2?.useBeacon && beacon(url, body)) {
+        if (opts2?.final) s.finalized = true;
+        return;
+      }
+
+      try {
+        const r = await post(url, body);
+        if (!r.ok && r.status !== 202) {
+          if (r.status !== 410) {
+            s.buffer = events.concat(s.buffer);
+            if (s.buffer.length > MAX_MEM_BUFFER) {
+              s.buffer = s.buffer.filter((e) => e[1] !== EventCode.TICK).slice(-MAX_MEM_BUFFER);
+            }
+            s.seq--;
+            return;
+          }
+        }
+      } catch {
+        s.buffer = events.concat(s.buffer);
+        s.seq--;
+        return;
+      }
+
+      if (opts2?.final) s.finalized = true;
+    })();
+
+    s.inFlightChunk = promise;
+    try {
+      await promise;
+    } finally {
+      s.inFlightChunk = null;
+    }
   };
 
   const push = (tuple: EventTuple, opts2?: { flush?: boolean }) => {
@@ -276,6 +299,10 @@ export function useVideoTracker(opts: UseVideoTrackerOpts) {
       window.removeEventListener('pagehide', onPageHide);
       document.removeEventListener('freeze', onFreeze);
       window.removeEventListener('beforeunload', onBeforeUnload);
+      // SPA navigation: seal the session before disposing timers.
+      if (!state.current.finalized && state.current.startedAt > 0) {
+        void flush({ useBeacon: true, final: true, endReason: 'NAVIGATED' });
+      }
       stopTimers();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
