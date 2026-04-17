@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { Nunito } from 'next/font/google';
 import Image from 'next/image';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 const nunito = Nunito({
 	weight: ['400', '600', '700', '800'],
@@ -1304,6 +1304,10 @@ export function LandingClient({ landing, video }: Props) {
 	// Scroll-reveal animations via IntersectionObserver
 	const [showCta, setShowCta] = useState(false);
 	const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+	// Mobile hides the CTA during playback so the video stays unobstructed.
+	// Desktop has a separate layout where the CTA doesn't overlap the video,
+	// so we keep it visible there regardless of play state.
+	const isDesktop = useIsDesktop();
 	useEffect(() => {
 		const timer = setTimeout(() => {
 			const els = document.querySelectorAll('[data-animate]');
@@ -1806,7 +1810,7 @@ export function LandingClient({ landing, video }: Props) {
 
 			{landing.productUrl && (
 				<div
-					className={`pointer-events-none fixed bottom-0 inset-x-0 z-[100] to-transparent pt-16 ${showCta && !isVideoPlaying ? 'anim-slide-up' : 'opacity-0 translate-y-full'}`}
+					className={`pointer-events-none fixed bottom-0 inset-x-0 z-[100] to-transparent pt-16 ${showCta && (isDesktop || !isVideoPlaying) ? 'anim-slide-up' : 'opacity-0 translate-y-full'}`}
 					style={{
 						paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 12px)',
 						willChange: 'transform',
@@ -1828,6 +1832,34 @@ export function LandingClient({ landing, video }: Props) {
 			)}
 		</div>
 	);
+}
+
+// Subscribe to the md: breakpoint via matchMedia. Returns false during SSR
+// and on first client render, then flips to the real value on hydration —
+// acceptable because the caller uses it to relax mobile-only behavior, not
+// to decide what to render on the server.
+function useIsDesktop(): boolean {
+	return useSyncExternalStore(
+		subscribeDesktop,
+		getDesktopSnapshot,
+		getDesktopServerSnapshot,
+	);
+}
+
+function subscribeDesktop(callback: () => void): () => void {
+	if (typeof window === 'undefined' || !window.matchMedia) return () => {};
+	const mq = window.matchMedia('(min-width: 768px)');
+	mq.addEventListener('change', callback);
+	return () => mq.removeEventListener('change', callback);
+}
+
+function getDesktopSnapshot(): boolean {
+	if (typeof window === 'undefined' || !window.matchMedia) return false;
+	return window.matchMedia('(min-width: 768px)').matches;
+}
+
+function getDesktopServerSnapshot(): boolean {
+	return false;
 }
 
 function SpecRow({
