@@ -32,6 +32,12 @@ export class VideoSessionsService {
     const startedAt = new Date(body.clientStartedAt);
     if (Number.isNaN(startedAt.getTime())) throw new BadRequestException('Invalid clientStartedAt');
 
+    const now = Date.now();
+    const ageMs = now - startedAt.getTime();
+    if (ageMs > 24 * 60 * 60 * 1000 || ageMs < -5 * 60 * 1000) {
+      throw new BadRequestException('clientStartedAt out of allowed window');
+    }
+
     const row = await this.prisma.raw.videoPlaybackSession.upsert({
       where: {
         landingVisitId_videoId_startedAt: {

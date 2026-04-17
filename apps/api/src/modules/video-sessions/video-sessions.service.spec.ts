@@ -41,7 +41,7 @@ describe('VideoSessionsService.createSession', () => {
   it('creates (or returns existing) session via upsert on (visitId,videoId,startedAt)', async () => {
     prisma.raw.videoPlaybackSession.upsert.mockResolvedValue({ id: 's1' });
     const ctx = { companyId: 'c1', landingId: 'l1', visitId: 'v1', videoId: 'vid1' };
-    const started = '2026-04-14T12:00:00.000Z';
+    const started = new Date(Date.now() - 60_000).toISOString();
     const out = await service.createSession(ctx, { videoDurationMs: 120000, clientStartedAt: started });
 
     expect(out).toEqual({ sessionId: 's1' });
@@ -74,5 +74,34 @@ describe('VideoSessionsService.createSession', () => {
       ),
     ).rejects.toMatchObject({ status: 429 });
     expect(rate.check).toHaveBeenCalledWith('ratelimit:session-create:v1', 10, 60);
+  });
+
+  it('rejects invalid clientStartedAt strings with 400', async () => {
+    await expect(
+      service.createSession(
+        { companyId: 'c1', landingId: 'l1', visitId: 'v1', videoId: 'vid1' },
+        { videoDurationMs: 1000, clientStartedAt: 'not-a-date' },
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('rejects clientStartedAt outside the skew window with 400', async () => {
+    // 48 hours in the past
+    const pastFar = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    await expect(
+      service.createSession(
+        { companyId: 'c1', landingId: 'l1', visitId: 'v1', videoId: 'vid1' },
+        { videoDurationMs: 1000, clientStartedAt: pastFar },
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+
+    // 10 minutes in the future
+    const futureFar = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    await expect(
+      service.createSession(
+        { companyId: 'c1', landingId: 'l1', visitId: 'v1', videoId: 'vid1' },
+        { videoDurationMs: 1000, clientStartedAt: futureFar },
+      ),
+    ).rejects.toMatchObject({ status: 400 });
   });
 });
