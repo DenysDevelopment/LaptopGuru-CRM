@@ -1490,7 +1490,7 @@ export function LandingClient({ landing, video }: Props) {
 									height={72}
 									loading='lazy'
 									unoptimized
-									className='w-auto h-12 sm:h-14'
+									className='w-auto h-20 sm:h-24'
 								/>
 							</div>
 							<div className='bg-[#fb7830] px-4 py-2 flex items-center justify-center'>
