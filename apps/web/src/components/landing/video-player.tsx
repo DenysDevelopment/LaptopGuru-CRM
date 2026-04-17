@@ -100,7 +100,7 @@ function PlayerInstance({
 
 	const handlePause = useCallback(() => {
 		setIsPlaying(false);
-		setControlsVisible(true);
+		setControlsVisible(false);
 		if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
 		onPause();
 	}, [onPause]);
@@ -255,8 +255,8 @@ function PlayerInstance({
 			    On mobile, sits above the sticky CTA using the inherited --cta-h
 			    variable; desktop uses bottom-0 since CTA has its own layout. */}
 			<div
-				className={`pointer-events-none absolute inset-x-0 bottom-[var(--cta-h,0px)] md:bottom-0 z-[60]  to-transparent px-3 pt-8 pb-3 transition-opacity duration-200 ${
-					controlsVisible ? 'opacity-100' : 'opacity-0'
+				className={`pointer-events-none absolute inset-x-0 bottom-[var(--cta-h,0px)] md:bottom-0 z-[60]  to-transparent px-3 pt-8 pb-3 ${
+					isPlaying && controlsVisible ? 'opacity-100' : 'opacity-0'
 				}`}>
 				<div className='pointer-events-auto flex items-center gap-3'>
 					<button

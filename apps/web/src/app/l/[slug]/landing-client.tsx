@@ -1482,10 +1482,10 @@ export function LandingClient({ landing, video }: Props) {
 					<div className='relative w-full md:w-auto md:aspect-[9/16] overflow-hidden bg-black h-[100dvh] md:h-[calc(100dvh-var(--cta-h)-var(--header-h)-3rem)] md:rounded-2xl md:shadow-[0_8px_32px_rgba(0,0,0,0.15)]'>
 						{/* Top header bar — hidden while playing */}
 						<div
-							className={`pointer-events-none absolute top-0 inset-x-0 z-20 shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-opacity duration-300 ${
+							className={`pointer-events-none absolute top-0 inset-x-0 z-20 shadow-[0_4px_16px_rgba(0,0,0,0.15)] ${
 								isVideoPlaying ? 'opacity-0' : 'opacity-100'
 							}`}>
-							<div className='md:hidden bg-white px-4 pt-4 pb-3 flex items-center justify-center'>
+							<div className='md:hidden bg-white px-4 py-1.5 flex items-center justify-center'>
 								<Image
 									src='/LG_logo2.webp'
 									alt='Laptop Guru'
@@ -1493,7 +1493,7 @@ export function LandingClient({ landing, video }: Props) {
 									height={72}
 									loading='lazy'
 									unoptimized
-									className='w-auto h-12 sm:h-14'
+									className='w-auto h-14 sm:h-16'
 								/>
 							</div>
 							<div className='bg-[#fb7830] px-4 py-3 flex items-center justify-center'>
@@ -1505,7 +1505,7 @@ export function LandingClient({ landing, video }: Props) {
 
 						{/* Mobile watermark logo — visible only while playing */}
 						<div
-							className={`md:hidden pointer-events-none absolute top-3 left-3 z-10 opacity-50 transition-opacity duration-300 ${
+							className={`md:hidden pointer-events-none absolute top-3 inset-x-0 flex justify-center z-10 ${
 								isVideoPlaying ? 'opacity-50' : 'opacity-0'
 							}`}>
 							<Image
@@ -1525,7 +1525,7 @@ export function LandingClient({ landing, video }: Props) {
 
 						{/* Model badge — benefit pill below the header */}
 						<div
-							className={`pointer-events-none absolute inset-x-3 z-20 flex justify-center transition-opacity duration-300 top-[11rem] sm:top-[12rem] md:top-16 ${
+							className={`pointer-events-none absolute inset-x-3 z-20 flex justify-center top-[11rem] sm:top-[12rem] md:top-16 ${
 								isVideoPlaying ? 'opacity-0' : 'opacity-100'
 							}`}>
 							<div className='inline-flex items-center rounded-full bg-white shadow-[0_6px_20px_rgba(0,0,0,0.18)] border border-white/80 px-5 py-2.5 max-w-full'>
@@ -1672,7 +1672,7 @@ export function LandingClient({ landing, video }: Props) {
 
 						{/* Benefits overlay — visible when paused (S3 player only) */}
 						<div
-							className={`pointer-events-none absolute inset-x-3 bottom-[calc(var(--cta-h,0px)+5rem)] md:bottom-32 z-20 ${
+							className={`pointer-events-none absolute inset-x-3 bottom-[calc(var(--cta-h,0px)+1rem)] md:bottom-8 z-20 ${
 								video.source === 'S3' && !isVideoPlaying
 									? 'opacity-100'
 									: 'opacity-0'
