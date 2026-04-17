@@ -18,6 +18,8 @@ import { StatsModule } from './modules/stats/stats.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { SuperAdminModule } from './modules/super-admin/super-admin.module';
 import { CompanyGuard } from './common/guards/company.guard';
+import Redis from 'ioredis';
+import { RateLimitService, REDIS_CLIENT } from './common/services/rate-limit.service';
 
 @Module({
   imports: [
@@ -49,6 +51,12 @@ import { CompanyGuard } from './common/guards/company.guard';
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: CompanyGuard },
+    {
+      provide: REDIS_CLIENT,
+      useFactory: () => new Redis(process.env.REDIS_URL || 'redis://localhost:6379'),
+    },
+    RateLimitService,
   ],
+  exports: [RateLimitService],
 })
 export class AppModule {}
