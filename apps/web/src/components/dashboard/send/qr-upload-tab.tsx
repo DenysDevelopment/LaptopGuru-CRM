@@ -177,8 +177,8 @@ export function QrUploadTab({ title, onComplete }: Props) {
 							<img
 								src={qrDataUrl}
 								alt='QR для загрузки с телефона'
-								width={220}
-								height={220}
+								width={420}
+								height={420}
 								className='rounded-lg border border-gray-100'
 							/>
 							{status.kind === 'uploading' && (
@@ -201,7 +201,7 @@ export function QrUploadTab({ title, onComplete }: Props) {
 								: 'Видео загружается с телефона…'}
 						</p>
 
-						{status.kind === 'waiting' && (
+						{/* {status.kind === 'waiting' && (
 							<details className='w-full'>
 								<summary className='text-xs text-gray-400 cursor-pointer text-center select-none'>
 									Не работает QR? Открыть ссылку вручную
@@ -220,7 +220,7 @@ export function QrUploadTab({ title, onComplete }: Props) {
 									</button>
 								</div>
 							</details>
-						)}
+						)} */}
 
 						<div className='text-xs text-gray-400'>
 							Ссылка истекает через {String(minLeft).padStart(2, '0')}:
