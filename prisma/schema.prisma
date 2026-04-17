@@ -166,6 +166,15 @@ enum VideoEventType {
   BUFFERING
 }
 
+enum VideoSessionEndReason {
+  ENDED
+  PAUSED_LONG
+  CLOSED
+  NAVIGATED
+  ERROR
+  INCOMPLETE
+}
+
 model Video {
   id                  String       @id @default(cuid())
   source              VideoSource  @default(YOUTUBE)
@@ -207,6 +216,8 @@ model Video {
 
   landings            Landing[]
   watchEvents         VideoWatchEvent[]
+  playbackSessions    VideoPlaybackSession[]
+  secondStats         VideoSecondStats[]
   mobileUploadToken   MobileUploadToken?
 
   @@unique([youtubeId, companyId], name: "youtubeId_companyId")
@@ -503,6 +514,7 @@ model LandingVisit {
   extendedData    Json?
 
   watchEvents     VideoWatchEvent[]
+  playbackSessions VideoPlaybackSession[]
 
   @@index([landingId])
   @@index([visitedAt])
@@ -1208,4 +1220,67 @@ model TypingIndicator {
   @@unique([conversationId, contactId])
   @@index([conversationId])
   @@index([companyId])
+}
+
+model VideoPlaybackSession {
+  id               String   @id @default(cuid())
+  landingVisitId   String
+  videoId          String
+  companyId        String
+
+  startedAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  endedAt          DateTime?
+  endReason        VideoSessionEndReason?
+  finalized        Boolean  @default(false)
+
+  videoDurationMs  Int
+
+  trace            Json     @default("[]")
+  chunksReceived   Int      @default(0)
+
+  durationWatchedMs    Int?
+  uniqueSecondsWatched Int?
+  maxPositionMs        Int?
+  completionPercent    Float?
+  playCount            Int?
+  pauseCount           Int?
+  seekCount            Int?
+  bufferCount          Int?
+  bufferTimeMs         Int?
+  errorCount           Int?
+
+  visit  LandingVisit @relation(fields: [landingVisitId], references: [id], onDelete: Cascade)
+  video  Video        @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  chunks VideoSessionChunk[]
+
+  @@unique([landingVisitId, videoId, startedAt])
+  @@index([videoId, startedAt])
+  @@index([companyId, startedAt])
+  @@index([finalized, updatedAt])
+}
+
+model VideoSessionChunk {
+  sessionId  String
+  seq        Int
+  receivedAt DateTime @default(now())
+
+  session    VideoPlaybackSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@id([sessionId, seq])
+}
+
+model VideoSecondStats {
+  videoId       String
+  second        Int
+  views         Int      @default(0)
+  replays       Int      @default(0)
+  pauseCount    Int      @default(0)
+  seekAwayCount Int      @default(0)
+
+  video  Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@id([videoId, second])
+  @@index([videoId])
 }
