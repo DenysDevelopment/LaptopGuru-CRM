@@ -8,6 +8,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
 import { MessagingModule } from './modules/messaging/messaging.module';
 import { VideosModule } from './modules/videos/videos.module';
+import { VideoSessionsModule } from './modules/video-sessions/video-sessions.module';
 import { EmailsModule } from './modules/emails/emails.module';
 import { LinksModule } from './modules/links/links.module';
 import { SendModule } from './modules/send/send.module';
@@ -38,6 +39,7 @@ import { RedisProvider } from './common/services/redis-provider.service';
     HealthModule,
     MessagingModule,
     VideosModule,
+    VideoSessionsModule,
     EmailsModule,
     LinksModule,
     SendModule,
