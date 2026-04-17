@@ -153,6 +153,8 @@ describe('VideoSessionsService.appendChunk', () => {
     await expect(
       service.appendChunk(ctx, { seq: 1, events: [[0, 1, 0]], final: false } as never, { beacon: false }),
     ).rejects.toMatchObject({ status: 410 });
+    expect(prisma.raw.videoSessionChunk.create).not.toHaveBeenCalled();
+    expect(prisma.raw.$executeRaw).not.toHaveBeenCalled();
   });
 
   it('inserts chunk row, appends to trace, increments chunksReceived', async () => {
@@ -170,6 +172,7 @@ describe('VideoSessionsService.appendChunk', () => {
     expect(prisma.raw.videoSessionChunk.create).toHaveBeenCalledWith({
       data: { sessionId: 's1', seq: 1 },
     });
+    expect(prisma.raw.$executeRaw).toHaveBeenCalledTimes(1);
   });
 
   it('returns 202 on duplicate seq (unique-conflict swallowed)', async () => {
@@ -187,6 +190,24 @@ describe('VideoSessionsService.appendChunk', () => {
       { beacon: false },
     );
     expect(out).toEqual({ deduped: true });
+  });
+
+  it('does not enqueue finalize on deduplicated final chunks', async () => {
+    prisma.raw.videoPlaybackSession.findUnique.mockResolvedValue({
+      id: 's1',
+      finalized: false,
+      videoDurationMs: 10000,
+    });
+    const err = new Error('duplicate') as Error & { code?: string };
+    err.code = 'P2002';
+    prisma.raw.videoSessionChunk.create.mockRejectedValue(err);
+    const out = await service.appendChunk(
+      ctx,
+      { seq: 1, events: [[0, 1, 0]], final: true, endReason: 'ENDED' } as never,
+      { beacon: false },
+    );
+    expect(out).toEqual({ deduped: true });
+    expect(queue.add).not.toHaveBeenCalled();
   });
 
   it('enqueues finalize job when final=true', async () => {

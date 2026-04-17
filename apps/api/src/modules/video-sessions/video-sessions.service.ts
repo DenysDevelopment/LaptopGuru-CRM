@@ -109,7 +109,8 @@ export class VideoSessionsService {
       if (type === 12 && extra && typeof extra === 'object') {
         const msg = (extra as { message?: unknown }).message;
         if (typeof msg === 'string') {
-          (extra as { message: string }).message = msg.slice(0, 500);
+          // Postgres JSONB cannot store \u0000; strip before truncate.
+          (extra as { message: string }).message = msg.replace(/\u0000/g, '').slice(0, 500);
         }
       }
       validated.push(raw);
@@ -135,6 +136,12 @@ export class VideoSessionsService {
     `;
 
     if (body.final) {
+      // Enqueue BEFORE the DB update. If the enqueue fails (Redis blip), the
+      // reaper can still find this session (endedAt still null → matches its
+      // cutoff query). If the enqueue succeeds and the subsequent update
+      // fails, the worker's finalized-check + endedAt-null tolerance handles
+      // it — see FinalizeWorker (Task 12).
+      await this.finalizeQueue.add('finalize', { sessionId: ctx.sessionId, reason: 'CLIENT_FINAL' });
       await this.prisma.raw.videoPlaybackSession.update({
         where: { id: ctx.sessionId },
         data: {
@@ -142,7 +149,6 @@ export class VideoSessionsService {
           endReason: (body.endReason as EndReason | undefined) ?? 'CLOSED',
         },
       });
-      await this.finalizeQueue.add('finalize', { sessionId: ctx.sessionId, reason: 'CLIENT_FINAL' });
     }
 
     return { accepted: true };
