@@ -43,6 +43,7 @@ export class FinalizeWorker extends WorkerHost {
         where: { id: sessionId },
         data: {
           finalized: true,
+          endReason: session.endReason ?? 'INCOMPLETE',
           durationWatchedMs: 0,
           uniqueSecondsWatched: 0,
           maxPositionMs: 0,
@@ -61,53 +62,53 @@ export class FinalizeWorker extends WorkerHost {
     const agg = computeAggregates(trace, session.videoDurationMs);
     const deltas = computeSecondDeltas(trace, session.videoDurationMs);
 
-    await this.prisma.raw.videoPlaybackSession.update({
-      where: { id: sessionId },
-      data: {
-        finalized: true,
-        durationWatchedMs: agg.durationWatchedMs,
-        uniqueSecondsWatched: deltas.uniqueSecondsWatched,
-        maxPositionMs: agg.maxPositionMs,
-        completionPercent: agg.completionPercent,
-        playCount: agg.playCount,
-        pauseCount: agg.pauseCount,
-        seekCount: agg.seekCount,
-        bufferCount: agg.bufferCount,
-        bufferTimeMs: agg.bufferTimeMs,
-        errorCount: agg.errorCount,
-      },
-    });
+    await this.prisma.raw.$transaction(async (tx) => {
+      await tx.videoPlaybackSession.update({
+        where: { id: sessionId },
+        data: {
+          finalized: true,
+          durationWatchedMs: agg.durationWatchedMs,
+          uniqueSecondsWatched: deltas.uniqueSecondsWatched,
+          maxPositionMs: agg.maxPositionMs,
+          completionPercent: agg.completionPercent,
+          playCount: agg.playCount,
+          pauseCount: agg.pauseCount,
+          seekCount: agg.seekCount,
+          bufferCount: agg.bufferCount,
+          bufferTimeMs: agg.bufferTimeMs,
+          errorCount: agg.errorCount,
+        },
+      });
 
-    if (deltas.seconds.length > 0) {
-      // Upsert per-second aggregates using unnest()-based bulk INSERT ON CONFLICT.
-      await this.prisma.raw.$executeRaw`
-        INSERT INTO "VideoSecondStats" ("videoId", "second", "views", "replays", "pauseCount", "seekAwayCount")
-        SELECT ${session.videoId}, sec, v, r, p, sa
-        FROM unnest(
-          ${deltas.seconds}::int[],
-          ${deltas.views}::int[],
-          ${deltas.replays}::int[],
-          ${deltas.pauses}::int[],
-          ${deltas.seekAways}::int[]
-        ) AS t(sec, v, r, p, sa)
-        ON CONFLICT ("videoId", "second") DO UPDATE
-        SET "views"         = "VideoSecondStats"."views"         + EXCLUDED."views",
-            "replays"       = "VideoSecondStats"."replays"       + EXCLUDED."replays",
-            "pauseCount"    = "VideoSecondStats"."pauseCount"    + EXCLUDED."pauseCount",
-            "seekAwayCount" = "VideoSecondStats"."seekAwayCount" + EXCLUDED."seekAwayCount"
-      `;
-    }
+      if (deltas.seconds.length > 0) {
+        await tx.$executeRaw`
+          INSERT INTO "VideoSecondStats" ("videoId", "second", "views", "replays", "pauseCount", "seekAwayCount")
+          SELECT ${session.videoId}, sec, v, r, p, sa
+          FROM unnest(
+            ${deltas.seconds}::int[],
+            ${deltas.views}::int[],
+            ${deltas.replays}::int[],
+            ${deltas.pauses}::int[],
+            ${deltas.seekAways}::int[]
+          ) AS t(sec, v, r, p, sa)
+          ON CONFLICT ("videoId", "second") DO UPDATE
+          SET "views"         = "VideoSecondStats"."views"         + EXCLUDED."views",
+              "replays"       = "VideoSecondStats"."replays"       + EXCLUDED."replays",
+              "pauseCount"    = "VideoSecondStats"."pauseCount"    + EXCLUDED."pauseCount",
+              "seekAwayCount" = "VideoSecondStats"."seekAwayCount" + EXCLUDED."seekAwayCount"
+        `;
+      }
 
-    // Refresh denormalized LandingVisit fields so existing analytics pages keep working.
-    await this.prisma.raw.landingVisit.update({
-      where: { id: session.landingVisitId },
-      data: {
-        videoPlayed: agg.playCount > 0,
-        videoWatchTime: Math.round(agg.durationWatchedMs / 1000),
-        videoCompleted: agg.completionPercent >= 0.95,
-        videoBufferCount: agg.bufferCount,
-        videoBufferTime: agg.bufferTimeMs,
-      },
+      await tx.landingVisit.update({
+        where: { id: session.landingVisitId },
+        data: {
+          videoPlayed: agg.playCount > 0,
+          videoWatchTime: Math.round(agg.durationWatchedMs / 1000),
+          videoCompleted: agg.completionPercent >= 0.95,
+          videoBufferCount: agg.bufferCount,
+          videoBufferTime: agg.bufferTimeMs,
+        },
+      });
     });
 
     this.logger.log(`Finalized session ${sessionId}: ${agg.durationWatchedMs}ms watched`);
