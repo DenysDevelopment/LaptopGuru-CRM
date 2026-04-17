@@ -3,11 +3,12 @@ import { BullModule } from '@nestjs/bullmq';
 import { PublicLandingGuard } from '../../common/guards/public-landing.guard';
 import { VideoSessionsController } from './video-sessions.controller';
 import { VideoSessionsService } from './video-sessions.service';
+import { FinalizeWorker } from './workers/finalize.worker';
 
 @Module({
   imports: [BullModule.registerQueue({ name: 'video-session-finalize' })],
   controllers: [VideoSessionsController],
-  providers: [PublicLandingGuard, VideoSessionsService],
+  providers: [PublicLandingGuard, VideoSessionsService, FinalizeWorker],
   exports: [VideoSessionsService],
 })
 export class VideoSessionsModule {}
