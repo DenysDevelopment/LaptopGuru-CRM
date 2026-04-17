@@ -15,7 +15,7 @@ interface Props {
 type Tab = 'computer' | 'phone';
 
 export function AddVideoModal({ open, onClose, onCreated }: Props) {
-	const [tab, setTab] = useState<Tab>('computer');
+	const [tab, setTab] = useState<Tab>('phone');
 	const [title, setTitle] = useState('');
 	const [phase, setPhase] = useState<'form' | 'active' | 'uploading'>('form');
 	const [progress, setProgress] = useState(0);
@@ -25,7 +25,7 @@ export function AddVideoModal({ open, onClose, onCreated }: Props) {
 	// Reset on open so each invocation starts fresh
 	useEffect(() => {
 		if (!open) return;
-		setTab('computer');
+		setTab('phone');
 		setTitle('');
 		setPhase('form');
 		setProgress(0);
@@ -174,17 +174,6 @@ export function AddVideoModal({ open, onClose, onCreated }: Props) {
 					<div className='grid grid-cols-2 bg-gray-100 rounded-lg p-1'>
 						<button
 							type='button'
-							onClick={() => setTab('computer')}
-							disabled={phase === 'uploading' || phase === 'active'}
-							className={`text-sm py-1.5 rounded-md transition-colors disabled:opacity-50 ${
-								tab === 'computer'
-									? 'bg-white shadow-sm text-gray-900'
-									: 'text-gray-600 hover:text-gray-900'
-							}`}>
-							💻 С компьютера
-						</button>
-						<button
-							type='button'
 							onClick={() => setTab('phone')}
 							disabled={phase === 'uploading' || phase === 'active'}
 							className={`text-sm py-1.5 rounded-md transition-colors disabled:opacity-50 ${
@@ -193,6 +182,17 @@ export function AddVideoModal({ open, onClose, onCreated }: Props) {
 									: 'text-gray-600 hover:text-gray-900'
 							}`}>
 							📱 Снять на телефон
+						</button>
+						<button
+							type='button'
+							onClick={() => setTab('computer')}
+							disabled={phase === 'uploading' || phase === 'active'}
+							className={`text-sm py-1.5 rounded-md transition-colors disabled:opacity-50 ${
+								tab === 'computer'
+									? 'bg-white shadow-sm text-gray-900'
+									: 'text-gray-600 hover:text-gray-900'
+							}`}>
+							💻 С компьютера
 						</button>
 					</div>
 

@@ -1,7 +1,7 @@
 'use client';
 
+import { AddVideoModal } from '@/components/dashboard/send/add-video-modal';
 import { VideoStatusBadge } from '@/components/dashboard/videos/video-status-badge';
-import { VideoUploader } from '@/components/dashboard/videos/video-uploader';
 import { YouTubeChannelCard } from '@/components/dashboard/videos/youtube-channel-card';
 import { EmptyState } from '@/components/ui/empty-state';
 import type { Video } from '@/types';
@@ -18,9 +18,7 @@ function formatFileSize(bytes: number): string {
 export default function VideosPage() {
 	const [videos, setVideos] = useState<Video[]>([]);
 	const [loading, setLoading] = useState(true);
-	const [url, setUrl] = useState('');
-	const [adding, setAdding] = useState(false);
-	const [error, setError] = useState('');
+	const [modalOpen, setModalOpen] = useState(false);
 
 	const fetchVideos = useCallback(async () => {
 		try {
@@ -65,30 +63,6 @@ export default function VideosPage() {
 		};
 	}, [videos, fetchVideos]);
 
-	async function handleAdd(e: React.FormEvent) {
-		e.preventDefault();
-		setError('');
-		setAdding(true);
-
-		try {
-			const res = await fetch('/api/videos', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ url }),
-			});
-			const data = await res.json();
-			if (!res.ok) setError(data.error);
-			else {
-				setUrl('');
-				fetchVideos();
-			}
-		} catch {
-			setError('Ошибка соединения');
-		}
-
-		setAdding(false);
-	}
-
 	async function handleDelete(id: string) {
 		if (!confirm('Удалить это видео из библиотеки?')) return;
 		await fetch(`/api/videos/${id}`, { method: 'DELETE' });
@@ -97,39 +71,43 @@ export default function VideosPage() {
 
 	return (
 		<div>
-			<div className='mb-6'>
+			<div className='mb-6 flex items-center justify-between'>
 				<h1 className='text-2xl font-bold text-gray-900'>Видео</h1>
+				<button
+					type='button'
+					onClick={() => setModalOpen(true)}
+					className='bg-brand hover:bg-brand-hover text-white font-medium px-4 py-2 rounded-lg transition-colors inline-flex items-center gap-1.5'
+					aria-label='Добавить новое видео'>
+					<svg
+						className='w-4 h-4'
+						fill='none'
+						viewBox='0 0 24 24'
+						strokeWidth={2.2}
+						stroke='currentColor'>
+						<path
+							strokeLinecap='round'
+							strokeLinejoin='round'
+							d='M12 4.5v15m7.5-7.5h-15'
+						/>
+					</svg>
+					Добавить
+				</button>
 			</div>
 
 			<YouTubeChannelCard onSyncComplete={fetchVideos} />
 
-			<VideoUploader onUploadComplete={fetchVideos} />
-
-			<form onSubmit={handleAdd} className='mb-8'>
-				<div className='flex gap-3'>
-					<input
-						type='text'
-						value={url}
-						onChange={e => setUrl(e.target.value)}
-						placeholder='Ссылка на YouTube видео...'
-						className='flex-1 rounded-lg border border-gray-200 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-brand focus:ring-2 focus:ring-brand-muted outline-none transition-colors'
-					/>
-					<button
-						type='submit'
-						disabled={adding || !url.trim()}
-						className='bg-brand hover:bg-brand-hover text-white font-medium px-5 py-2.5 rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap'>
-						{adding ? 'Добавление...' : 'Добавить'}
-					</button>
-				</div>
-				{error && <p className='text-sm text-red-500 mt-2'>{error}</p>}
-			</form>
+			<AddVideoModal
+				open={modalOpen}
+				onClose={() => setModalOpen(false)}
+				onCreated={() => fetchVideos()}
+			/>
 
 			{loading ? (
 				<div className='text-center py-12 text-gray-400'>Загрузка...</div>
 			) : videos.length === 0 ? (
 				<EmptyState
 					title='Видео пока нет'
-					subtitle='Добавьте первое видео, вставив ссылку выше'
+					subtitle='Нажмите «Добавить», чтобы загрузить первое видео'
 				/>
 			) : (
 				<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
