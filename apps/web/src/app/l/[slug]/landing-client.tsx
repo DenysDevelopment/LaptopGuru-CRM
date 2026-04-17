@@ -1501,8 +1501,35 @@ export function LandingClient({ landing, video }: Props) {
 									Sprawdzamy Twój laptop
 								</span>
 							</div>
-							<div className='bg-white/95 backdrop-blur-sm px-4 py-2 flex items-center justify-center border-t border-white/60'>
-								<span className='text-sm sm:text-base font-bold text-[#333] tracking-tight text-center line-clamp-1 max-w-full'>
+						</div>
+
+						{/* Mobile watermark logo — visible only while playing */}
+						<div
+							className={`md:hidden pointer-events-none absolute top-3 left-3 z-10 opacity-50 transition-opacity duration-300 ${
+								isVideoPlaying ? 'opacity-50' : 'opacity-0'
+							}`}>
+							<Image
+								src='/LG_logo2.webp'
+								alt=''
+								width={120}
+								height={43}
+								loading='lazy'
+								unoptimized
+								className='w-auto h-20'
+								style={{
+									filter:
+										'brightness(0) invert(1) drop-shadow(0 2px 4px rgba(0,0,0,0.7))',
+								}}
+							/>
+						</div>
+
+						{/* Model badge — benefit pill below the header */}
+						<div
+							className={`pointer-events-none absolute inset-x-3 z-20 flex justify-center transition-opacity duration-300 top-[11rem] sm:top-[12rem] md:top-16 ${
+								isVideoPlaying ? 'opacity-0' : 'opacity-100'
+							}`}>
+							<div className='inline-flex items-center rounded-full bg-white shadow-[0_6px_20px_rgba(0,0,0,0.18)] border border-white/80 px-5 py-2.5 max-w-full'>
+								<span className='text-base sm:text-lg font-bold text-[#333] line-clamp-1'>
 									{video.title}
 								</span>
 							</div>
