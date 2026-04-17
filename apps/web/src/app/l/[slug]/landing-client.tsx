@@ -1450,7 +1450,7 @@ export function LandingClient({ landing, video }: Props) {
 				}}
 			/>
 
-			<div className='flex-1 pb-28 '>
+			<div className='flex-1 pb-[var(--cta-h)] md:pb-28'>
 				{/* Header — desktop only, orange gradient with logo */}
 				<div
 					className='hidden md:block py-1 px-6 text-center header-shine'
