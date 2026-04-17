@@ -1359,7 +1359,18 @@ export function LandingClient({ landing, video }: Props) {
 	return (
 		<div
 			className={`min-h-screen bg-[#f5f5f5] flex flex-col ${nunito.className}`}
-			style={{ margin: 0, padding: 0 }}>
+			style={
+				{
+					margin: 0,
+					padding: 0,
+					// Published at the root so every descendant sees it — both the
+					// mobile bottom-spacer (pb-[var(--cta-h)]) a few levels up and the
+					// video height calc a few levels down rely on the same value.
+					'--cta-h':
+						'calc(85px + max(env(safe-area-inset-bottom, 0px), 12px))',
+					'--header-h': '86px',
+				} as React.CSSProperties
+			}>
 			{/* Animation styles */}
 			<style
 				dangerouslySetInnerHTML={{
@@ -1474,16 +1485,8 @@ export function LandingClient({ landing, video }: Props) {
 				    object-cover so it crops to fit the viewport aspect instead of
 				    showing letterbox bars. Mobile-only watermark sits in the
 				    middle (desktop has the header logo above instead). */}
-				<div
-					className='w-full flex items-center justify-center md:py-6 md:mb-6'
-					style={
-						{
-							'--cta-h':
-								'calc(85px + max(env(safe-area-inset-bottom, 0px), 12px))',
-							'--header-h': '86px',
-						} as React.CSSProperties
-					}>
-					<div className='relative w-full md:w-auto md:aspect-[9/16] overflow-hidden bg-black h-[100dvh] md:h-[calc(100dvh-var(--cta-h)-var(--header-h)-3rem)] md:rounded-2xl md:shadow-[0_8px_32px_rgba(0,0,0,0.15)]'>
+				<div className='w-full flex items-center justify-center md:py-6 md:mb-6'>
+					<div className='relative w-full md:w-auto md:aspect-[9/16] overflow-hidden bg-black h-screen h-[100dvh] md:h-[calc(100vh-var(--cta-h)-var(--header-h)-3rem)] md:h-[calc(100dvh-var(--cta-h)-var(--header-h)-3rem)] md:rounded-2xl md:shadow-[0_8px_32px_rgba(0,0,0,0.15)]'>
 						{/* Top header bar — hidden while playing */}
 						<div
 							className={`pointer-events-none absolute top-0 inset-x-0 z-20 shadow-[0_4px_16px_rgba(0,0,0,0.15)] ${
