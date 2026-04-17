@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { BullModule } from '@nestjs/bullmq';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ClsModule } from 'nestjs-cls';
 import { PrismaModule } from './prisma/prisma.module';
@@ -29,6 +30,7 @@ import { RedisProvider } from './common/services/redis-provider.service';
       middleware: { mount: true },
     }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 20 }]),
+    ScheduleModule.forRoot(),
     BullModule.forRoot({
       connection: {
         url: process.env.REDIS_URL || 'redis://localhost:6379',

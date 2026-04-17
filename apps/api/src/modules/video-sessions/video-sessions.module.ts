@@ -4,6 +4,7 @@ import { PublicLandingGuard } from '../../common/guards/public-landing.guard';
 import { VideoSessionsController } from './video-sessions.controller';
 import { VideoSessionsService } from './video-sessions.service';
 import { FinalizeWorker } from './workers/finalize.worker';
+import { ReaperCron } from './workers/reaper.cron';
 
 @Module({
   imports: [
@@ -18,7 +19,7 @@ import { FinalizeWorker } from './workers/finalize.worker';
     }),
   ],
   controllers: [VideoSessionsController],
-  providers: [PublicLandingGuard, VideoSessionsService, FinalizeWorker],
+  providers: [PublicLandingGuard, VideoSessionsService, FinalizeWorker, ReaperCron],
   exports: [VideoSessionsService],
 })
 export class VideoSessionsModule {}
