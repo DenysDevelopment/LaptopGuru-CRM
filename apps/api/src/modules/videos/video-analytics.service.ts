@@ -187,42 +187,43 @@ export class VideoAnalyticsService {
   }
 
   private async getBreakdowns(videoId: string, from: Date, to: Date) {
-    // Grouped counts via the same JOIN; each runs as its own SELECT for readability.
-    const geoRows = (await this.prisma.raw.$queryRaw`
-      SELECT v."country" AS k, COUNT(DISTINCT s.id)::int AS c
-      FROM "VideoPlaybackSession" s JOIN "LandingVisit" v ON v.id = s."landingVisitId"
-      WHERE s."videoId" = ${videoId} AND s."finalized" = true
-        AND s."startedAt" BETWEEN ${from} AND ${to} AND v."country" IS NOT NULL
-      GROUP BY v."country" ORDER BY c DESC LIMIT 15
-    `) as { k: string; c: number }[];
-    const devRows = (await this.prisma.raw.$queryRaw`
-      SELECT v."deviceType" AS k, COUNT(DISTINCT s.id)::int AS c
-      FROM "VideoPlaybackSession" s JOIN "LandingVisit" v ON v.id = s."landingVisitId"
-      WHERE s."videoId" = ${videoId} AND s."finalized" = true
-        AND s."startedAt" BETWEEN ${from} AND ${to} AND v."deviceType" IS NOT NULL
-      GROUP BY v."deviceType" ORDER BY c DESC
-    `) as { k: string; c: number }[];
-    const browRows = (await this.prisma.raw.$queryRaw`
-      SELECT v."browser" AS k, COUNT(DISTINCT s.id)::int AS c
-      FROM "VideoPlaybackSession" s JOIN "LandingVisit" v ON v.id = s."landingVisitId"
-      WHERE s."videoId" = ${videoId} AND s."finalized" = true
-        AND s."startedAt" BETWEEN ${from} AND ${to} AND v."browser" IS NOT NULL
-      GROUP BY v."browser" ORDER BY c DESC LIMIT 15
-    `) as { k: string; c: number }[];
-    const osRows = (await this.prisma.raw.$queryRaw`
-      SELECT v."os" AS k, COUNT(DISTINCT s.id)::int AS c
-      FROM "VideoPlaybackSession" s JOIN "LandingVisit" v ON v.id = s."landingVisitId"
-      WHERE s."videoId" = ${videoId} AND s."finalized" = true
-        AND s."startedAt" BETWEEN ${from} AND ${to} AND v."os" IS NOT NULL
-      GROUP BY v."os" ORDER BY c DESC LIMIT 15
-    `) as { k: string; c: number }[];
-    const refRows = (await this.prisma.raw.$queryRaw`
-      SELECT v."referrerDomain" AS k, COUNT(DISTINCT s.id)::int AS c
-      FROM "VideoPlaybackSession" s JOIN "LandingVisit" v ON v.id = s."landingVisitId"
-      WHERE s."videoId" = ${videoId} AND s."finalized" = true
-        AND s."startedAt" BETWEEN ${from} AND ${to} AND v."referrerDomain" IS NOT NULL
-      GROUP BY v."referrerDomain" ORDER BY c DESC LIMIT 15
-    `) as { k: string; c: number }[];
+    const [geoRows, devRows, browRows, osRows, refRows] = await Promise.all([
+      this.prisma.raw.$queryRaw`
+        SELECT v."country" AS k, COUNT(DISTINCT s.id)::int AS c
+        FROM "VideoPlaybackSession" s JOIN "LandingVisit" v ON v.id = s."landingVisitId"
+        WHERE s."videoId" = ${videoId} AND s."finalized" = true
+          AND s."startedAt" BETWEEN ${from} AND ${to} AND v."country" IS NOT NULL
+        GROUP BY v."country" ORDER BY c DESC LIMIT 15
+      ` as Promise<{ k: string; c: number }[]>,
+      this.prisma.raw.$queryRaw`
+        SELECT v."deviceType" AS k, COUNT(DISTINCT s.id)::int AS c
+        FROM "VideoPlaybackSession" s JOIN "LandingVisit" v ON v.id = s."landingVisitId"
+        WHERE s."videoId" = ${videoId} AND s."finalized" = true
+          AND s."startedAt" BETWEEN ${from} AND ${to} AND v."deviceType" IS NOT NULL
+        GROUP BY v."deviceType" ORDER BY c DESC
+      ` as Promise<{ k: string; c: number }[]>,
+      this.prisma.raw.$queryRaw`
+        SELECT v."browser" AS k, COUNT(DISTINCT s.id)::int AS c
+        FROM "VideoPlaybackSession" s JOIN "LandingVisit" v ON v.id = s."landingVisitId"
+        WHERE s."videoId" = ${videoId} AND s."finalized" = true
+          AND s."startedAt" BETWEEN ${from} AND ${to} AND v."browser" IS NOT NULL
+        GROUP BY v."browser" ORDER BY c DESC LIMIT 15
+      ` as Promise<{ k: string; c: number }[]>,
+      this.prisma.raw.$queryRaw`
+        SELECT v."os" AS k, COUNT(DISTINCT s.id)::int AS c
+        FROM "VideoPlaybackSession" s JOIN "LandingVisit" v ON v.id = s."landingVisitId"
+        WHERE s."videoId" = ${videoId} AND s."finalized" = true
+          AND s."startedAt" BETWEEN ${from} AND ${to} AND v."os" IS NOT NULL
+        GROUP BY v."os" ORDER BY c DESC LIMIT 15
+      ` as Promise<{ k: string; c: number }[]>,
+      this.prisma.raw.$queryRaw`
+        SELECT v."referrerDomain" AS k, COUNT(DISTINCT s.id)::int AS c
+        FROM "VideoPlaybackSession" s JOIN "LandingVisit" v ON v.id = s."landingVisitId"
+        WHERE s."videoId" = ${videoId} AND s."finalized" = true
+          AND s."startedAt" BETWEEN ${from} AND ${to} AND v."referrerDomain" IS NOT NULL
+        GROUP BY v."referrerDomain" ORDER BY c DESC LIMIT 15
+      ` as Promise<{ k: string; c: number }[]>,
+    ]);
 
     return {
       geography: geoRows.map((r) => ({ country: r.k, views: r.c })),

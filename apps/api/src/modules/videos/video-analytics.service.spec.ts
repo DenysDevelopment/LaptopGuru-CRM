@@ -39,6 +39,10 @@ describe('VideoAnalyticsService (session-trace)', () => {
     // Dispatch SQL to a router keyed on the first identifier in the template
     // string, so the order in which Promise.all resolves branches doesn't
     // matter for the test.
+    // The mock below keys on SQL substrings so Promise.all resolution order
+    // doesn't affect the test. If you change the SQL in the service, update
+    // the match predicates here. Branch ordering matters — the "VideoSecondStats"
+    // catch-all must come AFTER the pauseCount/seekAwayCount checks.
     prisma.raw.$queryRaw.mockImplementation((strings: TemplateStringsArray) => {
       const sql = strings.join('?');
       if (sql.includes('VideoPlaybackSession') && sql.includes('sessionCount')) {
