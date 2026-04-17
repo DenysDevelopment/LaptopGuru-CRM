@@ -1542,7 +1542,7 @@ export function LandingClient({ landing, video }: Props) {
 						{video.source === 'S3' && video.videoUrl ? (
 							<VideoPlayer
 								src={video.videoUrl}
-								poster={video.thumbnail}
+								poster='/poster.webp'
 								onPlay={() => {
 									videoPlayedRef.current = true;
 									setIsVideoPlaying(true);
