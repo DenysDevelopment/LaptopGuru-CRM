@@ -31,18 +31,15 @@ export class PublicLandingGuard implements CanActivate {
     ]);
     if (!isPublic) return true;
 
-    const req = context.switchToHttp().getRequest<{
-      body?: Record<string, unknown>;
-      params?: Record<string, string>;
-      publicContext?: PublicContext;
-    }>();
+    const req = context.switchToHttp().getRequest<import('express').Request>();
     const body = req.body ?? {};
     const params = req.params ?? {};
 
     // Chunk route: sessionId in URL, slug/visitId/videoId may be absent.
-    if (params.sessionId) {
+    const sessionId = typeof params.sessionId === 'string' ? params.sessionId : undefined;
+    if (sessionId) {
       const session = await this.prisma.raw.videoPlaybackSession.findUnique({
-        where: { id: params.sessionId },
+        where: { id: sessionId },
         select: {
           id: true,
           landingVisitId: true,
