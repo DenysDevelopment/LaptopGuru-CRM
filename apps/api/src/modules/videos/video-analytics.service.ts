@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import type { VideoAnalyticsData } from '@laptopguru-crm/shared';
 
 @Injectable()
 export class VideoAnalyticsService {
