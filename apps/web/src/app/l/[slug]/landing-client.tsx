@@ -1529,7 +1529,7 @@ export function LandingClient({ landing, video }: Props) {
 								isVideoPlaying ? 'opacity-0' : 'opacity-100'
 							}`}>
 							<div className='inline-flex items-center rounded-full bg-white shadow-[0_6px_20px_rgba(0,0,0,0.18)] border border-white/80 px-5 py-2.5 max-w-full'>
-								<span className='text-base sm:text-lg font-bold text-[#333] line-clamp-1'>
+								<span className='text-base sm:text-lg font-bold text-[#333] text-center'>
 									{video.title}
 								</span>
 							</div>
@@ -1806,7 +1806,7 @@ export function LandingClient({ landing, video }: Props) {
 
 			{landing.productUrl && (
 				<div
-					className={`pointer-events-none fixed bottom-0 inset-x-0 z-[100] to-transparent pt-16 ${showCta ? 'anim-slide-up' : 'opacity-0 translate-y-full'}`}
+					className={`pointer-events-none fixed bottom-0 inset-x-0 z-[100] to-transparent pt-16 ${showCta && !isVideoPlaying ? 'anim-slide-up' : 'opacity-0 translate-y-full'}`}
 					style={{
 						paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 12px)',
 						willChange: 'transform',
