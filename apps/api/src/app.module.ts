@@ -20,8 +20,7 @@ import { StatsModule } from './modules/stats/stats.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { SuperAdminModule } from './modules/super-admin/super-admin.module';
 import { CompanyGuard } from './common/guards/company.guard';
-import { RateLimitService } from './common/services/rate-limit.service';
-import { RedisProvider } from './common/services/redis-provider.service';
+import { CommonServicesModule } from './common/services/common-services.module';
 
 @Module({
   imports: [
@@ -36,6 +35,7 @@ import { RedisProvider } from './common/services/redis-provider.service';
         url: process.env.REDIS_URL || 'redis://localhost:6379',
       },
     }),
+    CommonServicesModule,
     PrismaModule,
     AuthModule,
     HealthModule,
@@ -55,9 +55,6 @@ import { RedisProvider } from './common/services/redis-provider.service';
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: CompanyGuard },
-    RedisProvider,
-    RateLimitService,
   ],
-  exports: [RateLimitService, RedisProvider],
 })
 export class AppModule {}
