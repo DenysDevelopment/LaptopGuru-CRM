@@ -25,20 +25,10 @@ const nextConfig: NextConfig = {
       { hostname: "d2e1etvd6vwgr0.cloudfront.net" },
     ],
   },
-  async rewrites() {
-    // Prefer the server-side INTERNAL_API_URL (set to http://api:4000 in Docker).
-    // Fall back to the public URL for non-container dev, then localhost.
-    const apiUrl =
-      process.env.INTERNAL_API_URL ||
-      process.env.NEXT_PUBLIC_API_URL ||
-      "http://localhost:4000";
-    return [
-      {
-        source: "/api/public/:path*",
-        destination: `${apiUrl}/api/public/:path*`,
-      },
-    ];
-  },
+  // NOTE: public endpoints are proxied at runtime via
+  // apps/web/src/app/api/public/[...path]/route.ts — Next.js rewrites() are
+  // evaluated at build time, so env vars set only at runtime (INTERNAL_API_URL
+  // in docker-compose) never reach the built manifest.
   headers: async () => [
     {
       source: "/(.*)",
