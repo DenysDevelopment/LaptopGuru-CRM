@@ -25,6 +25,15 @@ const nextConfig: NextConfig = {
       { hostname: "d2e1etvd6vwgr0.cloudfront.net" },
     ],
   },
+  async rewrites() {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+    return [
+      {
+        source: "/api/public/:path*",
+        destination: `${apiUrl}/api/public/:path*`,
+      },
+    ];
+  },
   headers: async () => [
     {
       source: "/(.*)",

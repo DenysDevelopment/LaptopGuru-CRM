@@ -166,14 +166,20 @@ export function useVideoTracker(opts: UseVideoTrackerOpts) {
       try {
         const r = await post(url, body);
         if (!r.ok && r.status !== 202) {
-          if (r.status !== 410) {
-            s.buffer = events.concat(s.buffer);
-            if (s.buffer.length > MAX_MEM_BUFFER) {
-              s.buffer = s.buffer.filter((e) => e[1] !== EventCode.TICK).slice(-MAX_MEM_BUFFER);
-            }
-            s.seq--;
+          if (r.status === 410) {
+            // Server considers session gone. Clear local state so the next
+            // flush creates a new session.
+            s.sessionId = null;
+            s.seq = 0;
+            s.finalized = true;
             return;
           }
+          s.buffer = events.concat(s.buffer);
+          if (s.buffer.length > MAX_MEM_BUFFER) {
+            s.buffer = s.buffer.filter((e) => e[1] !== EventCode.TICK).slice(-MAX_MEM_BUFFER);
+          }
+          s.seq--;
+          return;
         }
       } catch {
         s.buffer = events.concat(s.buffer);
@@ -231,10 +237,12 @@ export function useVideoTracker(opts: UseVideoTrackerOpts) {
 
   const onPlay = () => {
     if (state.current.finalized) {
-      // New session after prior seal
+      // New session after prior seal — fully reset session-scoped state.
       state.current.sessionId = null;
       state.current.seq = 0;
       state.current.finalized = false;
+      state.current.startedAt = 0;
+      state.current.lastTickPos = 0;
     }
     if (!state.current.startedAt) state.current.startedAt = now();
     push([relTime(), EventCode.PLAY, getCurrentTimeMs()]);
@@ -250,6 +258,7 @@ export function useVideoTracker(opts: UseVideoTrackerOpts) {
     stopTickTimer();
     state.current.pauseLongTimer = setTimeout(() => {
       void flush({ final: true, endReason: 'PAUSED_LONG' });
+      stopTimers();
     }, PAUSE_LONG_MS);
   };
 
