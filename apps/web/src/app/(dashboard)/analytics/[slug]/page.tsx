@@ -9,37 +9,7 @@ import {
   Link2, Megaphone, Settings, Wifi, Palette,
   BarChart3, Key, Film,
 } from "lucide-react";
-
-interface VideoAnalytics {
-  overview: {
-    totalViews: number;
-    uniqueViewers: number;
-    totalWatchTime: number;
-    avgViewDuration: number;
-    completionRate: number;
-    playRate: number;
-  };
-  durationSeconds: number;
-  retention: { second: number; viewers: number; viewersPercent: number }[];
-  viewsTimeSeries: { date: string; views: number }[];
-  replayHeatmap: { second: number; intensity: number }[];
-  sessionStrips: {
-    sessionId: string;
-    startedAt: string;
-    country: string | null;
-    device: string | null;
-    segments: boolean[];
-  }[];
-  recentWatches: {
-    sessionId: string;
-    startedAt: string;
-    duration: number;
-    completed: boolean;
-    country: string | null;
-    device: string | null;
-    browser: string | null;
-  }[];
-}
+import type { VideoAnalyticsData } from "@laptopguru-crm/shared";
 
 interface Analytics {
   landing: {
@@ -133,7 +103,7 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"overview" | "visits">("overview");
 
-  const [videoAnalytics, setVideoAnalytics] = useState<VideoAnalytics | null>(null);
+  const [videoAnalytics, setVideoAnalytics] = useState<VideoAnalyticsData | null>(null);
   const [error, setError] = useState("");
   const [visitsPage, setVisitsPage] = useState(1);
   const [loadingVisits, setLoadingVisits] = useState(false);
@@ -230,66 +200,6 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
                 <KPI label="% запуска" value={`${Math.round(videoAnalytics.overview.playRate * 100)}%`} icon={<Play className="w-4 h-4 text-gray-500" />} />
               </div>
 
-              {/* Watch Heatmap */}
-              {videoAnalytics.replayHeatmap && videoAnalytics.replayHeatmap.length > 0 && (
-                <div className="bg-white rounded-xl border border-gray-100 p-5 mb-4">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-1">Тепловая карта</h3>
-                  <p className="text-xs text-gray-400 mb-3">Яркие сегменты — смотрели чаще, тёмные — пропускали</p>
-                  <div className="flex gap-px h-10 rounded-lg overflow-hidden">
-                    {videoAnalytics.replayHeatmap.map((h, i) => (
-                      <div
-                        key={i}
-                        className="flex-1 relative group cursor-default"
-                        style={{
-                          backgroundColor: h.intensity > 0
-                            ? `rgba(99, 102, 241, ${0.15 + h.intensity * 0.85})`
-                            : '#f3f4f6',
-                        }}
-                      >
-                        <div className="absolute -top-9 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none z-10">
-                          {formatTimecode(h.second)} — {Math.round(h.intensity * 100)}%
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex justify-between text-[10px] text-gray-400 mt-1">
-                    <span>0:00</span>
-                    <span>{formatTimecode(videoAnalytics.durationSeconds)}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Per-session watch strips */}
-              {videoAnalytics.sessionStrips && videoAnalytics.sessionStrips.length > 0 && (
-                <div className="bg-white rounded-xl border border-gray-100 p-5 mb-4">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-1">Что смотрел каждый зритель</h3>
-                  <p className="text-xs text-gray-400 mb-3">Цветные сегменты — смотрел, серые — пропустил</p>
-                  <div className="space-y-1.5">
-                    {videoAnalytics.sessionStrips.map((strip) => (
-                      <div key={strip.sessionId} className="flex items-center gap-2">
-                        <div className="text-[10px] text-gray-400 w-20 flex-shrink-0 truncate" title={[strip.country, strip.device].filter(Boolean).join(' · ')}>
-                          {strip.startedAt ? new Date(strip.startedAt).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) : ''}
-                          {' '}
-                          {strip.country || ''}
-                        </div>
-                        <div className="flex gap-px flex-1 h-5 rounded overflow-hidden">
-                          {strip.segments.map((watched, i) => (
-                            <div
-                              key={i}
-                              className={`flex-1 ${watched ? 'bg-indigo-500' : 'bg-gray-200'}`}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex justify-between text-[10px] text-gray-400 mt-1 pl-[88px]">
-                    <span>0:00</span>
-                    <span>{formatTimecode(videoAnalytics.durationSeconds)}</span>
-                  </div>
-                </div>
-              )}
-
               {/* Retention chart */}
               {videoAnalytics.retention.length > 0 && (
                 <div className="bg-white rounded-xl border border-gray-100 p-5 mb-4">
@@ -302,7 +212,7 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
                         style={{ height: `${Math.max(r.viewersPercent * 100, 2)}%` }}
                       >
                         <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none z-10">
-                          {formatTimecode(r.second)} — {r.viewers} ({Math.round(r.viewersPercent * 100)}%)
+                          {formatTimecode(r.second)} — {r.views} ({Math.round(r.viewersPercent * 100)}%)
                         </div>
                       </div>
                     ))}
@@ -315,21 +225,25 @@ export default function AnalyticsPage({ params }: { params: Promise<{ slug: stri
               )}
 
               {/* Recent watches */}
-              {videoAnalytics.recentWatches && videoAnalytics.recentWatches.length > 0 && (
+              {videoAnalytics.recentSessions && videoAnalytics.recentSessions.length > 0 && (
                 <div className="bg-white rounded-xl border border-gray-100 p-5">
                   <h3 className="text-sm font-semibold text-gray-900 mb-3">Последние просмотры видео</h3>
                   <div className="space-y-2">
-                    {videoAnalytics.recentWatches.map((w) => (
-                      <div key={w.sessionId} className="flex items-center gap-3 text-xs py-2 border-b border-gray-50 last:border-0">
-                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${w.completed ? 'bg-green-500' : 'bg-yellow-400'}`} />
-                        <span className="text-gray-500 w-28 flex-shrink-0">
-                          {new Date(w.startedAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                        <span className="text-gray-700 font-medium w-16">{formatTime(w.duration)}</span>
-                        <span className="text-gray-400">{[w.country, w.device, w.browser].filter(Boolean).join(' · ') || '—'}</span>
-                        {w.completed && <span className="text-green-600 ml-auto">Досмотрел</span>}
-                      </div>
-                    ))}
+                    {videoAnalytics.recentSessions.map((w) => {
+                      const completed = w.completionPercent >= 0.9;
+                      const durationSec = Math.round(w.durationWatchedMs / 1000);
+                      return (
+                        <div key={w.sessionId} className="flex items-center gap-3 text-xs py-2 border-b border-gray-50 last:border-0">
+                          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${completed ? 'bg-green-500' : 'bg-yellow-400'}`} />
+                          <span className="text-gray-500 w-28 flex-shrink-0">
+                            {new Date(w.startedAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          <span className="text-gray-700 font-medium w-16">{formatTime(durationSec)}</span>
+                          <span className="text-gray-400">{[w.country, w.device, w.browser].filter(Boolean).join(' · ') || '—'}</span>
+                          {completed && <span className="text-green-600 ml-auto">Досмотрел</span>}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
