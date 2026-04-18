@@ -26,7 +26,12 @@ const nextConfig: NextConfig = {
     ],
   },
   async rewrites() {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+    // Prefer the server-side INTERNAL_API_URL (set to http://api:4000 in Docker).
+    // Fall back to the public URL for non-container dev, then localhost.
+    const apiUrl =
+      process.env.INTERNAL_API_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      "http://localhost:4000";
     return [
       {
         source: "/api/public/:path*",
