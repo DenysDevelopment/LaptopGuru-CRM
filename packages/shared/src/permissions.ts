@@ -7,6 +7,7 @@ export const PERMISSIONS = {
   SEND_EXECUTE: 'send:execute',
   LINKS_READ: 'links:read',
   LINKS_WRITE: 'links:write',
+  LINKS_DELETE: 'links:delete',
   QUICKLINKS_READ: 'quicklinks:read',
   QUICKLINKS_WRITE: 'quicklinks:write',
   ANALYTICS_READ: 'analytics:read',
@@ -77,6 +78,7 @@ export const PERMISSION_GROUPS: { label: string; permissions: { value: Permissio
     permissions: [
       { value: PERMISSIONS.LINKS_READ, label: 'Просмотр лендингов' },
       { value: PERMISSIONS.LINKS_WRITE, label: 'Создание лендингов' },
+      { value: PERMISSIONS.LINKS_DELETE, label: 'Удаление лендингов (админ)' },
     ],
   },
   {

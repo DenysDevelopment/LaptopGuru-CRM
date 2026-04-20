@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { BarChart3 } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { BarChart3, Trash2 } from "lucide-react";
+import { PERMISSIONS, hasPermission } from "@laptopguru-crm/shared";
 
 interface Landing {
   id: string;
@@ -17,9 +19,17 @@ interface Landing {
 }
 
 export default function LinksPage() {
+  const { data: session } = useSession();
   const [landings, setLandings] = useState<Landing[]>([]);
   const [loading, setLoading] = useState(true);
   const [customDomain, setCustomDomain] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const canDelete = hasPermission(
+    (session?.user as { role?: string } | undefined)?.role,
+    (session?.user as { permissions?: string[] } | undefined)?.permissions,
+    PERMISSIONS.LINKS_DELETE,
+  );
 
   useEffect(() => {
     fetch("/api/links")
@@ -40,6 +50,23 @@ export default function LinksPage() {
 
   function copyToClipboard(text: string) {
     navigator.clipboard.writeText(text);
+  }
+
+  async function handleDelete(landing: Landing) {
+    const visitsNote = landing.views > 0 ? ` Все ${landing.views} визитов и статистика будут удалены.` : '';
+    if (!confirm(`Удалить лендинг «${landing.title}»?${visitsNote}\n\nЭто действие нельзя отменить.`)) return;
+    setDeletingId(landing.id);
+    try {
+      const r = await fetch(`/api/links/${landing.id}`, { method: "DELETE" });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        alert(`Не удалось удалить: ${err.error || r.status}`);
+        return;
+      }
+      setLandings((prev) => prev.filter((l) => l.id !== landing.id));
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   return (
@@ -104,12 +131,28 @@ export default function LinksPage() {
                 <p className="text-xs text-gray-400">
                   {new Date(landing.createdAt).toLocaleDateString("ru-RU")}
                 </p>
-                <Link
-                  href={`/analytics/${landing.slug}`}
-                  className="text-xs text-brand hover:text-brand-hover font-medium transition-colors"
-                >
-                  <span className="inline-flex items-center gap-1"><BarChart3 className="w-3.5 h-3.5" /> Аналитика →</span>
-                </Link>
+                <div className="flex items-center gap-4">
+                  <Link
+                    href={`/analytics/${landing.slug}`}
+                    className="text-xs text-brand hover:text-brand-hover font-medium transition-colors"
+                  >
+                    <span className="inline-flex items-center gap-1"><BarChart3 className="w-3.5 h-3.5" /> Аналитика →</span>
+                  </Link>
+                  {canDelete && (
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(landing)}
+                      disabled={deletingId === landing.id}
+                      className="text-xs text-red-500 hover:text-red-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Удалить лендинг (только админ)"
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        <Trash2 className="w-3.5 h-3.5" />
+                        {deletingId === landing.id ? "Удаляю..." : "Удалить"}
+                      </span>
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           ))}
