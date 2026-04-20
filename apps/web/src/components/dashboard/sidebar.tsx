@@ -346,8 +346,8 @@ export function Sidebar() {
 										</span>
 									)}
 									</Link>
-									{item.children && (isActive || isParentActive) && (
-										<div className='ml-8 mt-1 space-y-0.5'>
+									{item.children && (
+										<div className='relative ml-6 mt-1 pl-3 border-l border-gray-200 space-y-0.5'>
 											{item.children
 												.filter(c => !c.permission || hasPermission(userRole, userPermissions, c.permission))
 												.map(child => {
@@ -363,10 +363,10 @@ export function Sidebar() {
 														<Link
 															key={child.href}
 															href={child.href}
-															className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+															className={`relative flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
 																isChildActive
-																	? 'text-brand bg-brand-light/50'
-																	: 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+																	? 'text-brand bg-brand-light/60 before:absolute before:-left-3 before:top-0 before:bottom-0 before:w-0.5 before:bg-brand before:rounded-r'
+																	: 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
 															}`}>
 															{child.color && (
 																<span className='w-2 h-2 rounded-full flex-shrink-0' style={{ backgroundColor: child.color }} />
