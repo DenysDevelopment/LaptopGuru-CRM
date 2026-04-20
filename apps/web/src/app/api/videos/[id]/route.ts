@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { NextRequest } from "next/server";
 import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
+import { writeAudit } from "@/lib/audit";
 import { PERMISSIONS } from "@laptopguru-crm/shared";
 
 export async function PATCH(
@@ -64,6 +65,14 @@ export async function DELETE(
   await prisma.video.update({
     where: { id },
     data: { active: false },
+  });
+  await writeAudit({
+    userId: session.user.id,
+    companyId,
+    action: "DELETE",
+    entity: "Video",
+    entityId: id,
+    payload: { title: video.title, source: video.source },
   });
   return NextResponse.json({ ok: true });
 }

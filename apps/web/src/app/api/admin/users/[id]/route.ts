@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
+import { writeAudit } from "@/lib/audit";
 import { PERMISSIONS, ALL_PERMISSIONS } from "@laptopguru-crm/shared";
 
 export async function PATCH(
@@ -78,11 +79,21 @@ export async function PATCH(
     },
   });
 
-  // Audit log
-  console.log(
-    `[AUDIT] User ${session.user.email} (${session.user.id}) modified user ${user.email} (${user.id}):`,
-    { role: role ?? "(unchanged)", permissions: permissions ? `${permissions.length} perms` : "(unchanged)" },
-  );
+  await writeAudit({
+    userId: session.user.id,
+    companyId,
+    action: "UPDATE",
+    entity: "User",
+    entityId: user.id,
+    payload: {
+      targetEmail: user.email,
+      before: { role: targetUser.role, permissions: targetUser.permissions },
+      after: {
+        role: role ?? targetUser.role,
+        permissions: permissions ?? targetUser.permissions,
+      },
+    },
+  });
 
   return NextResponse.json(user);
 }

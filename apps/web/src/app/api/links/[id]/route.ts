@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
+import { writeAudit } from "@/lib/audit";
 import { PERMISSIONS } from "@laptopguru-crm/shared";
 
 /**
@@ -29,7 +30,7 @@ export async function DELETE(
   // Confirm ownership before touching anything.
   const landing = await prisma.landing.findUnique({
     where: { id },
-    select: { id: true, companyId: true },
+    select: { id: true, companyId: true, slug: true, title: true, views: true, clicks: true },
   });
   if (!landing || landing.companyId !== companyId) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -40,6 +41,14 @@ export async function DELETE(
       prisma.sentEmail.deleteMany({ where: { landingId: id } }),
       prisma.landing.delete({ where: { id } }),
     ]);
+    await writeAudit({
+      userId: session.user.id,
+      companyId,
+      action: "DELETE",
+      entity: "Landing",
+      entityId: id,
+      payload: { slug: landing.slug, title: landing.title, views: landing.views, clicks: landing.clicks },
+    });
     return NextResponse.json({ ok: true });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Delete failed";
