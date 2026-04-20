@@ -70,9 +70,18 @@ export function useReEngagement(opts: UseReEngagementOpts = {}) {
 	useEffect(() => {
 		if (typeof document === 'undefined') return;
 
-		const faviconUrls = hiddenTitles.map(t => {
-			const e = extractLeadingEmoji(t);
-			return e ? emojiToFaviconUrl(e) : null;
+		// Split each entry into emoji (→ favicon) and text-only title so the
+		// browser tab label doesn't duplicate the emoji that's already shown in
+		// the favicon.
+		const entries = hiddenTitles.map(t => {
+			const emoji = extractLeadingEmoji(t);
+			const text = emoji
+				? t.replace(emoji, '').trim()
+				: t.trim();
+			return {
+				title: text || t,
+				faviconUrl: emoji ? emojiToFaviconUrl(emoji) : null,
+			};
 		});
 
 		const getFaviconEl = (): HTMLLinkElement | null =>
@@ -117,13 +126,12 @@ export function useReEngagement(opts: UseReEngagementOpts = {}) {
 				originalFaviconRef.current = favEl.href || null;
 			}
 
-			if (hiddenTitles.length > 0 && titleIntervalRef.current == null) {
+			if (entries.length > 0 && titleIntervalRef.current == null) {
 				let i = 0;
 				const tick = () => {
-					const idx = i % hiddenTitles.length;
-					document.title = hiddenTitles[idx];
-					const url = faviconUrls[idx];
-					if (url) favEl.href = url;
+					const entry = entries[i % entries.length];
+					document.title = entry.title;
+					if (entry.faviconUrl) favEl.href = entry.faviconUrl;
 					i += 1;
 				};
 				tick();
