@@ -115,7 +115,7 @@ export default function VideosPage() {
 						<div
 							key={video.id}
 							className='bg-white rounded-xl border border-gray-100 overflow-hidden hover:border-gray-200 transition-colors group'>
-							<div className='relative aspect-video bg-gray-100'>
+							<div className='relative aspect-[9/16] bg-black'>
 								{video.thumbnail &&
 								video.status !== 'UPLOADING' &&
 								video.status !== 'PROCESSING' ? (
