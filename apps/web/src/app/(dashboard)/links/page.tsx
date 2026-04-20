@@ -13,7 +13,7 @@ interface Landing {
   views: number;
   clicks: number;
   createdAt: string;
-  video: { title: string; thumbnail: string };
+  video: { title: string; thumbnail: string; createdAt: string };
   shortLinks: { code: string; clicks: number }[];
   incomingEmail: { customerName: string | null; customerEmail: string | null } | null;
 }
@@ -128,9 +128,10 @@ export default function LinksPage() {
                 </div>
               </div>
               <div className="flex items-center justify-between mt-2">
-                <p className="text-xs text-gray-400">
-                  {new Date(landing.createdAt).toLocaleDateString("ru-RU")}
-                </p>
+                <div className="text-xs text-gray-400 space-y-0.5">
+                  <p>Лендинг: {formatDateTime(landing.createdAt)}</p>
+                  <p>Видео загружено: {formatDateTime(landing.video.createdAt)}</p>
+                </div>
                 <div className="flex items-center gap-4">
                   <Link
                     href={`/analytics/${landing.slug}`}
@@ -160,4 +161,16 @@ export default function LinksPage() {
       )}
     </div>
   );
+}
+
+function formatDateTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }

@@ -12,7 +12,7 @@ export async function GET() {
       where: { companyId: session.user.companyId ?? "" },
       orderBy: { createdAt: "desc" },
       include: {
-        video: { select: { title: true, thumbnail: true } },
+        video: { select: { title: true, thumbnail: true, createdAt: true } },
         shortLinks: { select: { code: true, clicks: true } },
         incomingEmail: { select: { customerName: true, customerEmail: true } },
       },
