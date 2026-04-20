@@ -184,7 +184,13 @@ export default function VideosPage() {
 								<div className='flex items-center justify-between mt-3'>
 									<span className='text-xs text-gray-400'>
 										{video.createdAt
-											? new Date(video.createdAt).toLocaleDateString('ru-RU')
+											? new Date(video.createdAt).toLocaleString('ru-RU', {
+													day: '2-digit',
+													month: '2-digit',
+													year: 'numeric',
+													hour: '2-digit',
+													minute: '2-digit',
+												})
 											: ''}
 									</span>
 									<div className='flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity'>
