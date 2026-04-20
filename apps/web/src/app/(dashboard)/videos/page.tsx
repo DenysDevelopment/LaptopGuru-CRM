@@ -7,6 +7,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import type { Video } from '@/types';
 import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { useConfirm } from '@/components/ui/use-confirm';
 
 function formatFileSize(bytes: number): string {
 	const mb = bytes / (1024 * 1024);
@@ -16,6 +18,7 @@ function formatFileSize(bytes: number): string {
 }
 
 export default function VideosPage() {
+	const confirm = useConfirm();
 	const [videos, setVideos] = useState<Video[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [modalOpen, setModalOpen] = useState(false);
@@ -64,9 +67,21 @@ export default function VideosPage() {
 	}, [videos, fetchVideos]);
 
 	async function handleDelete(id: string) {
-		if (!confirm('Удалить это видео из библиотеки?')) return;
-		await fetch(`/api/videos/${id}`, { method: 'DELETE' });
-		fetchVideos();
+		const ok = await confirm({
+			title: 'Удалить видео?',
+			description: 'Видео будет удалено из библиотеки. Это действие нельзя отменить.',
+			confirmLabel: 'Удалить',
+			cancelLabel: 'Отмена',
+			variant: 'destructive',
+		});
+		if (!ok) return;
+		const r = await fetch(`/api/videos/${id}`, { method: 'DELETE' });
+		if (r.ok) {
+			toast.success('Видео удалено');
+			fetchVideos();
+		} else {
+			toast.error('Не удалось удалить видео', { description: `HTTP ${r.status}` });
+		}
 	}
 
 	return (

@@ -5,6 +5,8 @@ import { BarChart3, Trash2 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import { useConfirm } from '@/components/ui/use-confirm';
 
 interface Landing {
 	id: string;
@@ -24,6 +26,7 @@ interface Landing {
 
 export default function LinksPage() {
 	const { data: session } = useSession();
+	const confirm = useConfirm();
 	const [landings, setLandings] = useState<Landing[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [customDomain, setCustomDomain] = useState<string | null>(null);
@@ -55,8 +58,13 @@ export default function LinksPage() {
 	const effectiveDomain = isLocalhost ? null : customDomain;
 	const shortUrlBase = effectiveDomain ? `https://${effectiveDomain}` : origin;
 
-	function copyToClipboard(text: string) {
-		navigator.clipboard.writeText(text);
+	async function copyToClipboard(text: string) {
+		try {
+			await navigator.clipboard.writeText(text);
+			toast.success('Ссылка скопирована', { description: text });
+		} catch {
+			toast.error('Не удалось скопировать');
+		}
 	}
 
 	async function handleDelete(landing: Landing) {
@@ -64,21 +72,26 @@ export default function LinksPage() {
 			landing.views > 0
 				? ` Все ${landing.views} визитов и статистика будут удалены.`
 				: '';
-		if (
-			!confirm(
-				`Удалить лендинг «${landing.title}»?${visitsNote}\n\nЭто действие нельзя отменить.`,
-			)
-		)
-			return;
+		const ok = await confirm({
+			title: `Удалить лендинг «${cleanTitle(landing.title)}»?`,
+			description: `${visitsNote} Это действие нельзя отменить.`.trim(),
+			confirmLabel: 'Удалить',
+			cancelLabel: 'Отмена',
+			variant: 'destructive',
+		});
+		if (!ok) return;
 		setDeletingId(landing.id);
 		try {
 			const r = await fetch(`/api/links/${landing.id}`, { method: 'DELETE' });
 			if (!r.ok) {
 				const err = await r.json().catch(() => ({}));
-				alert(`Не удалось удалить: ${err.error || r.status}`);
+				toast.error('Не удалось удалить лендинг', {
+					description: err.error || `HTTP ${r.status}`,
+				});
 				return;
 			}
 			setLandings(prev => prev.filter(l => l.id !== landing.id));
+			toast.success('Лендинг удалён');
 		} finally {
 			setDeletingId(null);
 		}
