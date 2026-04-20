@@ -70,17 +70,9 @@ describe('FinalizeWorker', () => {
     });
     await worker.process({ data: { sessionId: 's1', reason: 'CLIENT_FINAL' } } as never);
     expect(prisma.raw.videoPlaybackSession.update).toHaveBeenCalled();
-    expect(prisma.raw.$executeRaw).toHaveBeenCalled(); // secondStats upsert
-    expect(prisma.raw.landingVisit.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 'lv1' },
-        data: expect.objectContaining({
-          videoPlayed: true,
-          videoWatchTime: 10,
-          videoCompleted: true,
-        }),
-      }),
-    );
+    // secondStats upsert + LandingVisit aggregate-update run via $executeRaw.
+    expect(prisma.raw.$executeRaw).toHaveBeenCalled();
+    expect(prisma.raw.$executeRaw.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
   it('wraps the three writes in a single transaction', async () => {

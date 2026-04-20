@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authorize } from '@/lib/authorize';
 import { prisma } from '@/lib/db';
+import { Prisma } from '@/generated/prisma/client';
 import { PERMISSIONS, type VideoAnalyticsData, type SessionEndReason } from '@laptopguru-crm/shared';
 
 export async function GET(
@@ -28,8 +29,30 @@ export async function GET(
   const url = new URL(request.url);
   const from = url.searchParams.get('from');
   const to = url.searchParams.get('to');
+  const landingId = url.searchParams.get('landingId');
   const fromDate = from ? new Date(from) : new Date(Date.now() - 30 * 86_400_000);
   const toDate = to ? new Date(to) : new Date();
+
+  // If landingId passed, scope ALL session queries to visits of that landing
+  // only. Otherwise aggregate across every landing that uses this video.
+  const sessionScope = landingId
+    ? Prisma.sql`
+        s."videoId" = ${id}
+        AND s."finalized" = true
+        AND s."startedAt" BETWEEN ${fromDate} AND ${toDate}
+        AND s."landingVisitId" IN (
+          SELECT id FROM "LandingVisit" WHERE "landingId" = ${landingId}
+        )
+      `
+    : Prisma.sql`
+        s."videoId" = ${id}
+        AND s."finalized" = true
+        AND s."startedAt" BETWEEN ${fromDate} AND ${toDate}
+      `;
+
+  const visitsScope = landingId
+    ? Prisma.sql`v."landingId" = ${landingId}`
+    : Prisma.sql`l."videoId" = ${id}`;
 
   const [
     overviewRows,
@@ -55,20 +78,20 @@ export async function GET(
     }[]>`
       SELECT
         COUNT(*)::int AS "sessionCount",
-        COUNT(DISTINCT "landingVisitId")::int AS "uniqueViewers",
-        COALESCE(SUM("durationWatchedMs"), 0)::int AS "totalWatchMs",
-        COALESCE(AVG("durationWatchedMs"), 0)::float AS "avgWatchMs",
-        COALESCE(AVG("completionPercent"), 0)::float AS "avgCompletion",
-        COALESCE(SUM("errorCount"), 0)::int AS "errorCount"
-      FROM "VideoPlaybackSession"
-      WHERE "videoId" = ${id} AND "finalized" = true
-        AND "startedAt" BETWEEN ${fromDate} AND ${toDate}
+        COUNT(DISTINCT s."landingVisitId")::int AS "uniqueViewers",
+        COALESCE(SUM(s."durationWatchedMs"), 0)::int AS "totalWatchMs",
+        COALESCE(AVG(s."durationWatchedMs"), 0)::float AS "avgWatchMs",
+        COALESCE(AVG(s."completionPercent"), 0)::float AS "avgCompletion",
+        COALESCE(SUM(s."errorCount"), 0)::int AS "errorCount"
+      FROM "VideoPlaybackSession" s
+      WHERE ${sessionScope}
     `,
     prisma.$queryRaw<{ c: number }[]>`
       SELECT COUNT(*)::int AS c
       FROM "LandingVisit" v
       JOIN "Landing" l ON l.id = v."landingId"
-      WHERE l."videoId" = ${id} AND v."visitedAt" BETWEEN ${fromDate} AND ${toDate}
+      WHERE ${visitsScope}
+        AND v."visitedAt" BETWEEN ${fromDate} AND ${toDate}
     `,
     prisma.$queryRaw<{ second: number; views: number; replays: number }[]>`
       SELECT "second", "views", "replays"
@@ -87,11 +110,10 @@ export async function GET(
       ORDER BY "seekAwayCount" DESC LIMIT 5
     `,
     prisma.$queryRaw<{ date: Date; views: number }[]>`
-      SELECT DATE("startedAt") AS date, COUNT(*)::int AS views
-      FROM "VideoPlaybackSession"
-      WHERE "videoId" = ${id} AND "finalized" = true
-        AND "startedAt" BETWEEN ${fromDate} AND ${toDate}
-      GROUP BY DATE("startedAt") ORDER BY date
+      SELECT DATE(s."startedAt") AS date, COUNT(*)::int AS views
+      FROM "VideoPlaybackSession" s
+      WHERE ${sessionScope}
+      GROUP BY DATE(s."startedAt") ORDER BY date
     `,
     prisma.$queryRaw<{
       sessionId: string;
@@ -109,53 +131,52 @@ export async function GET(
              v."country", v."deviceType", v."browser"
       FROM "VideoPlaybackSession" s
       LEFT JOIN "LandingVisit" v ON v.id = s."landingVisitId"
-      WHERE s."videoId" = ${id} AND s."finalized" = true
-        AND s."startedAt" BETWEEN ${fromDate} AND ${toDate}
+      WHERE ${sessionScope}
       ORDER BY s."startedAt" DESC LIMIT 50
     `,
     prisma.$queryRaw<{ k: string; c: number }[]>`
       SELECT v."country" AS k, COUNT(DISTINCT s.id)::int AS c
       FROM "VideoPlaybackSession" s JOIN "LandingVisit" v ON v.id = s."landingVisitId"
-      WHERE s."videoId" = ${id} AND s."finalized" = true
-        AND s."startedAt" BETWEEN ${fromDate} AND ${toDate} AND v."country" IS NOT NULL
+      WHERE ${sessionScope} AND v."country" IS NOT NULL
       GROUP BY v."country" ORDER BY c DESC LIMIT 15
     `,
     prisma.$queryRaw<{ k: string; c: number }[]>`
       SELECT v."deviceType" AS k, COUNT(DISTINCT s.id)::int AS c
       FROM "VideoPlaybackSession" s JOIN "LandingVisit" v ON v.id = s."landingVisitId"
-      WHERE s."videoId" = ${id} AND s."finalized" = true
-        AND s."startedAt" BETWEEN ${fromDate} AND ${toDate} AND v."deviceType" IS NOT NULL
+      WHERE ${sessionScope} AND v."deviceType" IS NOT NULL
       GROUP BY v."deviceType" ORDER BY c DESC
     `,
     prisma.$queryRaw<{ k: string; c: number }[]>`
       SELECT v."browser" AS k, COUNT(DISTINCT s.id)::int AS c
       FROM "VideoPlaybackSession" s JOIN "LandingVisit" v ON v.id = s."landingVisitId"
-      WHERE s."videoId" = ${id} AND s."finalized" = true
-        AND s."startedAt" BETWEEN ${fromDate} AND ${toDate} AND v."browser" IS NOT NULL
+      WHERE ${sessionScope} AND v."browser" IS NOT NULL
       GROUP BY v."browser" ORDER BY c DESC LIMIT 15
     `,
     prisma.$queryRaw<{ k: string; c: number }[]>`
       SELECT v."os" AS k, COUNT(DISTINCT s.id)::int AS c
       FROM "VideoPlaybackSession" s JOIN "LandingVisit" v ON v.id = s."landingVisitId"
-      WHERE s."videoId" = ${id} AND s."finalized" = true
-        AND s."startedAt" BETWEEN ${fromDate} AND ${toDate} AND v."os" IS NOT NULL
+      WHERE ${sessionScope} AND v."os" IS NOT NULL
       GROUP BY v."os" ORDER BY c DESC LIMIT 15
     `,
     prisma.$queryRaw<{ k: string; c: number }[]>`
       SELECT v."referrerDomain" AS k, COUNT(DISTINCT s.id)::int AS c
       FROM "VideoPlaybackSession" s JOIN "LandingVisit" v ON v.id = s."landingVisitId"
-      WHERE s."videoId" = ${id} AND s."finalized" = true
-        AND s."startedAt" BETWEEN ${fromDate} AND ${toDate} AND v."referrerDomain" IS NOT NULL
+      WHERE ${sessionScope} AND v."referrerDomain" IS NOT NULL
       GROUP BY v."referrerDomain" ORDER BY c DESC LIMIT 15
     `,
   ]);
 
   const ov = overviewRows[0] ?? {
-    sessionCount: 0, uniqueViewers: 0, totalWatchMs: 0, avgWatchMs: 0, avgCompletion: 0, errorCount: 0,
+    sessionCount: 0,
+    uniqueViewers: 0,
+    totalWatchMs: 0,
+    avgWatchMs: 0,
+    avgCompletion: 0,
+    errorCount: 0,
   };
   const visits = visitsCountRows[0]?.c ?? 0;
 
-  const retBySec = new Map(retentionRows.map((r) => [r.second, r]));
+  const retBySec = new Map(retentionRows.map(r => [r.second, r]));
   const retBase = retentionRows[0]?.views ?? 0;
   const retention = Array.from({ length: durationSeconds }, (_, s) => {
     const r = retBySec.get(s);
@@ -167,6 +188,11 @@ export async function GET(
     };
   });
 
+  // playRate = доля визитов, которые хотя бы раз нажали play. Clamp to 100% —
+  // если uniqueViewers > visits (редкая гонка при старых данных), не показываем
+  // «133%».
+  const playRate = visits > 0 ? Math.min(1, ov.uniqueViewers / visits) : 0;
+
   const data: VideoAnalyticsData = {
     overview: {
       totalViews: ov.sessionCount,
@@ -174,23 +200,23 @@ export async function GET(
       totalWatchTime: Math.round(ov.totalWatchMs / 1000),
       avgViewDuration: Math.round(ov.avgWatchMs / 1000),
       completionRate: ov.avgCompletion,
-      playRate: visits > 0 ? ov.sessionCount / visits : 0,
+      playRate,
       errorCount: ov.errorCount,
     },
     durationSeconds,
     retention,
-    topSeekAwaySeconds: topSeekRows.map((r) => ({ second: r.second, count: Number(r.c) })),
-    topPauseSeconds: topPauseRows.map((r) => ({ second: r.second, count: Number(r.c) })),
-    viewsTimeSeries: timeSeriesRows.map((r) => ({
+    topSeekAwaySeconds: topSeekRows.map(r => ({ second: r.second, count: Number(r.c) })),
+    topPauseSeconds: topPauseRows.map(r => ({ second: r.second, count: Number(r.c) })),
+    viewsTimeSeries: timeSeriesRows.map(r => ({
       date: r.date.toISOString().split('T')[0],
       views: Number(r.views),
     })),
-    geography: geoRows.map((r) => ({ country: r.k, views: r.c })),
-    devices: devRows.map((r) => ({ deviceType: r.k, views: r.c })),
-    browsers: browRows.map((r) => ({ browser: r.k, views: r.c })),
-    os: osRows.map((r) => ({ os: r.k, views: r.c })),
-    referrers: refRows.map((r) => ({ referrerDomain: r.k, views: r.c })),
-    recentSessions: recentRows.map((r) => ({
+    geography: geoRows.map(r => ({ country: r.k, views: r.c })),
+    devices: devRows.map(r => ({ deviceType: r.k, views: r.c })),
+    browsers: browRows.map(r => ({ browser: r.k, views: r.c })),
+    os: osRows.map(r => ({ os: r.k, views: r.c })),
+    referrers: refRows.map(r => ({ referrerDomain: r.k, views: r.c })),
+    recentSessions: recentRows.map(r => ({
       sessionId: r.sessionId,
       visitId: r.visitId,
       startedAt: r.startedAt.toISOString(),

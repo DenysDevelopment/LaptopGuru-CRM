@@ -99,16 +99,31 @@ export class FinalizeWorker extends WorkerHost {
         `;
       }
 
-      await tx.landingVisit.update({
-        where: { id: session.landingVisitId },
-        data: {
-          videoPlayed: agg.playCount > 0,
-          videoWatchTime: Math.round(agg.durationWatchedMs / 1000),
-          videoCompleted: agg.completionPercent >= 0.95,
-          videoBufferCount: agg.bufferCount,
-          videoBufferTime: agg.bufferTimeMs,
-        },
-      });
+      // Denorm LandingVisit fields: aggregate across ALL finalized sessions of
+      // the visit (not just the current one). If the viewer replays the video
+      // in the same tab it creates additional sessions — and we want cumulative
+      // watch time, not "last play only".
+      await tx.$executeRaw`
+        UPDATE "LandingVisit" lv
+        SET
+          "videoPlayed" = agg.plays > 0,
+          "videoWatchTime" = ROUND(agg.total_ms / 1000.0)::int,
+          "videoCompleted" = agg.any_completed,
+          "videoBufferCount" = agg.buffer_cnt,
+          "videoBufferTime" = agg.buffer_ms
+        FROM (
+          SELECT
+            COUNT(*)::int AS plays,
+            COALESCE(SUM("durationWatchedMs"), 0)::int AS total_ms,
+            COALESCE(BOOL_OR("completionPercent" >= 0.95), false) AS any_completed,
+            COALESCE(SUM("bufferCount"), 0)::int AS buffer_cnt,
+            COALESCE(SUM("bufferTimeMs"), 0)::int AS buffer_ms
+          FROM "VideoPlaybackSession"
+          WHERE "landingVisitId" = ${session.landingVisitId}
+            AND "finalized" = true
+        ) agg
+        WHERE lv."id" = ${session.landingVisitId}
+      `;
     });
 
     this.logger.log(`Finalized session ${sessionId}: ${agg.durationWatchedMs}ms watched`);

@@ -19,6 +19,7 @@ export enum EventCode {
   ERROR = 12,
   VISIBILITY_HIDDEN = 13,
   VISIBILITY_VISIBLE = 14,
+  VISITOR_RETURNED = 15, // viewer left the tab and returned after the re-engagement threshold
 }
 
 // Tuple: [tMs, typeCode, posMs, extra?]
@@ -34,6 +35,7 @@ export type EventExtras = {
   [EventCode.BUFFER_END]: { durationMs: number };
   [EventCode.QUALITY]: { label: string };
   [EventCode.ERROR]: { message: string };
+  [EventCode.VISITOR_RETURNED]: { awayMs: number; modalShown: boolean };
 };
 
 export type DecodedEvent =
@@ -51,7 +53,8 @@ export type DecodedEvent =
   | { tMs: number; type: EventCode.QUALITY; posMs: number; label: string }
   | { tMs: number; type: EventCode.ERROR; posMs: number; message: string }
   | { tMs: number; type: EventCode.VISIBILITY_HIDDEN; posMs: number }
-  | { tMs: number; type: EventCode.VISIBILITY_VISIBLE; posMs: number };
+  | { tMs: number; type: EventCode.VISIBILITY_VISIBLE; posMs: number }
+  | { tMs: number; type: EventCode.VISITOR_RETURNED; posMs: number; awayMs: number; modalShown: boolean };
 
 export function decodeTrace(trace: EventTuple[]): DecodedEvent[] {
   const out: DecodedEvent[] = [];
@@ -78,6 +81,11 @@ export function decodeTrace(trace: EventTuple[]): DecodedEvent[] {
       case EventCode.ERROR:
         out.push({ tMs, type, posMs, message: (extra as { message?: string })?.message ?? '' });
         break;
+      case EventCode.VISITOR_RETURNED: {
+        const e = extra as { awayMs?: number; modalShown?: boolean } | undefined;
+        out.push({ tMs, type, posMs, awayMs: e?.awayMs ?? 0, modalShown: e?.modalShown ?? false });
+        break;
+      }
       case EventCode.TICK:
       case EventCode.PLAY:
       case EventCode.PAUSE:
@@ -112,6 +120,8 @@ export function encodeTrace(events: DecodedEvent[]): EventTuple[] {
         return [e.tMs, e.type, e.posMs, { label: e.label }];
       case EventCode.ERROR:
         return [e.tMs, e.type, e.posMs, { message: e.message }];
+      case EventCode.VISITOR_RETURNED:
+        return [e.tMs, e.type, e.posMs, { awayMs: e.awayMs, modalShown: e.modalShown }];
       default:
         return [e.tMs, e.type, e.posMs];
     }

@@ -18,6 +18,7 @@ const EVENT_LABELS: Record<EventCode, string> = {
   [EventCode.ERROR]: 'ошибка',
   [EventCode.VISIBILITY_HIDDEN]: 'вкладка скрыта',
   [EventCode.VISIBILITY_VISIBLE]: 'вкладка видна',
+  [EventCode.VISITOR_RETURNED]: 'вернулся после ухода',
 };
 
 const END_REASON_LABELS: Record<SessionEndReason, string> = {

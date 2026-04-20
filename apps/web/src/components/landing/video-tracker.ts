@@ -283,6 +283,8 @@ export function useVideoTracker(opts: UseVideoTrackerOpts) {
     push([relTime(), on ? EventCode.FULLSCREEN_ON : EventCode.FULLSCREEN_OFF, getCurrentTimeMs()]);
   const onError = (message: string) =>
     push([relTime(), EventCode.ERROR, getCurrentTimeMs(), { message: message.slice(0, 500) }], { flush: true });
+  const onVisitorReturned = (awayMs: number, modalShown: boolean) =>
+    push([relTime(), EventCode.VISITOR_RETURNED, getCurrentTimeMs(), { awayMs, modalShown }], { flush: true });
 
   useEffect(() => {
     const onVis = () => {
@@ -330,5 +332,6 @@ export function useVideoTracker(opts: UseVideoTrackerOpts) {
     onVolume,
     onFullscreen,
     onError,
+    onVisitorReturned,
   };
 }
