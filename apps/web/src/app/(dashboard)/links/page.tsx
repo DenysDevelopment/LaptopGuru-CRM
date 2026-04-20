@@ -10,6 +10,7 @@ interface Landing {
 	id: string;
 	slug: string;
 	title: string;
+	type: string; // "email" | "allegro"
 	views: number;
 	clicks: number;
 	createdAt: string;
@@ -100,96 +101,177 @@ export default function LinksPage() {
 					</p>
 				</div>
 			) : (
-				<div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3'>
-					{landings.map(landing => {
-						const totalShortClicks = landing.shortLinks.reduce(
-							(sum, sl) => sum + sl.clicks,
-							0,
-						);
-						return (
-							<div
-								key={landing.id}
-								className='bg-white rounded-xl border border-gray-100 p-3 hover:border-gray-200 transition-colors flex flex-col gap-2'>
-								<div>
-									<h3 className='text-sm font-semibold text-gray-900 line-clamp-1' title={landing.title}>
-										{landing.title}
-									</h3>
-									{landing.incomingEmail && (
-										<p className='text-xs text-gray-500 line-clamp-1'>
-											{landing.incomingEmail.customerName} ·{' '}
-											{landing.incomingEmail.customerEmail}
-										</p>
+				<div className='space-y-6'>
+					{groupByDay(landings).map(group => (
+						<section key={group.key}>
+							<h2 className='text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2'>
+								{group.label}
+								<span className='ml-2 text-gray-400 font-normal normal-case tracking-normal'>
+									{group.items.length}{' '}
+									{pluralize(
+										group.items.length,
+										'лендинг',
+										'лендинга',
+										'лендингов',
 									)}
-								</div>
+								</span>
+							</h2>
+							<div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3'>
+								{group.items.map(landing => {
+									const totalShortClicks = landing.shortLinks.reduce(
+										(sum, sl) => sum + sl.clicks,
+										0,
+									);
+									return (
+										<div
+											key={landing.id}
+											className='bg-white rounded-xl border border-gray-100 p-3 hover:border-gray-200 transition-colors flex flex-col gap-2'>
+											<div>
+												<div className='flex items-center gap-2'>
+													<h3
+														className='text-sm font-semibold text-gray-900 line-clamp-1 flex-1 min-w-0'
+														title={landing.title}>
+														{cleanTitle(landing.title)}
+													</h3>
+													{landing.type === 'allegro' && (
+														<span
+															className='text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 flex-shrink-0'
+															title='Лендинг создан из Allegro'>
+															Allegro
+														</span>
+													)}
+												</div>
+												{landing.incomingEmail && (
+													<p className='text-xs text-gray-500 line-clamp-1'>
+														{landing.incomingEmail.customerName} ·{' '}
+														{landing.incomingEmail.customerEmail}
+													</p>
+												)}
+											</div>
 
-								<div className='flex flex-wrap gap-x-3 gap-y-0.5'>
-									{landing.shortLinks.map(sl => (
-										<button
-											key={sl.code}
-											onClick={() =>
-												copyToClipboard(`${shortUrlBase}/${sl.code}`)
-											}
-											className='text-xs text-brand hover:text-brand-hover transition-colors truncate max-w-full'
-											title='Скопировать'>
-											{(effectiveDomain ??
-												origin.replace(/^https?:\/\//, '')) +
-												'/' +
-												sl.code}
-										</button>
-									))}
-								</div>
+											<div className='flex flex-wrap gap-x-3 gap-y-0.5'>
+												{landing.shortLinks.map(sl => (
+													<button
+														key={sl.code}
+														onClick={() =>
+															copyToClipboard(`${shortUrlBase}/${sl.code}`)
+														}
+														className='text-xs text-brand hover:text-brand-hover transition-colors truncate max-w-full'
+														title='Скопировать'>
+														{(effectiveDomain ??
+															origin.replace(/^https?:\/\//, '')) +
+															'/' +
+															sl.code}
+													</button>
+												))}
+											</div>
 
-								<div className='flex items-center gap-4 text-xs text-gray-500 mt-auto'>
-									<span>
-										<b className='text-gray-900'>{landing.views}</b> просмотров
-									</span>
-									<span>
-										<b className='text-gray-900'>{landing.clicks}</b> кликов
-									</span>
-									<span>
-										<b className='text-gray-900'>{totalShortClicks}</b> переходов
-									</span>
-								</div>
+											<div className='flex items-center gap-4 text-xs text-gray-500 mt-auto'>
+												<span>
+													<b className='text-gray-900'>{landing.views}</b>{' '}
+													просмотров
+												</span>
+												<span>
+													<b className='text-gray-900'>{landing.clicks}</b>{' '}
+													кликов
+												</span>
+												<span>
+													<b className='text-gray-900'>{totalShortClicks}</b>{' '}
+													переходов
+												</span>
+											</div>
 
-								<div className='flex items-center justify-between pt-2 border-t border-gray-100 text-xs'>
-									<span className='text-gray-400'>
-										{formatDateTime(landing.createdAt)}
-									</span>
-									<div className='flex items-center gap-3'>
-										<Link
-											href={`/analytics/${landing.slug}`}
-											className='text-brand hover:text-brand-hover font-medium transition-colors inline-flex items-center gap-1'>
-											<BarChart3 className='w-3.5 h-3.5' /> Аналитика
-										</Link>
-										{canDelete && (
-											<button
-												type='button'
-												onClick={() => handleDelete(landing)}
-												disabled={deletingId === landing.id}
-												className='text-red-500 hover:text-red-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1'
-												title='Удалить лендинг (только админ)'>
-												<Trash2 className='w-3.5 h-3.5' />
-												{deletingId === landing.id ? 'Удаляю' : 'Удалить'}
-											</button>
-										)}
-									</div>
-								</div>
+											<div className='flex items-center justify-between pt-2 border-t border-gray-100 text-xs'>
+												<span className='text-gray-400'>
+													{formatTime(landing.createdAt)}
+												</span>
+												<div className='flex items-center gap-3'>
+													<Link
+														href={`/analytics/${landing.slug}`}
+														className='text-brand hover:text-brand-hover font-medium transition-colors inline-flex items-center gap-1'>
+														<BarChart3 className='w-3.5 h-3.5' /> Аналитика
+													</Link>
+													{canDelete && (
+														<button
+															type='button'
+															onClick={() => handleDelete(landing)}
+															disabled={deletingId === landing.id}
+															className='text-red-500 hover:text-red-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1'
+															title='Удалить лендинг (только админ)'>
+															<Trash2 className='w-3.5 h-3.5' />
+															{deletingId === landing.id
+																? 'Удаляю'
+																: 'Удалить'}
+														</button>
+													)}
+												</div>
+											</div>
+										</div>
+									);
+								})}
 							</div>
-						);
-					})}
+						</section>
+					))}
 				</div>
 			)}
 		</div>
 	);
 }
 
-function formatDateTime(iso: string): string {
+function groupByDay(
+	items: Landing[],
+): { key: string; label: string; items: Landing[] }[] {
+	const byKey = new Map<string, Landing[]>();
+	for (const l of items) {
+		const d = new Date(l.createdAt);
+		if (Number.isNaN(d.getTime())) continue;
+		const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+		const arr = byKey.get(key);
+		if (arr) arr.push(l);
+		else byKey.set(key, [l]);
+	}
+	return [...byKey.entries()]
+		.sort((a, b) => (a[0] < b[0] ? 1 : -1))
+		.map(([key, group]) => ({
+			key,
+			label: dayLabel(new Date(group[0].createdAt)),
+			items: group,
+		}));
+}
+
+function dayLabel(d: Date): string {
+	const today = new Date();
+	const yesterday = new Date();
+	yesterday.setDate(today.getDate() - 1);
+	const sameDay = (a: Date, b: Date) =>
+		a.getFullYear() === b.getFullYear() &&
+		a.getMonth() === b.getMonth() &&
+		a.getDate() === b.getDate();
+	if (sameDay(d, today)) return 'Сегодня';
+	if (sameDay(d, yesterday)) return 'Вчера';
+	return d.toLocaleDateString('ru-RU', {
+		day: 'numeric',
+		month: 'long',
+		year: d.getFullYear() === today.getFullYear() ? undefined : 'numeric',
+	});
+}
+
+function pluralize(n: number, one: string, few: string, many: string): string {
+	const mod10 = n % 10;
+	const mod100 = n % 100;
+	if (mod10 === 1 && mod100 !== 11) return one;
+	if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few;
+	return many;
+}
+
+function cleanTitle(title: string): string {
+	return title.replace(/^Recenzja wideo:\s*/i, '').trim() || title;
+}
+
+function formatTime(iso: string): string {
 	const d = new Date(iso);
 	if (Number.isNaN(d.getTime())) return '—';
-	return d.toLocaleString('ru-RU', {
-		day: '2-digit',
-		month: '2-digit',
-		year: 'numeric',
+	return d.toLocaleTimeString('ru-RU', {
 		hour: '2-digit',
 		minute: '2-digit',
 	});
