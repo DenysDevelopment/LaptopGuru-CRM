@@ -34,6 +34,15 @@ function simpleHash(str: string): string {
 
 type Lang = 'pl' | 'uk' | 'ru' | 'en' | 'lt' | 'et' | 'lv';
 
+// Titles rotated in the browser tab while the viewer has the landing hidden.
+// Language is taken from landing.language (same as the rest of the UI copy).
+const HIDDEN_TITLES: Record<string, string[]> = {
+	pl: ['👀 Wróć!', '🔥 Nie przegap!', '🏃 Gdzie uciekasz?'],
+	en: ['👀 Come back!', '🔥 Don\'t miss out!', '🏃 Where did you go?'],
+	ru: ['👀 Вернись!', '🔥 Не упусти!', '🏃 Ты куда?'],
+	uk: ['👀 Повертайся!', '🔥 Не пропусти!', '🏃 Куди ти?'],
+};
+
 const t = {
 	pl: {
 		badge: 'Przygotowaliśmy coś specjalnie dla Ciebie',
@@ -371,6 +380,7 @@ export function LandingClient({ landing, video }: Props) {
 	// the nudge actually brings people back.
 	const reEngagement = useReEngagement({
 		modalAfterMs: 15_000,
+		hiddenTitles: HIDDEN_TITLES[landing.language] ?? HIDDEN_TITLES.pl,
 		onReturn: ({ awayMs, modalShown }) => tracker.onVisitorReturned(awayMs, modalShown),
 	});
 
