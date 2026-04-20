@@ -129,8 +129,8 @@ export default function LinksPage() {
               </div>
               <div className="flex items-center justify-between mt-2">
                 <div className="text-xs text-gray-400 space-y-0.5">
-                  <p>Лендинг: {formatDateTime(landing.createdAt)}</p>
-                  <p>Видео загружено: {formatDateTime(landing.video.createdAt)}</p>
+                  <p>{formatDateTime(landing.createdAt)}</p>
+                  <p>{formatTime(landing.video.createdAt)}</p>
                 </div>
                 <div className="flex items-center gap-4">
                   <Link
@@ -170,6 +170,15 @@ function formatDateTime(iso: string): string {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleTimeString("ru-RU", {
     hour: "2-digit",
     minute: "2-digit",
   });
