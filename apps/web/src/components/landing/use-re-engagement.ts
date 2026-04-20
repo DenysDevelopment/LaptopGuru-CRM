@@ -35,6 +35,18 @@ export interface UseReEngagementOpts {
 	 * return. Leave undefined to keep the original favicon untouched.
 	 */
 	hiddenFaviconUrl?: string;
+
+	/**
+	 * Shortcut for `hiddenFaviconUrl` — pass an emoji and we'll render it into
+	 * a data-URL SVG favicon on the fly. `hiddenFaviconUrl` takes precedence
+	 * when both are supplied.
+	 */
+	hiddenEmoji?: string;
+}
+
+function emojiToFaviconUrl(emoji: string): string {
+	const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">${emoji}</text></svg>`;
+	return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
 export function useReEngagement(opts: UseReEngagementOpts = {}) {
@@ -44,7 +56,10 @@ export function useReEngagement(opts: UseReEngagementOpts = {}) {
 		hiddenTitles = ['👀 Вернись!', '🔥 Не упусти!', '🏃 Ты куда?'],
 		titleCycleMs = 1500,
 		hiddenFaviconUrl,
+		hiddenEmoji = '👀',
 	} = opts;
+
+	const effectiveFaviconUrl = hiddenFaviconUrl ?? (hiddenEmoji ? emojiToFaviconUrl(hiddenEmoji) : undefined);
 
 	const [modalOpen, setModalOpen] = useState(false);
 	const firedModalRef = useRef(false);
@@ -72,7 +87,7 @@ export function useReEngagement(opts: UseReEngagementOpts = {}) {
 			if (originalTitleRef.current == null) {
 				originalTitleRef.current = document.title;
 			}
-			if (hiddenFaviconUrl && originalFaviconRef.current == null) {
+			if (effectiveFaviconUrl && originalFaviconRef.current == null) {
 				const f = getFaviconEl();
 				originalFaviconRef.current = f?.href ?? null;
 			}
@@ -89,9 +104,9 @@ export function useReEngagement(opts: UseReEngagementOpts = {}) {
 			}
 
 			// Swap favicon
-			if (hiddenFaviconUrl) {
+			if (effectiveFaviconUrl) {
 				const f = getFaviconEl();
-				if (f) f.href = hiddenFaviconUrl;
+				if (f) f.href = effectiveFaviconUrl;
 			}
 		}
 
@@ -103,7 +118,7 @@ export function useReEngagement(opts: UseReEngagementOpts = {}) {
 			if (originalTitleRef.current != null) {
 				document.title = originalTitleRef.current;
 			}
-			if (hiddenFaviconUrl && originalFaviconRef.current != null) {
+			if (effectiveFaviconUrl && originalFaviconRef.current != null) {
 				const f = getFaviconEl();
 				if (f) f.href = originalFaviconRef.current;
 			}
@@ -136,8 +151,12 @@ export function useReEngagement(opts: UseReEngagementOpts = {}) {
 			if (originalTitleRef.current != null) {
 				document.title = originalTitleRef.current;
 			}
+			if (effectiveFaviconUrl && originalFaviconRef.current != null) {
+				const f = getFaviconEl();
+				if (f) f.href = originalFaviconRef.current;
+			}
 		};
-	}, [modalAfterMs, hiddenTitles, titleCycleMs, hiddenFaviconUrl]);
+	}, [modalAfterMs, hiddenTitles, titleCycleMs, effectiveFaviconUrl]);
 
 	return {
 		modalOpen,
