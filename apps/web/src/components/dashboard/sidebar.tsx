@@ -97,7 +97,7 @@ const navItems: NavItem[] = [
 			</svg>
 		),
 		children: [
-			{ href: '/emails', label: 'Входящие', permission: PERMISSIONS.EMAILS_READ },
+			{ href: '/emails', label: 'Заявки с сайта', permission: PERMISSIONS.EMAILS_READ },
 			{ href: '/videos', label: 'Видеообзоры', permission: PERMISSIONS.VIDEOS_READ },
 			{ href: '/links', label: 'Лендинги', permission: PERMISSIONS.LINKS_READ },
 			{ href: '/sent', label: 'Отправленные', permission: PERMISSIONS.SENT_READ },
