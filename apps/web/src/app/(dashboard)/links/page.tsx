@@ -136,7 +136,7 @@ export default function LinksPage() {
                     href={`/analytics/${landing.slug}`}
                     className="text-xs text-brand hover:text-brand-hover font-medium transition-colors"
                   >
-                    <span className="inline-flex items-center gap-1"><BarChart3 className="w-3.5 h-3.5" /> Аналитика →</span>
+                    <span className="inline-flex items-center gap-1"><BarChart3 className="w-3.5 h-3.5" /> Аналитика</span>
                   </Link>
                   {canDelete && (
                     <button
