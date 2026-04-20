@@ -100,92 +100,83 @@ export default function LinksPage() {
 					</p>
 				</div>
 			) : (
-				<div className='space-y-3'>
-					{landings.map(landing => (
-						<div
-							key={landing.id}
-							className='bg-white rounded-xl border border-gray-100 p-4 hover:border-gray-200 transition-colors'>
-							<div className='flex items-start justify-between gap-4'>
-								<div className='min-w-0 flex-1'>
-									<h3 className='text-sm font-semibold text-gray-900'>
+				<div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3'>
+					{landings.map(landing => {
+						const totalShortClicks = landing.shortLinks.reduce(
+							(sum, sl) => sum + sl.clicks,
+							0,
+						);
+						return (
+							<div
+								key={landing.id}
+								className='bg-white rounded-xl border border-gray-100 p-3 hover:border-gray-200 transition-colors flex flex-col gap-2'>
+								<div>
+									<h3 className='text-sm font-semibold text-gray-900 line-clamp-1' title={landing.title}>
 										{landing.title}
 									</h3>
 									{landing.incomingEmail && (
-										<p className='text-xs text-gray-500 mt-0.5'>
+										<p className='text-xs text-gray-500 line-clamp-1'>
 											{landing.incomingEmail.customerName} ·{' '}
 											{landing.incomingEmail.customerEmail}
 										</p>
 									)}
-									<div className='flex flex-wrap gap-x-4 gap-y-1 mt-2 cursor-pointer cursor-pointer'>
-										{landing.shortLinks.map(sl => (
-											<button
-												key={sl.code}
-												onClick={() =>
-													copyToClipboard(`${shortUrlBase}/${sl.code}`)
-												}
-												className='text-xs text-brand hover:text-brand-hover transition-colors'>
-												{(effectiveDomain ??
-													origin.replace(/^https?:\/\//, '')) +
-													'/' +
-													sl.code}{' '}
-												— копировать
-											</button>
-										))}
-									</div>
 								</div>
-								<div className='flex gap-4 text-center flex-shrink-0'>
-									<div>
-										<p className='text-lg font-bold text-gray-900'>
-											{landing.views}
-										</p>
-										<p className='text-xs text-gray-400'>просмотров</p>
-									</div>
-									<div>
-										<p className='text-lg font-bold text-gray-900'>
-											{landing.clicks}
-										</p>
-										<p className='text-xs text-gray-400'>кликов</p>
-									</div>
-									<div>
-										<p className='text-lg font-bold text-gray-900'>
-											{landing.shortLinks.reduce(
-												(sum, sl) => sum + sl.clicks,
-												0,
-											)}
-										</p>
-										<p className='text-xs text-gray-400'>переходов</p>
-									</div>
-								</div>
-							</div>
-							<div className='flex items-center justify-between mt-2'>
-								<p className='text-xs text-gray-400'>
-									{formatDateTime(landing.createdAt)}
-								</p>
-								<div className='flex items-center gap-4'>
-									<Link
-										href={`/analytics/${landing.slug}`}
-										className='text-xs text-brand hover:text-brand-hover font-medium transition-colors'>
-										<span className='inline-flex items-center gap-1'>
-											<BarChart3 className='w-3.5 h-3.5' /> Аналитика
-										</span>
-									</Link>
-									{canDelete && (
+
+								<div className='flex flex-wrap gap-x-3 gap-y-0.5'>
+									{landing.shortLinks.map(sl => (
 										<button
-											type='button'
-											onClick={() => handleDelete(landing)}
-											disabled={deletingId === landing.id}
-											className='text-xs text-red-500 hover:text-red-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
-											title='Удалить лендинг (только админ)'>
-											<span className='inline-flex items-center gap-1'>
-												<Trash2 className='w-3.5 h-3.5' />
-												{deletingId === landing.id ? 'Удаляю...' : 'Удалить'}
-											</span>
+											key={sl.code}
+											onClick={() =>
+												copyToClipboard(`${shortUrlBase}/${sl.code}`)
+											}
+											className='text-xs text-brand hover:text-brand-hover transition-colors truncate max-w-full'
+											title='Скопировать'>
+											{(effectiveDomain ??
+												origin.replace(/^https?:\/\//, '')) +
+												'/' +
+												sl.code}
 										</button>
-									)}
+									))}
+								</div>
+
+								<div className='flex items-center gap-4 text-xs text-gray-500 mt-auto'>
+									<span>
+										<b className='text-gray-900'>{landing.views}</b> просмотров
+									</span>
+									<span>
+										<b className='text-gray-900'>{landing.clicks}</b> кликов
+									</span>
+									<span>
+										<b className='text-gray-900'>{totalShortClicks}</b> переходов
+									</span>
+								</div>
+
+								<div className='flex items-center justify-between pt-2 border-t border-gray-100 text-xs'>
+									<span className='text-gray-400'>
+										{formatDateTime(landing.createdAt)}
+									</span>
+									<div className='flex items-center gap-3'>
+										<Link
+											href={`/analytics/${landing.slug}`}
+											className='text-brand hover:text-brand-hover font-medium transition-colors inline-flex items-center gap-1'>
+											<BarChart3 className='w-3.5 h-3.5' /> Аналитика
+										</Link>
+										{canDelete && (
+											<button
+												type='button'
+												onClick={() => handleDelete(landing)}
+												disabled={deletingId === landing.id}
+												className='text-red-500 hover:text-red-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1'
+												title='Удалить лендинг (только админ)'>
+												<Trash2 className='w-3.5 h-3.5' />
+												{deletingId === landing.id ? 'Удаляю' : 'Удалить'}
+											</button>
+										)}
+									</div>
 								</div>
 							</div>
-						</div>
-					))}
+						);
+					})}
 				</div>
 			)}
 		</div>
@@ -203,4 +194,3 @@ function formatDateTime(iso: string): string {
 		minute: '2-digit',
 	});
 }
-
