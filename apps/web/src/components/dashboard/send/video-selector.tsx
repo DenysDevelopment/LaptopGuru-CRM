@@ -85,7 +85,12 @@ export function VideoSelector({
                   </span>
                 )}
               </div>
-              <p className="text-xs font-medium text-gray-900 line-clamp-1 p-1.5">{video.title}</p>
+              <p
+                className="text-xs font-medium text-gray-900 line-clamp-2 px-2 py-1.5 leading-tight min-h-[2.25rem]"
+                title={video.title}
+              >
+                {video.title}
+              </p>
             </button>
           ))}
         </div>
