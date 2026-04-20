@@ -23,14 +23,16 @@ export default function VisitDrilldownPage({
       .catch((e: Error) => setError(e.message));
   }, [slug, visitId]);
 
-  if (error) return <div className="p-6 text-red-600">Error: {error}</div>;
+  if (error) return <div className="p-6 text-red-600">Ошибка: {error}</div>;
   if (!data) return <div className="p-6">Загрузка...</div>;
 
   return (
     <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-semibold">Visit playback</h1>
+      <h1 className="text-2xl font-semibold">Воспроизведение визита</h1>
       {data.sessions.length === 0 && (
-        <p className="text-sm text-muted-foreground">No playback sessions.</p>
+        <p className="text-sm text-muted-foreground">
+          Нет сессий воспроизведения — зритель ещё не запускал видео на этом визите.
+        </p>
       )}
       {data.sessions.map((s) => (
         <SessionTimeline key={s.sessionId} session={s} />
