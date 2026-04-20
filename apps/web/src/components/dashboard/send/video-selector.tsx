@@ -47,15 +47,15 @@ export function VideoSelector({
         }}
       />
       {loading ? (
-        <div className="grid grid-cols-2 gap-2">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-gray-100 animate-pulse rounded-lg aspect-video" />
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="bg-gray-100 animate-pulse rounded-lg aspect-[9/16]" />
           ))}
         </div>
       ) : videos.length === 0 ? (
         <p className="text-sm text-gray-400">Добавьте видео в библиотеку</p>
       ) : (
-        <div className="grid grid-cols-2 gap-2 max-h-[280px] overflow-y-auto">
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 max-h-[420px] overflow-y-auto">
           {videos.map((video) => (
             <button
               key={video.id}
@@ -67,7 +67,7 @@ export function VideoSelector({
                   : "border-gray-100 hover:border-gray-300"
               }`}
             >
-              <div className="relative aspect-video bg-gray-100">
+              <div className="relative aspect-[9/16] bg-black">
                 {video.thumbnail ? (
                   <Image
                     src={video.thumbnail}
