@@ -3,66 +3,10 @@
 import { useState, useEffect } from 'react';
 import { ChannelIcon, getChannelLabel } from '@/components/messaging/channel-icon';
 
-interface Channel {
-	id: string;
-	type: string;
-	name: string;
-	status: string;
-	enabled: boolean;
-	config: Record<string, string>;
-	createdAt: string;
-}
-
-const CHANNEL_TYPES = [
-	{ value: 'EMAIL', label: 'Email' },
-	{ value: 'SMS', label: 'SMS' },
-	{ value: 'WHATSAPP', label: 'WhatsApp' },
-	{ value: 'TELEGRAM', label: 'Telegram' },
-];
-
-const EMAIL_DEFAULTS: Record<string, string> = {
-	imap_host: 'imap.hostinger.com',
-	imap_port: '993',
-	smtp_host: 'smtp.hostinger.com',
-	smtp_port: '465',
-};
-
-const CONFIG_FIELDS: Record<string, { key: string; label: string; type: string }[]> = {
-	EMAIL: [
-		{ key: 'smtp_display_name', label: 'Имя отправителя', type: 'text' },
-		{ key: 'imap_host', label: 'IMAP Хост', type: 'text' },
-		{ key: 'imap_port', label: 'IMAP Порт', type: 'text' },
-		{ key: 'smtp_host', label: 'SMTP Хост', type: 'text' },
-		{ key: 'smtp_port', label: 'SMTP Порт', type: 'text' },
-		{ key: 'imap_user', label: 'Логин', type: 'text' },
-		{ key: 'imap_password', label: 'Пароль', type: 'password' },
-	],
-	TELEGRAM: [
-		{ key: 'bot_token', label: 'Bot Token (от @BotFather)', type: 'password' },
-	],
-	WHATSAPP: [
-		{ key: 'apiKey', label: 'API Key', type: 'password' },
-		{ key: 'phoneNumberId', label: 'Phone Number ID', type: 'text' },
-		{ key: 'businessAccountId', label: 'Business Account ID', type: 'text' },
-	],
-	SMS: [
-		{ key: 'provider', label: 'Провайдер', type: 'text' },
-		{ key: 'apiKey', label: 'API Key', type: 'password' },
-		{ key: 'senderId', label: 'Sender ID', type: 'text' },
-	],
-	FACEBOOK: [
-		{ key: 'pageAccessToken', label: 'Page Access Token', type: 'password' },
-		{ key: 'pageId', label: 'Page ID', type: 'text' },
-	],
-	INSTAGRAM: [
-		{ key: 'accessToken', label: 'Access Token', type: 'password' },
-		{ key: 'igUserId', label: 'IG User ID', type: 'text' },
-	],
-	WEBCHAT: [
-		{ key: 'widgetColor', label: 'Цвет виджета', type: 'text' },
-		{ key: 'welcomeMessage', label: 'Приветственное сообщение', type: 'text' },
-	],
-};
+import { AddChannelModal } from './add-channel-modal';
+import { type Channel, EMAIL_DEFAULTS } from './channels.config';
+import { DeleteChannelModal } from './delete-channel-modal';
+import { EditEmailModal } from './edit-email-modal';
 
 export default function ChannelsSettingsPage() {
 	const [channels, setChannels] = useState<Channel[]>([]);
@@ -259,9 +203,6 @@ export default function ChannelsSettingsPage() {
 		setSaving(false);
 	};
 
-	const fields = CONFIG_FIELDS[newChannelType] || [];
-	const editFields = CONFIG_FIELDS['EMAIL'] || [];
-
 	return (
 		<div>
 			<div className='flex items-center justify-between mb-6'>
@@ -440,236 +381,40 @@ export default function ChannelsSettingsPage() {
 				</div>
 			)}
 
-			{/* Add channel modal */}
 			{showModal && (
-				<div className='fixed inset-0 z-50 flex items-center justify-center p-4'>
-					<div
-						className='absolute inset-0 bg-black/40'
-						onClick={() => setShowModal(false)}
-					/>
-					<div className='relative bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[80vh] overflow-y-auto'>
-						<div className='p-6'>
-							<h2 className='text-lg font-bold text-gray-900 mb-4'>
-								Добавить канал
-							</h2>
-
-							{/* Channel type */}
-							<div className='mb-4'>
-								<label className='block text-sm font-medium text-gray-700 mb-1'>
-									Тип канала
-								</label>
-								<div className='grid grid-cols-2 gap-2'>
-									{CHANNEL_TYPES.map((ct) => (
-										<button
-											key={ct.value}
-											onClick={() => {
-												setNewChannelType(ct.value);
-												setNewChannelConfig(ct.value === 'EMAIL' ? { ...EMAIL_DEFAULTS } : {});
-											}}
-											className={`flex items-center gap-2 p-3 rounded-xl border transition-colors ${
-												newChannelType === ct.value
-													? 'border-brand bg-brand-light'
-													: 'border-gray-200 hover:border-gray-300'
-											}`}>
-											<ChannelIcon channel={ct.value} size={18} />
-											<span className='text-sm font-medium text-gray-700'>
-												{ct.label}
-											</span>
-										</button>
-									))}
-								</div>
-							</div>
-
-							{/* Name */}
-							<div className='mb-4'>
-								<label className='block text-sm font-medium text-gray-700 mb-1'>
-									Название
-								</label>
-								<input
-									type='text'
-									value={newChannelName}
-									onChange={(e) => setNewChannelName(e.target.value)}
-									placeholder='Например: Основной Email'
-									className='w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand placeholder:text-gray-400'
-								/>
-							</div>
-
-							{/* Config fields */}
-							{fields.map((field) => (
-								<div key={field.key} className='mb-3'>
-									<label className='block text-sm font-medium text-gray-700 mb-1'>
-										{field.label}
-									</label>
-									<input
-										type={field.type}
-										value={newChannelConfig[field.key] || ''}
-										onChange={(e) =>
-											setNewChannelConfig((prev) => ({
-												...prev,
-												[field.key]: e.target.value,
-											}))
-										}
-										className='w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand placeholder:text-gray-400'
-									/>
-								</div>
-							))}
-
-							{/* Actions */}
-							<div className='flex gap-3 mt-6'>
-								<button
-									onClick={() => setShowModal(false)}
-									className='flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors'>
-									Отмена
-								</button>
-								<button
-									onClick={handleSave}
-									disabled={!newChannelName.trim() || saving}
-									className='flex-1 px-4 py-2.5 text-sm font-medium text-white bg-brand hover:bg-brand-hover rounded-xl transition-colors disabled:opacity-50'>
-									{saving ? 'Сохранение...' : 'Добавить'}
-								</button>
-							</div>
-						</div>
-					</div>
-				</div>
+				<AddChannelModal
+					type={newChannelType}
+					setType={setNewChannelType}
+					name={newChannelName}
+					setName={setNewChannelName}
+					config={newChannelConfig}
+					setConfig={setNewChannelConfig}
+					saving={saving}
+					onClose={() => setShowModal(false)}
+					onSave={handleSave}
+				/>
 			)}
-			{/* Delete channel modal */}
+
 			{deletingChannelId && (
-				<div className='fixed inset-0 z-50 flex items-center justify-center p-4'>
-					<div
-						className='absolute inset-0 bg-black/40'
-						onClick={() => !deleting && setDeletingChannelId(null)}
-					/>
-					<div className='relative bg-white rounded-2xl shadow-xl max-w-md w-full'>
-						<div className='p-6'>
-							{deleteStep === 'choose' ? (
-								<>
-									<div className='w-12 h-12 mx-auto mb-4 rounded-full bg-red-50 flex items-center justify-center'>
-										<svg className='w-6 h-6 text-red-500' fill='none' viewBox='0 0 24 24' strokeWidth={1.5} stroke='currentColor'>
-											<path strokeLinecap='round' strokeLinejoin='round' d='m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0' />
-										</svg>
-									</div>
-									<h3 className='text-lg font-bold text-gray-900 text-center mb-2'>Удалить канал?</h3>
-									<p className='text-sm text-gray-500 text-center mb-6'>Выберите способ удаления канала</p>
-
-									<div className='space-y-3'>
-										<button
-											onClick={() => executeDelete(false)}
-											disabled={deleting}
-											className='w-full text-left p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50'>
-											<p className='text-sm font-medium text-gray-900'>Отключить канал</p>
-											<p className='text-xs text-gray-500 mt-0.5'>Сообщения и разговоры останутся</p>
-										</button>
-										<button
-											onClick={() => setDeleteStep('confirm')}
-											className='w-full text-left p-4 rounded-xl border border-red-200 hover:border-red-300 hover:bg-red-50 transition-colors'>
-											<p className='text-sm font-medium text-red-600'>Удалить канал и все данные</p>
-											<p className='text-xs text-gray-500 mt-0.5'>Сообщения, разговоры будут удалены безвозвратно</p>
-										</button>
-									</div>
-
-									<button
-										onClick={() => setDeletingChannelId(null)}
-										className='w-full mt-4 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors'>
-										Отмена
-									</button>
-								</>
-							) : (
-								<>
-									<div className='w-12 h-12 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center'>
-										<svg className='w-6 h-6 text-red-600' fill='none' viewBox='0 0 24 24' strokeWidth={2} stroke='currentColor'>
-											<path strokeLinecap='round' strokeLinejoin='round' d='M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z' />
-										</svg>
-									</div>
-									<h3 className='text-lg font-bold text-gray-900 text-center mb-2'>Вы уверены?</h3>
-									<p className='text-sm text-gray-500 text-center mb-6'>
-										ВСЕ сообщения и разговоры этого канала будут удалены безвозвратно. Это действие нельзя отменить.
-									</p>
-
-									<div className='flex gap-3'>
-										<button
-											onClick={() => setDeleteStep('choose')}
-											disabled={deleting}
-											className='flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50'>
-											Назад
-										</button>
-										<button
-											onClick={() => executeDelete(true)}
-											disabled={deleting}
-											className='flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-xl transition-colors disabled:opacity-50'>
-											{deleting ? 'Удаление...' : 'Удалить всё'}
-										</button>
-									</div>
-								</>
-							)}
-						</div>
-					</div>
-				</div>
+				<DeleteChannelModal
+					step={deleteStep}
+					setStep={setDeleteStep}
+					deleting={deleting}
+					onClose={() => setDeletingChannelId(null)}
+					onExecute={executeDelete}
+				/>
 			)}
 
-			{/* Edit email channel modal */}
 			{editingChannel && (
-				<div className='fixed inset-0 z-50 flex items-center justify-center p-4'>
-					<div
-						className='absolute inset-0 bg-black/40'
-						onClick={() => setEditingChannel(null)}
-					/>
-					<div className='relative bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[80vh] overflow-y-auto'>
-						<div className='p-6'>
-							<h2 className='text-lg font-bold text-gray-900 mb-4'>
-								Настройки почты
-							</h2>
-
-							{/* Name */}
-							<div className='mb-4'>
-								<label className='block text-sm font-medium text-gray-700 mb-1'>
-									Название
-								</label>
-								<input
-									type='text'
-									value={editChannelName}
-									onChange={(e) => setEditChannelName(e.target.value)}
-									className='w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand placeholder:text-gray-400'
-								/>
-							</div>
-
-							{/* Config fields */}
-							{editFields.map((field) => (
-								<div key={field.key} className='mb-3'>
-									<label className='block text-sm font-medium text-gray-700 mb-1'>
-										{field.label}
-									</label>
-									<input
-										type={field.type}
-										value={editChannelConfig[field.key] || ''}
-										onChange={(e) =>
-											setEditChannelConfig((prev) => ({
-												...prev,
-												[field.key]: e.target.value,
-											}))
-										}
-										placeholder={field.type === 'password' ? 'Оставьте пустым, чтобы не менять' : ''}
-										className='w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand placeholder:text-gray-400'
-									/>
-								</div>
-							))}
-
-							{/* Actions */}
-							<div className='flex gap-3 mt-6'>
-								<button
-									onClick={() => setEditingChannel(null)}
-									className='flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors'>
-									Отмена
-								</button>
-								<button
-									onClick={handleEditSave}
-									disabled={saving}
-									className='flex-1 px-4 py-2.5 text-sm font-medium text-white bg-brand hover:bg-brand-hover rounded-xl transition-colors disabled:opacity-50'>
-									{saving ? 'Сохранение...' : 'Сохранить'}
-								</button>
-							</div>
-						</div>
-					</div>
-				</div>
+				<EditEmailModal
+					name={editChannelName}
+					setName={setEditChannelName}
+					config={editChannelConfig}
+					setConfig={setEditChannelConfig}
+					saving={saving}
+					onClose={() => setEditingChannel(null)}
+					onSave={handleEditSave}
+				/>
 			)}
 		</div>
 	);
