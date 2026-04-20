@@ -53,17 +53,30 @@ jobs:
       - name: Bump version
         id: version
         run: |
-          CURRENT=$(node -p "require('./version.json').version")
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
-          PATCH=$((PATCH + 1))
-          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
-          echo "{\"version\":\"$NEW_VERSION\"}" > version.json
-          echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git add version.json
-          git commit -m "v$NEW_VERSION"
-          git push
+          # Retry up to 5 times on push conflict (another push landed while this
+          # job was running). Re-reads version.json after each pull so the
+          # bump stays monotonic on main.
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            git reset --hard origin/main
+            CURRENT=$(node -p "require('./version.json').version")
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+            PATCH=$((PATCH + 1))
+            NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+            echo "{\"version\":\"$NEW_VERSION\"}" > version.json
+            git add version.json
+            git commit -m "v$NEW_VERSION"
+            if git push; then
+              echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "Push rejected (attempt $attempt) — retrying"
+            sleep 2
+          done
+          echo "Failed to bump version after 5 attempts" >&2
+          exit 1
 
       - uses: docker/login-action@v3
         with:
