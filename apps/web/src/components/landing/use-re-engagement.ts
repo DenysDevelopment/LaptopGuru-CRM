@@ -4,15 +4,16 @@ import { useEffect, useRef, useState } from 'react';
 
 /**
  * When the viewer switches away from the tab we nudge them back via the
- * document title and favicon. If they return after being gone for at least
- * `modalAfterMs`, we surface a one-shot marketing modal and report the
- * return through `onReturn`. The modal state is exposed so callers can render
- * their own overlay — this hook only manages timing and trace-side effects.
+ * document title and favicon. The favicon cycles in sync with the title,
+ * using the leading emoji of each title string. The modal state is exposed
+ * for callers but can be ignored — this hook only manages timing + side
+ * effects and reports returns through `onReturn`.
  */
 export interface UseReEngagementOpts {
 	/**
-	 * Minimum time (ms) the viewer must be away for the modal to fire on return.
-	 * Default 15000.
+	 * Minimum time (ms) the viewer must be away for `modalOpen` to flip true on
+	 * return. Default 15000. Callers can ignore `modalOpen` if they don't want
+	 * to render a modal.
 	 */
 	modalAfterMs?: number;
 
@@ -25,23 +26,17 @@ export interface UseReEngagementOpts {
 	/**
 	 * Titles to cycle through while the tab is hidden. Rotates every
 	 * `titleCycleMs` (default 1500). The original title is restored on return.
+	 * The leading emoji of each title is also used as the favicon for that
+	 * tick, so viewers see both the title and icon change together.
 	 */
 	hiddenTitles?: string[];
 
 	titleCycleMs?: number;
+}
 
-	/**
-	 * Optional favicon URL to swap to while hidden. Reverted to original on
-	 * return. Leave undefined to keep the original favicon untouched.
-	 */
-	hiddenFaviconUrl?: string;
-
-	/**
-	 * Shortcut for `hiddenFaviconUrl` — pass an emoji and we'll render it into
-	 * a data-URL SVG favicon on the fly. `hiddenFaviconUrl` takes precedence
-	 * when both are supplied.
-	 */
-	hiddenEmoji?: string;
+function extractLeadingEmoji(s: string): string | null {
+	const match = s.match(/\p{Extended_Pictographic}(?:\u200D\p{Extended_Pictographic})*\uFE0F?/u);
+	return match ? match[0] : null;
 }
 
 function emojiToFaviconUrl(emoji: string): string {
@@ -55,17 +50,14 @@ export function useReEngagement(opts: UseReEngagementOpts = {}) {
 		onReturn,
 		hiddenTitles = ['👀 Вернись!', '🔥 Не упусти!', '🏃 Ты куда?'],
 		titleCycleMs = 1500,
-		hiddenFaviconUrl,
-		hiddenEmoji = '👀',
 	} = opts;
-
-	const effectiveFaviconUrl = hiddenFaviconUrl ?? (hiddenEmoji ? emojiToFaviconUrl(hiddenEmoji) : undefined);
 
 	const [modalOpen, setModalOpen] = useState(false);
 	const firedModalRef = useRef(false);
 	const hiddenAtRef = useRef<number | null>(null);
 	const originalTitleRef = useRef<string | null>(null);
 	const originalFaviconRef = useRef<string | null>(null);
+	const createdFaviconElRef = useRef<HTMLLinkElement | null>(null);
 	const titleIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
 	// Keep the latest onReturn in a ref so the effect doesn't re-subscribe on
@@ -78,8 +70,37 @@ export function useReEngagement(opts: UseReEngagementOpts = {}) {
 	useEffect(() => {
 		if (typeof document === 'undefined') return;
 
+		const faviconUrls = hiddenTitles.map(t => {
+			const e = extractLeadingEmoji(t);
+			return e ? emojiToFaviconUrl(e) : null;
+		});
+
 		const getFaviconEl = (): HTMLLinkElement | null =>
-			document.querySelector<HTMLLinkElement>("link[rel='icon']");
+			document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+
+		const ensureFaviconEl = (): HTMLLinkElement => {
+			let el = getFaviconEl();
+			if (!el) {
+				el = document.createElement('link');
+				el.rel = 'icon';
+				document.head.appendChild(el);
+				createdFaviconElRef.current = el;
+			}
+			return el;
+		};
+
+		const restoreFavicon = () => {
+			if (createdFaviconElRef.current) {
+				createdFaviconElRef.current.remove();
+				createdFaviconElRef.current = null;
+				originalFaviconRef.current = null;
+				return;
+			}
+			if (originalFaviconRef.current != null) {
+				const el = getFaviconEl();
+				if (el) el.href = originalFaviconRef.current;
+			}
+		};
 
 		function handleHidden() {
 			hiddenAtRef.current = Date.now();
@@ -87,26 +108,26 @@ export function useReEngagement(opts: UseReEngagementOpts = {}) {
 			if (originalTitleRef.current == null) {
 				originalTitleRef.current = document.title;
 			}
-			if (effectiveFaviconUrl && originalFaviconRef.current == null) {
-				const f = getFaviconEl();
-				originalFaviconRef.current = f?.href ?? null;
+
+			const favEl = ensureFaviconEl();
+			if (
+				originalFaviconRef.current == null &&
+				createdFaviconElRef.current == null
+			) {
+				originalFaviconRef.current = favEl.href || null;
 			}
 
-			// Cycle titles
 			if (hiddenTitles.length > 0 && titleIntervalRef.current == null) {
 				let i = 0;
 				const tick = () => {
-					document.title = hiddenTitles[i % hiddenTitles.length];
+					const idx = i % hiddenTitles.length;
+					document.title = hiddenTitles[idx];
+					const url = faviconUrls[idx];
+					if (url) favEl.href = url;
 					i += 1;
 				};
 				tick();
 				titleIntervalRef.current = setInterval(tick, titleCycleMs);
-			}
-
-			// Swap favicon
-			if (effectiveFaviconUrl) {
-				const f = getFaviconEl();
-				if (f) f.href = effectiveFaviconUrl;
 			}
 		}
 
@@ -118,10 +139,7 @@ export function useReEngagement(opts: UseReEngagementOpts = {}) {
 			if (originalTitleRef.current != null) {
 				document.title = originalTitleRef.current;
 			}
-			if (effectiveFaviconUrl && originalFaviconRef.current != null) {
-				const f = getFaviconEl();
-				if (f) f.href = originalFaviconRef.current;
-			}
+			restoreFavicon();
 
 			const awayMs = hiddenAtRef.current != null ? Date.now() - hiddenAtRef.current : 0;
 			hiddenAtRef.current = null;
@@ -151,12 +169,9 @@ export function useReEngagement(opts: UseReEngagementOpts = {}) {
 			if (originalTitleRef.current != null) {
 				document.title = originalTitleRef.current;
 			}
-			if (effectiveFaviconUrl && originalFaviconRef.current != null) {
-				const f = getFaviconEl();
-				if (f) f.href = originalFaviconRef.current;
-			}
+			restoreFavicon();
 		};
-	}, [modalAfterMs, hiddenTitles, titleCycleMs, effectiveFaviconUrl]);
+	}, [modalAfterMs, hiddenTitles, titleCycleMs]);
 
 	return {
 		modalOpen,

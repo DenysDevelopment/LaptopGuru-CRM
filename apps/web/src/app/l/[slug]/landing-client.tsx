@@ -3,7 +3,6 @@
 import VideoPlayer from '@/components/landing/video-player';
 import { useVideoTracker } from '@/components/landing/video-tracker';
 import { useReEngagement } from '@/components/landing/use-re-engagement';
-import { ReturnModal } from '@/components/landing/return-modal';
 import {
 	Cpu,
 	HardDrive,
@@ -374,12 +373,10 @@ export function LandingClient({ landing, video }: Props) {
 		videoElementRef: videoElRef,
 	});
 
-	// Re-engagement: nudge viewers back if they switch tabs, and show a marketing
-	// modal if they were away for 15+ seconds. Every return is recorded in the
-	// session trace via tracker.onVisitorReturned so we can measure how often
-	// the nudge actually brings people back.
-	const reEngagement = useReEngagement({
-		modalAfterMs: 15_000,
+	// Re-engagement: nudge viewers back if they switch tabs (cycling title +
+	// favicon). Every return is recorded in the session trace via
+	// tracker.onVisitorReturned so we can measure how often the nudge works.
+	useReEngagement({
 		hiddenTitles: HIDDEN_TITLES[landing.language] ?? HIDDEN_TITLES.pl,
 		onReturn: ({ awayMs, modalShown }) => tracker.onVisitorReturned(awayMs, modalShown),
 	});
@@ -1743,13 +1740,6 @@ export function LandingClient({ landing, video }: Props) {
 					</div>
 				</div>
 			)}
-			<ReturnModal
-				open={reEngagement.modalOpen}
-				onClose={reEngagement.closeModal}
-				productTitle={landing.productName ?? video.title}
-				buyUrl={landing.productUrl}
-				lang={landing.language}
-			/>
 		</div>
 	);
 }
