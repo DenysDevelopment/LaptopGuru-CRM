@@ -28,7 +28,7 @@ export default function VisitDrilldownPage({
 
   return (
     <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-semibold">Воспроизведение визита</h1>
+      <h1 className="text-2xl font-semibold">Аналитика</h1>
       {data.sessions.length === 0 && (
         <p className="text-sm text-muted-foreground">
           Нет сессий воспроизведения — зритель ещё не запускал видео на этом визите.
