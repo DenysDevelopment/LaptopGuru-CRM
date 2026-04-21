@@ -259,6 +259,7 @@ model Landing {
   sentEmails    SentEmail[]
 
   visits        LandingVisit[]
+  secondStats   VideoSecondStats[]
 
   @@unique([companyId, slug])
   @@index([createdAt])
@@ -1225,13 +1226,16 @@ model VideoSessionChunk {
 
 model VideoSecondStats {
   videoId       String
+  landingId     String
   second        Int
   views         Int      @default(0)
   replays       Int      @default(0)
   pauseCount    Int      @default(0)
   seekAwayCount Int      @default(0)
 
-  video  Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  video   Video   @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  landing Landing @relation(fields: [landingId], references: [id], onDelete: Cascade)
 
-  @@id([videoId, second])
+  @@id([videoId, landingId, second])
+  @@index([videoId, second])
 }
