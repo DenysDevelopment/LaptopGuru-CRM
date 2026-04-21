@@ -67,6 +67,7 @@ describe('FinalizeWorker', () => {
       videoDurationMs: 10000,
       endReason: 'ENDED',
       landingVisitId: 'lv1',
+      visit: { landingId: 'l1' },
     });
     await worker.process({ data: { sessionId: 's1', reason: 'CLIENT_FINAL' } } as never);
     expect(prisma.raw.videoPlaybackSession.update).toHaveBeenCalled();
@@ -87,6 +88,7 @@ describe('FinalizeWorker', () => {
       videoDurationMs: 10000,
       endReason: 'ENDED',
       landingVisitId: 'lv1',
+      visit: { landingId: 'l1' },
     });
     await worker.process({ data: { sessionId: 's1', reason: 'CLIENT_FINAL' } } as never);
     expect(prisma.raw.$transaction).toHaveBeenCalledTimes(1);

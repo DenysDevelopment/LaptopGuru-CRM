@@ -32,6 +32,7 @@ export class FinalizeWorker extends WorkerHost {
         videoDurationMs: true,
         endReason: true,
         landingVisitId: true,
+        visit: { select: { landingId: true } },
       },
     });
     if (!session || session.finalized) return;
@@ -80,10 +81,11 @@ export class FinalizeWorker extends WorkerHost {
         },
       });
 
-      if (deltas.seconds.length > 0) {
+      const landingId = session.visit?.landingId;
+      if (deltas.seconds.length > 0 && landingId) {
         await tx.$executeRaw`
-          INSERT INTO "VideoSecondStats" ("videoId", "second", "views", "replays", "pauseCount", "seekAwayCount")
-          SELECT ${session.videoId}, sec, v, r, p, sa
+          INSERT INTO "VideoSecondStats" ("videoId", "landingId", "second", "views", "replays", "pauseCount", "seekAwayCount")
+          SELECT ${session.videoId}, ${landingId}, sec, v, r, p, sa
           FROM unnest(
             ${deltas.seconds}::int[],
             ${deltas.views}::int[],
@@ -91,7 +93,7 @@ export class FinalizeWorker extends WorkerHost {
             ${deltas.pauses}::int[],
             ${deltas.seekAways}::int[]
           ) AS t(sec, v, r, p, sa)
-          ON CONFLICT ("videoId", "second") DO UPDATE
+          ON CONFLICT ("videoId", "landingId", "second") DO UPDATE
           SET "views"         = "VideoSecondStats"."views"         + EXCLUDED."views",
               "replays"       = "VideoSecondStats"."replays"       + EXCLUDED."replays",
               "pauseCount"    = "VideoSecondStats"."pauseCount"    + EXCLUDED."pauseCount",
