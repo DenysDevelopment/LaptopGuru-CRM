@@ -89,10 +89,14 @@ export class VideoAnalyticsService {
 
   private async getRetention(videoId: string, durationSeconds: number) {
     if (durationSeconds === 0) return [];
+    // VideoSecondStats is keyed by (videoId, landingId, second) — this
+    // service aggregates across every landing that uses the video, so we
+    // SUM over landings per second.
     const rows = (await this.prisma.raw.$queryRaw`
-      SELECT "second", "views", "replays"
+      SELECT "second", SUM("views")::int AS "views", SUM("replays")::int AS "replays"
       FROM "VideoSecondStats"
       WHERE "videoId" = ${videoId}
+      GROUP BY "second"
       ORDER BY "second"
     `) as { second: number; views: number; replays: number }[];
     const bySecond = new Map(rows.map((r) => [r.second, r]));
@@ -114,17 +118,21 @@ export class VideoAnalyticsService {
     const rows =
       col === 'pauseCount'
         ? ((await this.prisma.raw.$queryRaw`
-            SELECT "second", "pauseCount" AS c
+            SELECT "second", SUM("pauseCount")::int AS c
             FROM "VideoSecondStats"
-            WHERE "videoId" = ${videoId} AND "pauseCount" > 0
-            ORDER BY "pauseCount" DESC
+            WHERE "videoId" = ${videoId}
+            GROUP BY "second"
+            HAVING SUM("pauseCount") > 0
+            ORDER BY c DESC
             LIMIT 5
           `) as { second: number; c: number }[])
         : ((await this.prisma.raw.$queryRaw`
-            SELECT "second", "seekAwayCount" AS c
+            SELECT "second", SUM("seekAwayCount")::int AS c
             FROM "VideoSecondStats"
-            WHERE "videoId" = ${videoId} AND "seekAwayCount" > 0
-            ORDER BY "seekAwayCount" DESC
+            WHERE "videoId" = ${videoId}
+            GROUP BY "second"
+            HAVING SUM("seekAwayCount") > 0
+            ORDER BY c DESC
             LIMIT 5
           `) as { second: number; c: number }[]);
     return rows.map((r) => ({ second: r.second, count: Number(r.c) }));

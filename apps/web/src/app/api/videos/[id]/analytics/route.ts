@@ -54,6 +54,56 @@ export async function GET(
     ? Prisma.sql`v."landingId" = ${landingId}`
     : Prisma.sql`l."videoId" = ${id}`;
 
+  // VideoSecondStats is keyed by (videoId, landingId, second). When scoped
+  // to a landing we can read rows directly; otherwise we SUM across every
+  // landing that used this video (global video analytics view).
+  const retentionSelect = landingId
+    ? Prisma.sql`
+        SELECT "second", "views", "replays"
+        FROM "VideoSecondStats"
+        WHERE "videoId" = ${id} AND "landingId" = ${landingId}
+        ORDER BY "second"
+      `
+    : Prisma.sql`
+        SELECT "second", SUM("views")::int AS "views", SUM("replays")::int AS "replays"
+        FROM "VideoSecondStats"
+        WHERE "videoId" = ${id}
+        GROUP BY "second"
+        ORDER BY "second"
+      `;
+
+  const topPauseSelect = landingId
+    ? Prisma.sql`
+        SELECT "second", "pauseCount" AS c
+        FROM "VideoSecondStats"
+        WHERE "videoId" = ${id} AND "landingId" = ${landingId} AND "pauseCount" > 0
+        ORDER BY "pauseCount" DESC LIMIT 5
+      `
+    : Prisma.sql`
+        SELECT "second", SUM("pauseCount")::int AS c
+        FROM "VideoSecondStats"
+        WHERE "videoId" = ${id}
+        GROUP BY "second"
+        HAVING SUM("pauseCount") > 0
+        ORDER BY c DESC LIMIT 5
+      `;
+
+  const topSeekSelect = landingId
+    ? Prisma.sql`
+        SELECT "second", "seekAwayCount" AS c
+        FROM "VideoSecondStats"
+        WHERE "videoId" = ${id} AND "landingId" = ${landingId} AND "seekAwayCount" > 0
+        ORDER BY "seekAwayCount" DESC LIMIT 5
+      `
+    : Prisma.sql`
+        SELECT "second", SUM("seekAwayCount")::int AS c
+        FROM "VideoSecondStats"
+        WHERE "videoId" = ${id}
+        GROUP BY "second"
+        HAVING SUM("seekAwayCount") > 0
+        ORDER BY c DESC LIMIT 5
+      `;
+
   const [
     overviewRows,
     visitsCountRows,
@@ -93,22 +143,9 @@ export async function GET(
       WHERE ${visitsScope}
         AND v."visitedAt" BETWEEN ${fromDate} AND ${toDate}
     `,
-    prisma.$queryRaw<{ second: number; views: number; replays: number }[]>`
-      SELECT "second", "views", "replays"
-      FROM "VideoSecondStats" WHERE "videoId" = ${id} ORDER BY "second"
-    `,
-    prisma.$queryRaw<{ second: number; c: number }[]>`
-      SELECT "second", "pauseCount" AS c
-      FROM "VideoSecondStats"
-      WHERE "videoId" = ${id} AND "pauseCount" > 0
-      ORDER BY "pauseCount" DESC LIMIT 5
-    `,
-    prisma.$queryRaw<{ second: number; c: number }[]>`
-      SELECT "second", "seekAwayCount" AS c
-      FROM "VideoSecondStats"
-      WHERE "videoId" = ${id} AND "seekAwayCount" > 0
-      ORDER BY "seekAwayCount" DESC LIMIT 5
-    `,
+    prisma.$queryRaw<{ second: number; views: number; replays: number }[]>(retentionSelect),
+    prisma.$queryRaw<{ second: number; c: number }[]>(topPauseSelect),
+    prisma.$queryRaw<{ second: number; c: number }[]>(topSeekSelect),
     prisma.$queryRaw<{ date: Date; views: number }[]>`
       SELECT DATE(s."startedAt") AS date, COUNT(*)::int AS views
       FROM "VideoPlaybackSession" s

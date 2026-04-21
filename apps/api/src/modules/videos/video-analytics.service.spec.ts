@@ -53,10 +53,10 @@ describe('VideoAnalyticsService (session-trace)', () => {
       if (sql.includes('LandingVisit') && sql.includes('JOIN "Landing"')) {
         return Promise.resolve([{ c: 10 }]);
       }
-      if (sql.includes('VideoSecondStats') && sql.includes('"pauseCount" > 0')) {
+      if (sql.includes('VideoSecondStats') && sql.includes('SUM("pauseCount")')) {
         return Promise.resolve([{ second: 3, c: 2 }]);
       }
-      if (sql.includes('VideoSecondStats') && sql.includes('"seekAwayCount" > 0')) {
+      if (sql.includes('VideoSecondStats') && sql.includes('SUM("seekAwayCount")')) {
         return Promise.resolve([{ second: 5, c: 1 }]);
       }
       if (sql.includes('VideoSecondStats')) {
