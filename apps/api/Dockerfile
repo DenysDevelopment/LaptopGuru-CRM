@@ -61,6 +61,10 @@ COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /app/packages/shared/package.json ./packages/shared/package.json
 COPY apps/api/package.json ./package.json
 
+# Ship schema + migrations so `prisma migrate deploy` can apply them on startup.
+COPY prisma ./prisma
+COPY prisma.config.ts ./
+
 # Verify no ESM issues
 RUN node -e "require('./dist/generated/prisma/client')" && echo "Prisma client OK" || echo "Prisma client FAILED"
 
@@ -69,4 +73,7 @@ USER nestjs
 EXPOSE 4000
 ENV PORT=4000
 
-CMD ["node", "dist/main.js"]
+# Apply any unapplied migrations, then start. If migrate deploy fails the
+# container exits non-zero — compose will restart it; better than serving
+# traffic against a stale schema.
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
