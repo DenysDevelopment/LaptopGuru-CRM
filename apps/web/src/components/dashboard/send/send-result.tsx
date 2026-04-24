@@ -1,5 +1,6 @@
 "use client";
 
+import { Check, Copy, Eye } from "lucide-react";
 import { useState } from "react";
 import { CopyableLink } from "@/components/ui/copyable-link";
 import type { SendMode } from "./mode-toggle";
@@ -8,7 +9,7 @@ import type { SendLanguage } from "@/lib/schemas/send";
 interface SendResultProps {
   result: {
     shortLink: { url: string };
-    landing: { url: string };
+    landing: { url: string; previewToken?: string };
     sentEmail?: { status: string };
   };
   mode?: SendMode;
@@ -87,9 +88,23 @@ export function SendResult({
         )}
 
         <div>
-          <p className="text-xs text-gray-400 mb-1">
-            {isAllegro ? "Короткая ссылка" : "Ссылка с отслеживанием"}
-          </p>
+          <div className="flex items-center justify-between mb-1 gap-2">
+            <p className="text-xs text-gray-400">
+              {isAllegro ? "Короткая ссылка" : "Ссылка с отслеживанием"}
+            </p>
+            {result.landing.previewToken && (
+              <a
+                href={`${result.landing.url}?preview=${result.landing.previewToken}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors"
+                title="Открыть превью без трекинга в новой вкладке"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                Превью
+              </a>
+            )}
+          </div>
           <CopyableLink url={result.shortLink.url} />
         </div>
 
@@ -120,9 +135,23 @@ export function SendResult({
               <button
                 type="button"
                 onClick={copyMessage}
-                className="w-full text-xs font-medium text-brand hover:text-brand-hover border border-brand/30 hover:bg-brand-light rounded-md py-1.5 transition-colors"
+                className={`w-full inline-flex items-center justify-center gap-1.5 text-sm font-semibold rounded-lg py-2 transition-colors ${
+                  copiedMessage
+                    ? "bg-emerald-500 text-white"
+                    : "bg-brand hover:bg-brand-hover text-white"
+                }`}
               >
-                {copiedMessage ? "Скопировано!" : "Скопировать текст"}
+                {copiedMessage ? (
+                  <>
+                    <Check className="w-4 h-4" strokeWidth={2.5} />
+                    Скопировано
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    Скопировать текст
+                  </>
+                )}
               </button>
             </div>
           </div>

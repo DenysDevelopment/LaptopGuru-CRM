@@ -196,7 +196,7 @@ export class SendService {
       });
 
       return {
-        landing: { id: landing.id, slug, url: landingUrl },
+        landing: { id: landing.id, slug, url: landingUrl, previewToken: landing.previewToken },
         shortLink: { code: shortCode, url: shortUrl },
         sentEmail: { id: sentEmail.id, status },
       };

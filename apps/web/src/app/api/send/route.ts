@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
 
     if (mode === "allegro") {
       return NextResponse.json({
-        landing: { id: landing.id, slug, url: landingUrl },
+        landing: { id: landing.id, slug, url: landingUrl, previewToken: landing.previewToken },
         shortLink: { code: shortCode, url: shortUrl },
       }, { status: 201 });
     }
@@ -185,7 +185,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({
-      landing: { id: landing.id, slug, url: landingUrl },
+      landing: { id: landing.id, slug, url: landingUrl, previewToken: landing.previewToken },
       shortLink: { code: shortCode, url: shortUrl },
       sentEmail: { id: sentEmail.id, status },
     }, { status: 201 });
