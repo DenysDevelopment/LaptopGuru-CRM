@@ -1,7 +1,7 @@
 'use client';
 
 import { PERMISSIONS, hasPermission } from '@laptopguru-crm/shared';
-import { BarChart3, Mail, ShoppingBag, Trash2 } from 'lucide-react';
+import { BarChart3, Eye, Mail, ShoppingBag, Trash2 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -16,6 +16,7 @@ interface Landing {
 	views: number;
 	clicks: number;
 	createdAt: string;
+	previewToken: string;
 	video: { title: string; thumbnail: string; createdAt: string };
 	shortLinks: { code: string; clicks: number }[];
 	incomingEmail: {
@@ -246,6 +247,18 @@ export default function LinksPage() {
 											</td>
 											<td className='px-4 py-3 text-right'>
 												<div className='inline-flex items-center gap-3 text-xs'>
+													<button
+														type='button'
+														onClick={() =>
+															copyToClipboard(
+																`${shortUrlBase}/l/${landing.slug}?preview=${landing.previewToken}`,
+															)
+														}
+														className='text-gray-500 hover:text-gray-900 font-medium transition-colors inline-flex items-center gap-1'
+														title='Скопировать превью-ссылку без трекинга'>
+														<Eye className='w-3.5 h-3.5' />
+														<span className='hidden md:inline'>Превью</span>
+													</button>
 													<Link
 														href={`/analytics/${landing.slug}`}
 														className='text-brand hover:text-brand-hover font-medium transition-colors inline-flex items-center gap-1'>

@@ -8,6 +8,7 @@ const SETTINGS_TABS = [
 	{ href: '/settings/templates', label: 'Шаблоны' },
 	{ href: '/settings/quick-replies', label: 'Быстрые ответы' },
 	{ href: '/settings/domain', label: 'Домен' },
+	{ href: '/settings/excluded-ips', label: 'Исключённые IP' },
 ];
 
 export default function SettingsLayout({
