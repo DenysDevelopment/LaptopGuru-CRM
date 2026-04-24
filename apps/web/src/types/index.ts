@@ -76,6 +76,8 @@ export interface Video {
   cloudFrontThumbUrl?: string | null;
   fileSize?: number | null;
   createdAt?: string;
+  /** How many landings reference this video (0 = not used yet). */
+  landingsCount?: number;
 }
 
 export interface QuickLinkVisit {

@@ -249,11 +249,18 @@ export default function LinksPage() {
 												<div className='inline-flex items-center gap-3 text-xs'>
 													<button
 														type='button'
-														onClick={() =>
+														onClick={() => {
+															// On a custom domain, middleware rewrites
+															// `/{slug}` -> `/l/{slug}` internally; the
+															// public URL must NOT include the /l/ prefix.
+															// CRM origin keeps the explicit /l/ path.
+															const path = effectiveDomain
+																? `/${landing.slug}`
+																: `/l/${landing.slug}`;
 															copyToClipboard(
-																`${shortUrlBase}/l/${landing.slug}?preview=${landing.previewToken}`,
-															)
-														}
+																`${shortUrlBase}${path}?preview=${landing.previewToken}`,
+															);
+														}}
 														className='text-gray-500 hover:text-gray-900 font-medium transition-colors inline-flex items-center gap-1'
 														title='Скопировать превью-ссылку без трекинга'>
 														<Eye className='w-3.5 h-3.5' />

@@ -46,16 +46,19 @@ export async function GET() {
 
   const videos = await prisma.video.findMany({
     where: { active: true, companyId },
-    orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+    orderBy: { createdAt: "desc" },
+    include: { _count: { select: { landings: true } } },
   });
 
   // BigInt (fileSize) can't be JSON-serialized — convert to number
   // Sign CloudFront thumbnail URLs on-the-fly
+  // Surface landingsCount so the UI can mark used vs unused videos.
   const serializable = videos.map((v) => ({
     ...v,
     fileSize: v.fileSize ? Number(v.fileSize) : null,
     thumbnail: v.s3KeyThumb ? signCfUrl(v.s3KeyThumb) : v.thumbnail,
     cloudFrontThumbUrl: v.s3KeyThumb ? signCfUrl(v.s3KeyThumb) : v.cloudFrontThumbUrl,
+    landingsCount: v._count?.landings ?? 0,
   }));
 
   return NextResponse.json(serializable);
