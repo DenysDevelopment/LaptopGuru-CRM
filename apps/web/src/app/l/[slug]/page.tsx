@@ -115,6 +115,7 @@ export default async function LandingPage({ params }: Props) {
 			video={{
 				id: video.id,
 				source: video.source,
+				status: video.status,
 				youtubeId: video.youtubeId,
 				videoUrl: signedVideoUrl,
 				thumbnail: video.thumbnail,

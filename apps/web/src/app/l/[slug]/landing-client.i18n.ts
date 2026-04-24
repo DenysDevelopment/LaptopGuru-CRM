@@ -39,6 +39,9 @@ export const t = {
 		specStorage: 'Dysk',
 		specGpu: 'Karta graficzna',
 		specDisplay: 'Wyświetlacz',
+		videoProcessingTitle: 'Wideo jest przygotowywane',
+		videoProcessingDesc:
+			'Moment — plik jest jeszcze przetwarzany. Odśwież stronę za kilka minut.',
 	},
 	uk: {
 		badge: 'Ми підготували щось спеціально для вас',
@@ -69,6 +72,9 @@ export const t = {
 		specStorage: 'Накопичувач',
 		specGpu: 'Відеокарта',
 		specDisplay: 'Дисплей',
+		videoProcessingTitle: 'Відео готується',
+		videoProcessingDesc:
+			'Зачекайте, будь ласка — файл ще обробляється. Оновіть сторінку через кілька хвилин.',
 	},
 	ru: {
 		badge: 'Мы подготовили кое-что специально для вас',
@@ -99,6 +105,9 @@ export const t = {
 		specStorage: 'Накопитель',
 		specGpu: 'Видеокарта',
 		specDisplay: 'Дисплей',
+		videoProcessingTitle: 'Видео готовится',
+		videoProcessingDesc:
+			'Подождите, видео загружается. Обновите страницу через несколько минут.',
 	},
 	en: {
 		badge: "We've prepared something special for you",
@@ -129,6 +138,9 @@ export const t = {
 		specStorage: 'Storage',
 		specGpu: 'Graphics',
 		specDisplay: 'Display',
+		videoProcessingTitle: 'Video is being prepared',
+		videoProcessingDesc:
+			"Please wait — the video is still processing. Refresh the page in a few minutes.",
 	},
 	lt: {
 		badge: 'Paruošėme kažką specialiai jums',
@@ -160,6 +172,9 @@ export const t = {
 		specStorage: 'Diskas',
 		specGpu: 'Vaizdo plokštė',
 		specDisplay: 'Ekranas',
+		videoProcessingTitle: 'Vaizdo įrašas ruošiamas',
+		videoProcessingDesc:
+			'Palaukite — failas dar apdorojamas. Atnaujinkite puslapį po kelių minučių.',
 	},
 	et: {
 		badge: 'Oleme teile midagi erilist ette valmistanud',
@@ -190,6 +205,9 @@ export const t = {
 		specStorage: 'Kõvaketas',
 		specGpu: 'Graafikakaart',
 		specDisplay: 'Ekraan',
+		videoProcessingTitle: 'Video valmistub',
+		videoProcessingDesc:
+			'Palun oodake — faili töödeldakse. Värskendage lehte mõne minuti pärast.',
 	},
 	lv: {
 		badge: 'Esam sagatavojuši kaut ko īpašu tieši jums',
@@ -221,5 +239,8 @@ export const t = {
 		specStorage: 'Disks',
 		specGpu: 'Grafiskā karte',
 		specDisplay: 'Displejs',
+		videoProcessingTitle: 'Video tiek sagatavots',
+		videoProcessingDesc:
+			'Lūdzu, uzgaidiet — fails vēl tiek apstrādāts. Atsvaidziniet lapu pēc dažām minūtēm.',
 	},
 };

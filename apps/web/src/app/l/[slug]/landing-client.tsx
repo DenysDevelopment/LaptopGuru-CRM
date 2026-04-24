@@ -41,6 +41,7 @@ interface Props {
 	video: {
 		id: string;
 		source: string;
+		status: string;
 		youtubeId: string | null;
 		videoUrl: string | null;
 		thumbnail: string;
@@ -1237,7 +1238,17 @@ export function LandingClient({ landing, video }: Props) {
 							</div>
 						</div>
 
-						{video.source === 'S3' && video.videoUrl ? (
+						{video.status !== 'READY' ||
+						(video.source === 'S3' && !video.videoUrl) ||
+						(video.source === 'YOUTUBE' && !video.youtubeId) ? (
+							<div className='absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 to-gray-800 text-white px-6 text-center gap-3'>
+								<div className='w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin' />
+								<p className='text-lg font-semibold'>{tr.videoProcessingTitle}</p>
+								<p className='text-sm text-white/70 max-w-xs'>
+									{tr.videoProcessingDesc}
+								</p>
+							</div>
+						) : video.source === 'S3' && video.videoUrl ? (
 							<VideoPlayer
 								src={video.videoUrl}
 								poster='/poster.webp'
