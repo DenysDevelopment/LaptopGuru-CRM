@@ -37,6 +37,10 @@ interface Props {
 		productName: string | null;
 		language: Lang;
 		type: string;
+		/** true when the server determined this visit shouldn't be tracked. */
+		trackingExcluded: boolean;
+		/** Raw ?preview=<token> value from the URL, forwarded to the API. */
+		previewToken: string | null;
 	};
 	video: {
 		id: string;
@@ -98,9 +102,11 @@ export function LandingClient({ landing, video }: Props) {
 		onReturn: ({ awayMs, modalShown }) => tracker.onVisitorReturned(awayMs, modalShown),
 	});
 
-	// PATCH engagement — waits for visitId if not ready
+	// PATCH engagement — waits for visitId if not ready. Becomes a no-op when
+	// the server flagged this visit as excluded from tracking.
 	const sendUpdate = useCallback(
 		(data: Record<string, unknown>) => {
+			if (landing.trackingExcluded) return;
 			const doPatch = (visitId: string) => {
 				fetch(`/api/landings/${landing.slug}/track`, {
 					method: 'PATCH',
@@ -119,11 +125,12 @@ export function LandingClient({ landing, video }: Props) {
 				visitIdPromise.current!.promise.then(doPatch);
 			}
 		},
-		[landing.slug],
+		[landing.slug, landing.trackingExcluded],
 	);
 
 	// Initial visit registration — collect ABSOLUTELY EVERYTHING
 	useEffect(() => {
+		if (landing.trackingExcluded) return; // admin preview / allowlisted IP
 		startTimeRef.current = Date.now();
 		const sessionId = crypto.randomUUID();
 		const urlParams = new URLSearchParams(window.location.search);
@@ -731,7 +738,7 @@ export function LandingClient({ landing, video }: Props) {
 					}, 1000);
 				});
 		});
-	}, [landing.slug]);
+	}, [landing.slug, landing.trackingExcluded]);
 
 	// Scroll tracking
 	useEffect(() => {

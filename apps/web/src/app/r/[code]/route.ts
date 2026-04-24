@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db';
+import { isTrackingExcluded } from '@/lib/tracking/should-exclude';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
@@ -20,11 +21,21 @@ export async function GET(
 		return NextResponse.json({ error: 'Not found' }, { status: 404 });
 	}
 
-	// Increment click counter
-	await prisma.shortLink.update({
-		where: { id: shortLink.id },
-		data: { clicks: { increment: 1 } },
+	const excluded = await isTrackingExcluded({
+		req: _request,
+		landing: {
+			companyId: shortLink.landing.companyId,
+			previewToken: shortLink.landing.previewToken,
+		},
 	});
+
+	// Increment click counter only for real visitors
+	if (!excluded) {
+		await prisma.shortLink.update({
+			where: { id: shortLink.id },
+			data: { clicks: { increment: 1 } },
+		});
+	}
 
 	// Only redirect to internal landing pages — slug is alphanumeric
 	const slug = shortLink.landing.slug.replace(/[^a-zA-Z0-9_-]/g, '');

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { resolveCompanyFromRequest } from "@/lib/domain";
+import { isTrackingExcluded } from "@/lib/tracking/should-exclude";
 
 // In-memory rate limiter for click tracking (single-instance; resets on deploy; upgrade to Redis if scaling horizontally)
 const clickRateMap = new Map<string, { count: number; resetAt: number }>();
@@ -36,14 +37,31 @@ export async function POST(
   }
 
   const companyId = await resolveCompanyFromRequest(request);
-  const result = await prisma.landing.updateMany({
+  const landing = await prisma.landing.findFirst({
     where: { slug, ...(companyId ? { companyId } : {}) },
-    data: { clicks: { increment: 1 } },
+    select: { id: true, companyId: true, previewToken: true },
   });
 
-  if (result.count === 0) {
+  if (!landing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+
+  const body = await request.json().catch(() => ({}));
+
+  if (
+    await isTrackingExcluded({
+      req: request,
+      landing: { companyId: landing.companyId, previewToken: landing.previewToken },
+      previewToken: (body?.previewToken as string | undefined) ?? null,
+    })
+  ) {
+    return NextResponse.json({ ok: true, excluded: true });
+  }
+
+  await prisma.landing.update({
+    where: { id: landing.id },
+    data: { clicks: { increment: 1 } },
+  });
 
   return NextResponse.json({ ok: true });
 }

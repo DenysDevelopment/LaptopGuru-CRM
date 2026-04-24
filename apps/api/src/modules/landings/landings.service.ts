@@ -50,16 +50,33 @@ export class LandingsService {
       return { error: 'Too many requests', statusCode: 429 };
     }
 
-    const result = await this.prisma.landing.updateMany({
+    const landing = await this.prisma.raw.landing.findFirst({
       where: { slug },
-      data: { clicks: { increment: 1 } },
+      select: { id: true, companyId: true },
     });
-
-    if (result.count === 0) {
+    if (!landing) {
       throw new NotFoundException('Not found');
     }
 
+    if (await this.isExcluded(landing.companyId, ip)) {
+      return { ok: true, excluded: true };
+    }
+
+    await this.prisma.raw.landing.update({
+      where: { id: landing.id },
+      data: { clicks: { increment: 1 } },
+    });
+
     return { ok: true };
+  }
+
+  private async isExcluded(companyId: string, ip: string | null): Promise<boolean> {
+    if (!ip || ip === 'unknown') return false;
+    const company = await this.prisma.raw.company.findUnique({
+      where: { id: companyId },
+      select: { excludedIps: true },
+    });
+    return !!company?.excludedIps.includes(ip);
   }
 
   // POST /landings/:slug/track
@@ -92,6 +109,15 @@ export class LandingsService {
 
     const ua = (req.headers['user-agent'] as string) || '';
     const ip = extractIP(req);
+
+    // Allowlist admin/office IPs — return a dummy visit object without
+    // writing anything. The caller only reads `visitId`, which the web
+    // client uses to attach engagement PATCH calls; when there's no visit
+    // id returned, subsequent PATCH requests will quietly 404 and be ignored.
+    if (await this.isExcluded(landing.companyId, ip)) {
+      return { id: null, excluded: true };
+    }
+
     const refHeader =
       (req.headers['referer'] as string) || body.referrer || null;
     const parsed = parseUA(ua);
@@ -243,6 +269,7 @@ export class LandingsService {
           select: { customerName: true, customerEmail: true },
         },
         shortLinks: { select: { code: true, clicks: true } },
+        company: { select: { excludedIps: true } },
       },
     });
 
@@ -250,8 +277,12 @@ export class LandingsService {
       throw new NotFoundException('Not found');
     }
 
+    const excludedIps = landing.company.excludedIps;
     const visits = await this.prisma.landingVisit.findMany({
-      where: { landingId: landing.id },
+      where: {
+        landingId: landing.id,
+        ...(excludedIps.length ? { ip: { notIn: excludedIps } } : {}),
+      },
       orderBy: { visitedAt: 'desc' },
     });
 

@@ -1,7 +1,10 @@
+import { auth } from '@/lib/auth';
 import { signVideoUrl } from '@/lib/cloudfront-signer';
 import { prisma } from '@/lib/db';
 import { resolveCompanyFromDomain } from '@/lib/domain';
+import { isTrackingExcludedSync } from '@/lib/tracking/should-exclude';
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { LandingClient } from './landing-client';
 
@@ -10,6 +13,7 @@ export const runtime = 'nodejs';
 
 interface Props {
 	params: Promise<{ slug: string }>;
+	searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 const metaByLang: Record<string, { desc: string; og: string }> = {
@@ -60,22 +64,45 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	};
 }
 
-export default async function LandingPage({ params }: Props) {
+export default async function LandingPage({ params, searchParams }: Props) {
 	const { slug } = await params;
+	const sp = await searchParams;
 	const companyId = await resolveCompanyFromDomain();
 
 	const landing = await prisma.landing.findFirst({
 		where: { slug, ...(companyId ? { companyId } : {}) },
-		include: { video: true },
+		include: { video: true, company: { select: { excludedIps: true } } },
 	});
 
 	if (!landing) notFound();
 
-	// Increment views
-	await prisma.landing.update({
-		where: { id: landing.id },
-		data: { views: { increment: 1 } },
+	// Resolve signals once so both view-counter and client tracker agree
+	const hdrs = await headers();
+	const ipHeader =
+		hdrs.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+		hdrs.get('x-real-ip') ||
+		hdrs.get('cf-connecting-ip') ||
+		null;
+	const session = await auth().catch(() => null);
+	const sessionCompanyId =
+		(session?.user as { companyId?: string } | undefined)?.companyId ?? null;
+	const previewTokenParam = typeof sp.preview === 'string' ? sp.preview : null;
+
+	const excluded = isTrackingExcludedSync({
+		landing: { companyId: landing.companyId, previewToken: landing.previewToken },
+		ip: ipHeader,
+		sessionCompanyId,
+		previewToken: previewTokenParam,
+		excludedIps: landing.company.excludedIps,
 	});
+
+	// Increment views only for real visitors
+	if (!excluded) {
+		await prisma.landing.update({
+			where: { id: landing.id },
+			data: { views: { increment: 1 } },
+		});
+	}
 
 	const lang = (landing.language || 'pl') as
 		| 'pl'
@@ -111,6 +138,8 @@ export default async function LandingPage({ params }: Props) {
 				productName: landing.productName,
 				language: lang,
 				type: landing.type,
+				trackingExcluded: excluded,
+				previewToken: previewTokenParam,
 			}}
 			video={{
 				id: video.id,

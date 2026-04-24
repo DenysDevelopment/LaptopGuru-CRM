@@ -23,6 +23,7 @@ export async function GET(
       video: { select: { title: true, thumbnail: true, source: true, durationSeconds: true } },
       incomingEmail: { select: { customerName: true, customerEmail: true } },
       shortLinks: { select: { code: true, clicks: true } },
+      company: { select: { excludedIps: true } },
     },
   });
 
@@ -36,9 +37,17 @@ export async function GET(
   const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit")) || 50));
   const offset = (page - 1) * limit;
 
+  // Filter out visits from allowlisted admin IPs so analytics never include
+  // the team's own testing traffic.
+  const excludedIps = landing.company.excludedIps;
+  const visitWhere = {
+    landingId: landing.id,
+    ...(excludedIps.length ? { ip: { notIn: excludedIps } } : {}),
+  };
+
   // Aggregation: load only fields needed for stats (cap at 10k for memory safety)
   const allVisits = await prisma.landingVisit.findMany({
-    where: { landingId: landing.id },
+    where: visitWhere,
     orderBy: { visitedAt: "desc" },
     take: 10_000,
     select: {
@@ -62,7 +71,7 @@ export async function GET(
     },
   });
 
-  const totalCount = await prisma.landingVisit.count({ where: { landingId: landing.id } });
+  const totalCount = await prisma.landingVisit.count({ where: visitWhere });
 
   // Aggregated stats
   const totalVisits = totalCount;
@@ -160,13 +169,21 @@ export async function GET(
     },
     // Paginated visits list (detailed fields loaded separately)
     pagination: { page, limit, totalCount },
-    visits: await getVisitsPage(landing.id, offset, limit),
+    visits: await getVisitsPage(landing.id, offset, limit, excludedIps),
   });
 }
 
-async function getVisitsPage(landingId: string, offset: number, limit: number) {
+async function getVisitsPage(
+  landingId: string,
+  offset: number,
+  limit: number,
+  excludedIps: string[],
+) {
   const visits = await prisma.landingVisit.findMany({
-    where: { landingId },
+    where: {
+      landingId,
+      ...(excludedIps.length ? { ip: { notIn: excludedIps } } : {}),
+    },
     orderBy: { visitedAt: "desc" },
     skip: offset,
     take: limit,

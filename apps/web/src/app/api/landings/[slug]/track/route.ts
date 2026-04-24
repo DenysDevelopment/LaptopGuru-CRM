@@ -4,6 +4,7 @@ import { parseUA } from "@/lib/utils/user-agent";
 import { geolocate } from "@/lib/utils/geo";
 import { extractDomain, extractHeaders, extractIP } from "@/lib/utils/headers";
 import { resolveCompanyFromRequest } from "@/lib/domain";
+import { isTrackingExcluded } from "@/lib/tracking/should-exclude";
 
 // In-memory rate limiter for visit creation (single-instance; upgrade to Redis if scaling horizontally)
 const visitRateMap = new Map<string, { count: number; resetAt: number }>();
@@ -29,10 +30,24 @@ export async function POST(
   const { slug } = await params;
 
   const companyId = await resolveCompanyFromRequest(request);
-  const landing = await prisma.landing.findFirst({ where: { slug, ...(companyId ? { companyId } : {}) }, select: { id: true, companyId: true } });
+  const landing = await prisma.landing.findFirst({
+    where: { slug, ...(companyId ? { companyId } : {}) },
+    select: { id: true, companyId: true, previewToken: true },
+  });
   if (!landing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await request.json().catch(() => ({}));
+
+  // Skip tracking for admin previews / logged-in admins / allowlisted IPs
+  if (
+    await isTrackingExcluded({
+      req: request,
+      landing: { companyId: landing.companyId, previewToken: landing.previewToken },
+      previewToken: (body.previewToken as string | undefined) ?? null,
+    })
+  ) {
+    return NextResponse.json({ excluded: true });
+  }
 
   const ua = request.headers.get("user-agent") || "";
   const ip = extractIP(request);
