@@ -17,6 +17,7 @@ type Tab = 'computer' | 'phone';
 export function AddVideoModal({ open, onClose, onCreated }: Props) {
 	const [tab, setTab] = useState<Tab>('phone');
 	const [title, setTitle] = useState('');
+	const [debouncedTitle, setDebouncedTitle] = useState('');
 	const [phase, setPhase] = useState<'form' | 'active' | 'uploading'>('form');
 	const [progress, setProgress] = useState(0);
 	const [error, setError] = useState<string | null>(null);
@@ -27,10 +28,22 @@ export function AddVideoModal({ open, onClose, onCreated }: Props) {
 		if (!open) return;
 		setTab('phone');
 		setTitle('');
+		setDebouncedTitle('');
 		setPhase('form');
 		setProgress(0);
 		setError(null);
 	}, [open]);
+
+	// Debounce title so the QR code isn't regenerated on every keystroke
+	useEffect(() => {
+		const trimmed = title.trim();
+		if (!trimmed) {
+			setDebouncedTitle('');
+			return;
+		}
+		const id = setTimeout(() => setDebouncedTitle(trimmed), 500);
+		return () => clearTimeout(id);
+	}, [title]);
 
 	// Close on Escape
 	useEffect(() => {
@@ -181,7 +194,7 @@ export function AddVideoModal({ open, onClose, onCreated }: Props) {
 									? 'bg-white shadow-sm text-gray-900'
 									: 'text-gray-600 hover:text-gray-900'
 							}`}>
-							📱 Снять на телефон
+							📱 С телефона
 						</button>
 						<button
 							type='button'
@@ -246,9 +259,9 @@ export function AddVideoModal({ open, onClose, onCreated }: Props) {
 								<p className='text-xs text-red-500 mt-2 text-center'>{error}</p>
 							)}
 						</div>
-					) : titleIsValid ? (
+					) : debouncedTitle ? (
 						<QrUploadTab
-							title={title.trim()}
+							title={debouncedTitle}
 							onComplete={videoId => {
 								onCreated(videoId);
 								// Small delay so user sees the ✅ state briefly before modal closes
@@ -257,7 +270,7 @@ export function AddVideoModal({ open, onClose, onCreated }: Props) {
 						/>
 					) : (
 						<div className='py-8 text-center text-sm text-gray-400'>
-							Сначала введите название.
+							{titleIsValid ? 'Подождите…' : 'Сначала введите название.'}
 						</div>
 					)}
 				</div>

@@ -121,7 +121,7 @@ export function MobileCapture({ token, title }: Props) {
 								type='button'
 								onClick={() => fileInputRef.current?.click()}
 								className='w-full py-4 rounded-2xl bg-brand text-white font-semibold text-base shadow-sm hover:brightness-95 active:scale-[0.99] transition'>
-								Снять видео
+								Загрузить видео
 							</button>
 							<input
 								ref={fileInputRef}
@@ -131,8 +131,7 @@ export function MobileCapture({ token, title }: Props) {
 								className='hidden'
 							/>
 							<p className='mt-3 text-center text-xs text-gray-500'>
-								Выберите «Снять видео» — для лучшего качества снимайте через
-								системную Камеру.
+								Выберите видео из галереи телефона.
 							</p>
 						</>
 					)}
@@ -154,7 +153,7 @@ export function MobileCapture({ token, title }: Props) {
 										setPhase({ kind: 'idle' });
 									}}
 									className='py-3 rounded-xl bg-gray-100 text-gray-700 font-medium text-sm'>
-									Переснять
+									Выбрать другое
 								</button>
 								<button
 									type='button'
