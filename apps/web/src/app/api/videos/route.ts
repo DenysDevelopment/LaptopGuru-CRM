@@ -12,14 +12,22 @@ const CF_PRIVATE_KEY = process.env.AWS_CLOUDFRONT_PRIVATE_KEY_BASE64
   : "";
 const CF_TTL = Number(process.env.CLOUDFRONT_SIGNED_URL_TTL_SECONDS || 14400);
 
+// Signed thumbnail URLs must be STABLE within a time window so the browser
+// and next/image optimizer can cache them. We round `dateLessThan` up to the
+// next 1-hour boundary and add the configured TTL on top — within any given
+// hour, every call returns the same URL string; the signature stays valid
+// for at least CF_TTL (and up to CF_TTL + 1h).
+const BUCKET_SECONDS = 3600;
 function signCfUrl(s3Key: string): string | null {
   if (!CF_DOMAIN || !CF_KEY_PAIR_ID || !CF_PRIVATE_KEY) return null;
   try {
     const url = `https://${CF_DOMAIN}/${s3Key}`;
+    const nowSec = Math.floor(Date.now() / 1000);
+    const expSec = Math.ceil(nowSec / BUCKET_SECONDS) * BUCKET_SECONDS + CF_TTL;
     return getSignedUrl({
       url,
       keyPairId: CF_KEY_PAIR_ID,
-      dateLessThan: new Date(Date.now() + CF_TTL * 1000).toISOString(),
+      dateLessThan: new Date(expSec * 1000).toISOString(),
       privateKey: CF_PRIVATE_KEY,
     });
   } catch {
