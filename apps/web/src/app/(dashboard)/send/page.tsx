@@ -60,7 +60,7 @@ const LANGUAGE_OPTIONS: { value: SendLanguage; label: string }[] = [
 ];
 
 export default function SendPage() {
-  const [mode, setMode] = useState<SendMode>("email");
+  const [mode, setMode] = useState<SendMode>("allegro");
   const [emails, setEmails] = useState<IncomingEmail[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
   const [loadingEmails, setLoadingEmails] = useState(true);
