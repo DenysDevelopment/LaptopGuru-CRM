@@ -1,7 +1,7 @@
 'use client';
 
 import { PERMISSIONS, hasPermission } from '@laptopguru-crm/shared';
-import { BarChart3, Trash2 } from 'lucide-react';
+import { BarChart3, Mail, ShoppingBag, Trash2 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -134,11 +134,11 @@ export default function LinksPage() {
 									<table className='w-full text-sm'>
 										<thead className='bg-gray-50 text-xs text-gray-500 uppercase tracking-wide'>
 											<tr>
-												<th className='text-left font-medium px-4 py-2.5'>
-													Лендинг
+												<th className='text-left font-medium px-4 py-2.5 w-20 whitespace-nowrap'>
+													Время
 												</th>
 												<th className='text-left font-medium px-4 py-2.5'>
-													Клиент
+													Лендинг
 												</th>
 												<th className='text-left font-medium px-4 py-2.5'>
 													Короткие ссылки
@@ -153,9 +153,6 @@ export default function LinksPage() {
 													Переходы
 												</th>
 												<th className='text-right font-medium px-4 py-2.5'>
-													Время
-												</th>
-												<th className='text-right font-medium px-4 py-2.5'>
 													Действия
 												</th>
 											</tr>
@@ -166,115 +163,115 @@ export default function LinksPage() {
 													(sum, sl) => sum + sl.clicks,
 													0,
 												);
+												const isEmail = !!landing.incomingEmail;
+												const isAllegro = landing.type === 'allegro';
 												return (
 													<tr
 														key={landing.id}
 														className='hover:bg-gray-50/60 transition-colors align-top'>
-														<td className='px-4 py-3 max-w-xs'>
-															<div className='flex items-center gap-2 flex-wrap'>
-																<span
-																	className='font-semibold text-gray-900 line-clamp-1'
-																	title={landing.title}>
-																	{cleanTitle(landing.title)}
-																</span>
-																{landing.type === 'allegro' && (
-																	<span
-																		className='text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-orange-100 text-orange-700'
-																		title='Лендинг создан из Allegro'>
-																		Allegro
-																	</span>
-																)}
-																{landing.incomingEmail && (
-																	<span
-																		className='text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-100 text-blue-700'
-																		title='Лендинг создан из email-заявки'>
-																		Email
-																	</span>
-																)}
-															</div>
-														</td>
-														<td className='px-4 py-3 text-xs text-gray-600 max-w-[14rem]'>
-															{landing.incomingEmail ? (
-																<>
-																	<div
-																		className='font-medium text-gray-900 truncate'
-																		title={
-																			landing.incomingEmail.customerName ?? ''
-																		}>
-																		{landing.incomingEmail.customerName || '—'}
-																	</div>
-																	<div
-																		className='truncate'
-																		title={
-																			landing.incomingEmail.customerEmail ?? ''
-																		}>
-																		{landing.incomingEmail.customerEmail}
-																	</div>
-																</>
-															) : (
-																<span className='text-gray-300'>—</span>
-															)}
-														</td>
-														<td className='px-4 py-3 max-w-[14rem]'>
-															<div className='flex flex-col gap-0.5'>
-																{landing.shortLinks.map(sl => (
-																	<button
-																		key={sl.code}
-																		onClick={() =>
-																			copyToClipboard(
-																				`${shortUrlBase}/${sl.code}`,
-																			)
-																		}
-																		className='text-xs text-brand hover:text-brand-hover transition-colors truncate text-left'
-																		title='Скопировать'>
-																		{(effectiveDomain ??
-																			origin.replace(/^https?:\/\//, '')) +
-																			'/' +
-																			sl.code}
-																	</button>
-																))}
-															</div>
-														</td>
-														<td className='px-3 py-3 text-right text-gray-900 font-semibold tabular-nums'>
-															{landing.views}
-														</td>
-														<td className='px-3 py-3 text-right text-gray-900 font-semibold tabular-nums'>
-															{landing.clicks}
-														</td>
-														<td className='px-3 py-3 text-right text-gray-900 font-semibold tabular-nums'>
-															{totalShortClicks}
-														</td>
-														<td className='px-4 py-3 text-right text-xs text-gray-400 tabular-nums whitespace-nowrap'>
+														<td className='px-4 py-3 text-xs text-gray-500 tabular-nums whitespace-nowrap'>
 															{formatTime(landing.createdAt)}
 														</td>
-														<td className='px-4 py-3 text-right'>
-															<div className='inline-flex items-center gap-3 text-xs'>
-																<Link
-																	href={`/analytics/${landing.slug}`}
-																	className='text-brand hover:text-brand-hover font-medium transition-colors inline-flex items-center gap-1'>
-																	<BarChart3 className='w-3.5 h-3.5' />
-																	<span className='hidden md:inline'>
-																		Аналитика
+														<td className='px-4 py-3 max-w-sm'>
+												<div className='min-w-0'>
+													<div className='flex items-center gap-2 flex-wrap'>
+														<span
+															className='font-semibold text-gray-900 truncate'
+															title={landing.title}>
+															{cleanTitle(landing.title)}
+														</span>
+														{isEmail && (
+															<span
+																className='inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gradient-to-r from-sky-500/10 to-indigo-500/10 text-sky-700 ring-1 ring-inset ring-sky-500/20'
+																title='Лендинг создан из email-заявки'>
+																<Mail className='w-3 h-3' strokeWidth={2.5} />
+																Email
+															</span>
+														)}
+														{isAllegro && (
+															<span
+																className='inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gradient-to-r from-orange-500/10 to-amber-500/10 text-orange-700 ring-1 ring-inset ring-orange-500/20'
+																title='Лендинг создан из Allegro'>
+																<ShoppingBag
+																	className='w-3 h-3'
+																	strokeWidth={2.5}
+																/>
+																Allegro
+															</span>
+														)}
+													</div>
+													{landing.incomingEmail && (
+														<div className='mt-1 text-xs text-gray-500 truncate'>
+															<span className='text-gray-700 font-medium'>
+																{landing.incomingEmail.customerName || '—'}
+															</span>
+															{landing.incomingEmail.customerEmail && (
+																<>
+																	<span className='text-gray-300 mx-1'>·</span>
+																	<span>
+																		{landing.incomingEmail.customerEmail}
 																	</span>
-																</Link>
-																{canDelete && (
-																	<button
-																		type='button'
-																		onClick={() => handleDelete(landing)}
-																		disabled={deletingId === landing.id}
-																		className='text-red-500 hover:text-red-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1'
-																		title='Удалить лендинг (только админ)'>
-																		<Trash2 className='w-3.5 h-3.5' />
-																		<span className='hidden md:inline'>
-																			{deletingId === landing.id
-																				? 'Удаляю'
-																				: 'Удалить'}
-																		</span>
-																	</button>
-																)}
-															</div>
-														</td>
-													</tr>
+																</>
+															)}
+														</div>
+													)}
+												</div>
+											</td>
+											<td className='px-4 py-3 max-w-[14rem]'>
+												<div className='flex flex-col gap-0.5'>
+													{landing.shortLinks.map(sl => (
+														<button
+															key={sl.code}
+															onClick={() =>
+																copyToClipboard(`${shortUrlBase}/${sl.code}`)
+															}
+															className='text-xs text-brand hover:text-brand-hover transition-colors truncate text-left'
+															title='Скопировать'>
+															{(effectiveDomain ??
+																origin.replace(/^https?:\/\//, '')) +
+																'/' +
+																sl.code}
+														</button>
+													))}
+												</div>
+											</td>
+											<td className='px-3 py-3 text-right text-gray-900 font-semibold tabular-nums'>
+												{landing.views}
+											</td>
+											<td className='px-3 py-3 text-right text-gray-900 font-semibold tabular-nums'>
+												{landing.clicks}
+											</td>
+											<td className='px-3 py-3 text-right text-gray-900 font-semibold tabular-nums'>
+												{totalShortClicks}
+											</td>
+											<td className='px-4 py-3 text-right'>
+												<div className='inline-flex items-center gap-3 text-xs'>
+													<Link
+														href={`/analytics/${landing.slug}`}
+														className='text-brand hover:text-brand-hover font-medium transition-colors inline-flex items-center gap-1'>
+														<BarChart3 className='w-3.5 h-3.5' />
+														<span className='hidden md:inline'>
+															Аналитика
+														</span>
+													</Link>
+													{canDelete && (
+														<button
+															type='button'
+															onClick={() => handleDelete(landing)}
+															disabled={deletingId === landing.id}
+															className='text-red-500 hover:text-red-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1'
+															title='Удалить лендинг (только админ)'>
+															<Trash2 className='w-3.5 h-3.5' />
+															<span className='hidden md:inline'>
+																{deletingId === landing.id
+																	? 'Удаляю'
+																	: 'Удалить'}
+															</span>
+														</button>
+													)}
+												</div>
+											</td>
+										</tr>
 												);
 											})}
 										</tbody>
