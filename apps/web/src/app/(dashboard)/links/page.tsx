@@ -129,99 +129,157 @@ export default function LinksPage() {
 									)}
 								</span>
 							</h2>
-							<div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3'>
-								{group.items.map(landing => {
-									const totalShortClicks = landing.shortLinks.reduce(
-										(sum, sl) => sum + sl.clicks,
-										0,
-									);
-									return (
-										<div
-											key={landing.id}
-											className='bg-white rounded-xl border border-gray-100 p-3 hover:border-gray-200 transition-colors flex flex-col gap-2'>
-											<div>
-												<div className='flex items-center gap-2'>
-													<h3
-														className='text-sm font-semibold text-gray-900 line-clamp-1 flex-1 min-w-0'
-														title={landing.title}>
-														{cleanTitle(landing.title)}
-													</h3>
-													{landing.type === 'allegro' && (
-														<span
-															className='text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 flex-shrink-0'
-															title='Лендинг создан из Allegro'>
-															Allegro
-														</span>
-													)}
-												</div>
-												{landing.incomingEmail && (
-													<p className='text-xs text-gray-500 line-clamp-1'>
-														{landing.incomingEmail.customerName} ·{' '}
-														{landing.incomingEmail.customerEmail}
-													</p>
-												)}
-											</div>
-
-											<div className='flex flex-wrap gap-x-3 gap-y-0.5'>
-												{landing.shortLinks.map(sl => (
-													<button
-														key={sl.code}
-														onClick={() =>
-															copyToClipboard(`${shortUrlBase}/${sl.code}`)
-														}
-														className='text-xs text-brand hover:text-brand-hover transition-colors truncate max-w-full'
-														title='Скопировать'>
-														{(effectiveDomain ??
-															origin.replace(/^https?:\/\//, '')) +
-															'/' +
-															sl.code}
-													</button>
-												))}
-											</div>
-
-											<div className='flex items-center gap-4 text-xs text-gray-500 mt-auto'>
-												<span>
-													<b className='text-gray-900'>{landing.views}</b>{' '}
-													просмотров
-												</span>
-												<span>
-													<b className='text-gray-900'>{landing.clicks}</b>{' '}
-													кликов
-												</span>
-												<span>
-													<b className='text-gray-900'>{totalShortClicks}</b>{' '}
-													переходов
-												</span>
-											</div>
-
-											<div className='flex items-center justify-between pt-2 border-t border-gray-100 text-xs'>
-												<span className='text-gray-400'>
-													{formatTime(landing.createdAt)}
-												</span>
-												<div className='flex items-center gap-3'>
-													<Link
-														href={`/analytics/${landing.slug}`}
-														className='text-brand hover:text-brand-hover font-medium transition-colors inline-flex items-center gap-1'>
-														<BarChart3 className='w-3.5 h-3.5' /> Аналитика
-													</Link>
-													{canDelete && (
-														<button
-															type='button'
-															onClick={() => handleDelete(landing)}
-															disabled={deletingId === landing.id}
-															className='text-red-500 hover:text-red-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1'
-															title='Удалить лендинг (только админ)'>
-															<Trash2 className='w-3.5 h-3.5' />
-															{deletingId === landing.id
-																? 'Удаляю'
-																: 'Удалить'}
-														</button>
-													)}
-												</div>
-											</div>
-										</div>
-									);
-								})}
+							<div className='bg-white rounded-xl border border-gray-100 overflow-hidden'>
+								<div className='overflow-x-auto'>
+									<table className='w-full text-sm'>
+										<thead className='bg-gray-50 text-xs text-gray-500 uppercase tracking-wide'>
+											<tr>
+												<th className='text-left font-medium px-4 py-2.5'>
+													Лендинг
+												</th>
+												<th className='text-left font-medium px-4 py-2.5'>
+													Клиент
+												</th>
+												<th className='text-left font-medium px-4 py-2.5'>
+													Короткие ссылки
+												</th>
+												<th className='text-right font-medium px-3 py-2.5'>
+													Визиты
+												</th>
+												<th className='text-right font-medium px-3 py-2.5'>
+													Клики
+												</th>
+												<th className='text-right font-medium px-3 py-2.5'>
+													Переходы
+												</th>
+												<th className='text-right font-medium px-4 py-2.5'>
+													Время
+												</th>
+												<th className='text-right font-medium px-4 py-2.5'>
+													Действия
+												</th>
+											</tr>
+										</thead>
+										<tbody className='divide-y divide-gray-100'>
+											{group.items.map(landing => {
+												const totalShortClicks = landing.shortLinks.reduce(
+													(sum, sl) => sum + sl.clicks,
+													0,
+												);
+												return (
+													<tr
+														key={landing.id}
+														className='hover:bg-gray-50/60 transition-colors align-top'>
+														<td className='px-4 py-3 max-w-xs'>
+															<div className='flex items-center gap-2 flex-wrap'>
+																<span
+																	className='font-semibold text-gray-900 line-clamp-1'
+																	title={landing.title}>
+																	{cleanTitle(landing.title)}
+																</span>
+																{landing.type === 'allegro' && (
+																	<span
+																		className='text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-orange-100 text-orange-700'
+																		title='Лендинг создан из Allegro'>
+																		Allegro
+																	</span>
+																)}
+																{landing.incomingEmail && (
+																	<span
+																		className='text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-100 text-blue-700'
+																		title='Лендинг создан из email-заявки'>
+																		Email
+																	</span>
+																)}
+															</div>
+														</td>
+														<td className='px-4 py-3 text-xs text-gray-600 max-w-[14rem]'>
+															{landing.incomingEmail ? (
+																<>
+																	<div
+																		className='font-medium text-gray-900 truncate'
+																		title={
+																			landing.incomingEmail.customerName ?? ''
+																		}>
+																		{landing.incomingEmail.customerName || '—'}
+																	</div>
+																	<div
+																		className='truncate'
+																		title={
+																			landing.incomingEmail.customerEmail ?? ''
+																		}>
+																		{landing.incomingEmail.customerEmail}
+																	</div>
+																</>
+															) : (
+																<span className='text-gray-300'>—</span>
+															)}
+														</td>
+														<td className='px-4 py-3 max-w-[14rem]'>
+															<div className='flex flex-col gap-0.5'>
+																{landing.shortLinks.map(sl => (
+																	<button
+																		key={sl.code}
+																		onClick={() =>
+																			copyToClipboard(
+																				`${shortUrlBase}/${sl.code}`,
+																			)
+																		}
+																		className='text-xs text-brand hover:text-brand-hover transition-colors truncate text-left'
+																		title='Скопировать'>
+																		{(effectiveDomain ??
+																			origin.replace(/^https?:\/\//, '')) +
+																			'/' +
+																			sl.code}
+																	</button>
+																))}
+															</div>
+														</td>
+														<td className='px-3 py-3 text-right text-gray-900 font-semibold tabular-nums'>
+															{landing.views}
+														</td>
+														<td className='px-3 py-3 text-right text-gray-900 font-semibold tabular-nums'>
+															{landing.clicks}
+														</td>
+														<td className='px-3 py-3 text-right text-gray-900 font-semibold tabular-nums'>
+															{totalShortClicks}
+														</td>
+														<td className='px-4 py-3 text-right text-xs text-gray-400 tabular-nums whitespace-nowrap'>
+															{formatTime(landing.createdAt)}
+														</td>
+														<td className='px-4 py-3 text-right'>
+															<div className='inline-flex items-center gap-3 text-xs'>
+																<Link
+																	href={`/analytics/${landing.slug}`}
+																	className='text-brand hover:text-brand-hover font-medium transition-colors inline-flex items-center gap-1'>
+																	<BarChart3 className='w-3.5 h-3.5' />
+																	<span className='hidden md:inline'>
+																		Аналитика
+																	</span>
+																</Link>
+																{canDelete && (
+																	<button
+																		type='button'
+																		onClick={() => handleDelete(landing)}
+																		disabled={deletingId === landing.id}
+																		className='text-red-500 hover:text-red-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1'
+																		title='Удалить лендинг (только админ)'>
+																		<Trash2 className='w-3.5 h-3.5' />
+																		<span className='hidden md:inline'>
+																			{deletingId === landing.id
+																				? 'Удаляю'
+																				: 'Удалить'}
+																		</span>
+																	</button>
+																)}
+															</div>
+														</td>
+													</tr>
+												);
+											})}
+										</tbody>
+									</table>
+								</div>
 							</div>
 						</section>
 					))}
