@@ -74,6 +74,20 @@ export class NotificationsService {
     });
   }
 
+  /**
+   * Pushes a single ConversationEvent (status change, landing-sent, etc.) to
+   * the conversation room so the timeline can refresh without a full reload.
+   */
+  async emitConversationEvent(
+    conversationId: string,
+    event: Record<string, unknown>,
+  ) {
+    this.gateway.emitConversationEvent(conversationId, {
+      conversationId,
+      ...event,
+    });
+  }
+
   async notifyAssignment(
     conversationId: string,
     userId: string,

@@ -3,6 +3,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { OutboundProcessor } from './outbound.processor';
 import { InboundProcessor } from './inbound.processor';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ConversationsModule } from '../conversations/conversations.module';
 
 @Module({
   imports: [
@@ -11,6 +12,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
       { name: 'inbound-messages' },
     ),
     NotificationsModule,
+    ConversationsModule,
   ],
   providers: [OutboundProcessor, InboundProcessor],
   exports: [BullModule],

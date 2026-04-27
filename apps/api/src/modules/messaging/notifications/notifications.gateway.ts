@@ -142,6 +142,16 @@ export class NotificationsGateway
       .emit('conversation:updated', updateData);
   }
 
+  /**
+   * Server-pushed timeline event (status change, landing-sent, etc.). The web
+   * client merges these into the rendered timeline alongside `message:new`.
+   */
+  emitConversationEvent(conversationId: string, eventData: Record<string, unknown>) {
+    this.server
+      .to(`conversation:${conversationId}`)
+      .emit('conversation:event', eventData);
+  }
+
   emitNotification(userId: string, notification: Record<string, unknown>) {
     this.server.to(`user:${userId}`).emit('notification:new', notification);
   }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
+import { transitionConversationStatus } from "@/lib/messaging/transition-status";
 import { PERMISSIONS } from "@laptopguru-crm/shared";
 
 export async function GET(
@@ -11,6 +12,26 @@ export async function GET(
   if (error) return error;
 
   const { id } = await params;
+
+  // Auto-transition: first time an admin of the same company looks at a NEW
+  // conversation, flip to OPEN. Race-safe via requireFromStatus.
+  const preview = await prisma.conversation.findUnique({
+    where: { id },
+    select: { companyId: true, status: true },
+  });
+  if (
+    preview &&
+    preview.companyId === (session.user.companyId ?? "") &&
+    preview.status === "NEW"
+  ) {
+    await transitionConversationStatus({
+      conversationId: id,
+      toStatus: "OPEN",
+      actorUserId: session.user.id,
+      reason: "viewed-by-admin",
+      requireFromStatus: ["NEW"],
+    }).catch(() => {/* non-fatal */});
+  }
 
   const conversation = await prisma.conversation.findUnique({
     where: { id },
@@ -37,6 +58,16 @@ export async function GET(
       tags: {
         include: { tag: true },
       },
+      lastStatusChangedBy: {
+        select: { id: true, name: true, email: true },
+      },
+      events: {
+        orderBy: { createdAt: "desc" },
+        take: 50,
+        include: {
+          actor: { select: { id: true, name: true, email: true } },
+        },
+      },
     },
   });
 
@@ -58,6 +89,8 @@ export async function GET(
     subject: conversation.subject,
     createdAt: conversation.createdAt,
     closedAt: conversation.closedAt,
+    lastStatusChangedAt: conversation.lastStatusChangedAt,
+    lastStatusChangedBy: conversation.lastStatusChangedBy,
     contact: contact
       ? {
           id: contact.id,
@@ -78,6 +111,17 @@ export async function GET(
       name: ct.tag.name,
       color: ct.tag.color || "#6B7280",
     })),
+    // Timeline events (oldest first for direct rendering)
+    events: conversation.events
+      .slice()
+      .reverse()
+      .map((e) => ({
+        id: e.id,
+        type: e.type,
+        actor: e.actor,
+        payload: e.payload,
+        createdAt: e.createdAt,
+      })),
   });
 }
 

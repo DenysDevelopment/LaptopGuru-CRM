@@ -7,6 +7,7 @@ import { sendEmail } from "@/lib/smtp";
 import { buildEmailHtml } from "@/lib/email-template";
 import type { EmailLanguage } from "@/lib/email-template";
 import { emitMessagingEvent } from "@/lib/messaging-events";
+import { transitionConversationStatus } from "@/lib/messaging/transition-status";
 import { VALID_LANGUAGES, SUBJECT_BY_LANG, TITLE_BY_LANG, FALLBACK_NAME, BUY_BUTTON_BY_LANG } from "@/lib/constants/languages";
 
 export async function POST(
@@ -126,6 +127,12 @@ export async function POST(
         direction: "OUTBOUND",
         contentType: "TEXT",
         body: `Видео-рецензия отправлена: ${video.title}\n${shortUrl}`,
+        // Marks this Message as the raw text behind a LANDING_SENT event so
+        // the timeline UI can hide it in favour of the rich event card.
+        metadata: {
+          eventType: "LANDING_SENT",
+          landingId: landing.id,
+        },
         senderId: session.user.id,
         contactId: conversation.contactId,
         companyId: session.user.companyId ?? "",
@@ -136,10 +143,36 @@ export async function POST(
       data: { messageId: message.id, status: "SENT" },
     });
 
+    // Rich timeline event for the landing send
+    await prisma.conversationEvent.create({
+      data: {
+        conversationId: id,
+        type: "LANDING_SENT",
+        actorUserId: session.user.id,
+        payload: {
+          landingId: landing.id,
+          slug,
+          videoId: video.id,
+          videoTitle: video.title,
+          videoThumbnail: video.thumbnail,
+          shortUrl,
+          messageId: message.id,
+        },
+        companyId: session.user.companyId ?? "",
+      },
+    });
+
     await prisma.conversation.update({
       where: { id },
-      data: { lastMessageAt: new Date(), status: "WAITING_REPLY" },
+      data: { lastMessageAt: new Date() },
     });
+    await transitionConversationStatus({
+      conversationId: id,
+      toStatus: "WAITING_REPLY",
+      actorUserId: session.user.id,
+      reason: "landing-sent",
+      requireFromStatus: ["NEW", "OPEN", "RESOLVED"],
+    }).catch(() => {/* non-fatal */});
 
     emitMessagingEvent({
       type: "new_message",

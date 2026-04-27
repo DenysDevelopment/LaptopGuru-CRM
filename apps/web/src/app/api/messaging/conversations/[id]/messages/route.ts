@@ -3,6 +3,7 @@ import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
 import { PERMISSIONS } from "@laptopguru-crm/shared";
 import { emitMessagingEvent } from "@/lib/messaging-events";
+import { transitionConversationStatus } from "@/lib/messaging/transition-status";
 import { formatSmtpFrom } from "@/lib/smtp";
 
 function escapeHtml(str: string): string {
@@ -66,6 +67,7 @@ export async function GET(
     direction: m.direction,
     contentType: m.contentType,
     body: m.body,
+    metadata: m.metadata,
     createdAt: m.createdAt,
     sender: m.senderUser
       ? { id: m.senderUser.id, name: m.senderUser.name, email: m.senderUser.email }
@@ -118,14 +120,19 @@ export async function POST(
     },
   });
 
-  // Update conversation
+  // Bump last-message timestamp; status moves through the audited
+  // helper so the transition is logged in ConversationEvent.
   await prisma.conversation.update({
     where: { id },
-    data: {
-      lastMessageAt: new Date(),
-      status: "WAITING_REPLY",
-    },
+    data: { lastMessageAt: new Date() },
   });
+  await transitionConversationStatus({
+    conversationId: id,
+    toStatus: "WAITING_REPLY",
+    actorUserId: session.user!.id,
+    reason: "outbound-reply",
+    requireFromStatus: ["NEW", "OPEN", "RESOLVED"],
+  }).catch(() => {/* non-fatal */});
 
   // Send message through the actual channel
   const channel = await prisma.channel.findUnique({

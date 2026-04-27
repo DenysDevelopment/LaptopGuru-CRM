@@ -12,6 +12,7 @@ import {
   WebhookEventStatus,
 } from '../../../generated/prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ConversationStatusService } from '../conversations/status.service';
 
 const AVATARS_DIR = path.join(process.cwd(), 'public', 'uploads', 'avatars');
 
@@ -28,6 +29,7 @@ export class InboundProcessor extends WorkerHost {
     private readonly prisma: PrismaService,
     private readonly providerRegistry: ProviderRegistryService,
     private readonly notificationsService: NotificationsService,
+    private readonly statusService: ConversationStatusService,
   ) {
     super();
   }
@@ -237,20 +239,24 @@ export class InboundProcessor extends WorkerHost {
         });
       }
 
-      // Update conversation
-      const newStatus =
-        conversation.status === ConversationStatus.NEW ||
-        conversation.status === ConversationStatus.RESOLVED ||
-        conversation.status === ConversationStatus.CLOSED
-          ? ConversationStatus.OPEN
-          : conversation.status;
-
+      // Bump last-message timestamp; status moves through the audited
+      // helper so each reopen leaves a trail.
       await this.prisma.conversation.update({
         where: { id: conversation.id },
-        data: {
-          lastMessageAt: parsed.timestamp,
-          status: newStatus,
-        },
+        data: { lastMessageAt: parsed.timestamp },
+      });
+      await this.statusService.transition({
+        conversationId: conversation.id,
+        toStatus: ConversationStatus.OPEN,
+        actorUserId: null, // system / inbound
+        reason: 'inbound-message',
+        requireFromStatus: [
+          ConversationStatus.NEW,
+          ConversationStatus.WAITING_REPLY,
+          ConversationStatus.RESOLVED,
+          ConversationStatus.CLOSED,
+        ],
+        respectManualCloseGrace: true,
       });
 
       // Mark webhook event as processed
