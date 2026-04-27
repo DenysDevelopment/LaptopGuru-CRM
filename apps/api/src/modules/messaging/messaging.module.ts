@@ -15,6 +15,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
 import { QueueModule } from './queue/queue.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SyncModule } from './sync/sync.module';
+import { AllegroPollCron } from './jobs/allegro-poll.cron';
 
 @Module({
   imports: [
@@ -35,5 +36,6 @@ import { SyncModule } from './sync/sync.module';
     NotificationsModule,
     SyncModule,
   ],
+  providers: [AllegroPollCron],
 })
 export class MessagingModule {}

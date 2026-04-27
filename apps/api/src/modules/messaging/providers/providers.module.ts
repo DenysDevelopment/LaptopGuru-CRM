@@ -4,6 +4,8 @@ import { EmailProviderService } from './email/email-provider.service';
 import { TelegramProviderService } from './telegram/telegram-provider.service';
 import { WhatsAppProviderService } from './whatsapp/whatsapp-provider.service';
 import { SmsProviderService } from './sms/sms-provider.service';
+import { AllegroOAuthService } from './allegro/allegro-oauth.service';
+import { AllegroProviderService } from './allegro/allegro-provider.service';
 
 @Global()
 @Module({
@@ -13,6 +15,8 @@ import { SmsProviderService } from './sms/sms-provider.service';
     TelegramProviderService,
     WhatsAppProviderService,
     SmsProviderService,
+    AllegroOAuthService,
+    AllegroProviderService,
   ],
   exports: [
     ProviderRegistryService,
@@ -20,6 +24,8 @@ import { SmsProviderService } from './sms/sms-provider.service';
     TelegramProviderService,
     WhatsAppProviderService,
     SmsProviderService,
+    AllegroOAuthService,
+    AllegroProviderService,
   ],
 })
 export class ProvidersModule implements OnModuleInit {
@@ -29,6 +35,7 @@ export class ProvidersModule implements OnModuleInit {
     private readonly telegramProvider: TelegramProviderService,
     private readonly whatsappProvider: WhatsAppProviderService,
     private readonly smsProvider: SmsProviderService,
+    private readonly allegroProvider: AllegroProviderService,
   ) {}
 
   onModuleInit() {
@@ -36,5 +43,6 @@ export class ProvidersModule implements OnModuleInit {
     this.registry.register(this.telegramProvider);
     this.registry.register(this.whatsappProvider);
     this.registry.register(this.smsProvider);
+    this.registry.register(this.allegroProvider);
   }
 }
