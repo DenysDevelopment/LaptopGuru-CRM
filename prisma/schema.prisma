@@ -259,6 +259,10 @@ model Landing {
   // to bypass analytics tracking (used for admin previews on foreign devices).
   // DB-level default so existing rows get populated during migration.
   previewToken  String    @unique @default(dbgenerated("gen_random_uuid()::text"))
+  // Allegro Direct: id of the Allegro discussion thread the link was sent to,
+  // and the buyer's Allegro login (cached for analytics / sidebar display).
+  allegroThreadId   String?
+  allegroBuyerLogin String?
   createdBy     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId        String
   companyId     String
@@ -516,6 +520,7 @@ enum ChannelType {
   TELEGRAM
   FACEBOOK_MESSENGER
   INSTAGRAM_DIRECT
+  ALLEGRO
 }
 
 enum MessageDirection {
