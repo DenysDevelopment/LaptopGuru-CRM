@@ -9,6 +9,7 @@ import { SUBJECT_BY_LANG, TITLE_BY_LANG, FALLBACK_NAME, BUY_BUTTON_BY_LANG } fro
 import { formatSmtpFrom } from "@/lib/smtp";
 import { sendSchema } from "@/lib/schemas/send";
 import { validateRequest } from "@/lib/validate-request";
+import { sendViaAllegroDirect } from "@/lib/messaging/allegro-send";
 
 export async function POST(request: NextRequest) {
   const { session, error } = await authorize(PERMISSIONS.SEND_EXECUTE);
@@ -22,6 +23,9 @@ export async function POST(request: NextRequest) {
   const emailId = data.mode === "email" ? data.emailId : undefined;
   const personalNote = data.mode === "email" ? data.personalNote : undefined;
   const manualProductUrl = data.mode === "allegro" ? data.productUrl : undefined;
+  const allegroThreadId = data.mode === "allegro" ? data.allegroThreadId : undefined;
+  const allegroBuyerLogin = data.mode === "allegro" ? data.allegroBuyerLogin : undefined;
+  const allegroMessage = data.mode === "allegro" ? data.allegroMessage : undefined;
 
   const incomingEmail =
     mode === "email"
@@ -84,6 +88,8 @@ export async function POST(request: NextRequest) {
         language: lang,
         type: mode,
         emailId: mode === "allegro" ? null : incomingEmail?.id,
+        allegroThreadId: mode === "allegro" ? (allegroThreadId ?? null) : null,
+        allegroBuyerLogin: mode === "allegro" ? (allegroBuyerLogin ?? null) : null,
         userId: session.user.id,
         companyId: session.user.companyId ?? "",
       },
@@ -98,9 +104,31 @@ export async function POST(request: NextRequest) {
       : `${publicBase}/l/${slug}`;
 
     if (mode === "allegro") {
+      // Optional: when a threadId is supplied, deliver the link directly into
+      // the buyer's Allegro discussion via the Allegro Direct API. Errors
+      // here are non-fatal — the landing+shortlink are already saved and
+      // the admin can copy-paste manually as a fallback.
+      let allegroDelivered: { ok: boolean; error?: string; messageId?: string } | null = null;
+      if (allegroThreadId) {
+        try {
+          allegroDelivered = await sendViaAllegroDirect({
+            companyId: session.user.companyId ?? "",
+            threadId: allegroThreadId,
+            text: (allegroMessage && allegroMessage.trim().length > 0)
+              ? `${allegroMessage}\n${shortUrl}`
+              : shortUrl,
+          });
+        } catch (err) {
+          allegroDelivered = {
+            ok: false,
+            error: err instanceof Error ? err.message : "Allegro send failed",
+          };
+        }
+      }
       return NextResponse.json({
         landing: { id: landing.id, slug, url: landingUrl, previewToken: landing.previewToken },
         shortLink: { code: shortCode, url: shortUrl },
+        allegro: allegroDelivered,
       }, { status: 201 });
     }
 

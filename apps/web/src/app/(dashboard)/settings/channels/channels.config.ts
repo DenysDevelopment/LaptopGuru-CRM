@@ -13,6 +13,7 @@ export const CHANNEL_TYPES = [
 	{ value: 'SMS', label: 'SMS' },
 	{ value: 'WHATSAPP', label: 'WhatsApp' },
 	{ value: 'TELEGRAM', label: 'Telegram' },
+	{ value: 'ALLEGRO', label: 'Allegro' },
 ];
 
 export const EMAIL_DEFAULTS: Record<string, string> = {
@@ -59,5 +60,14 @@ export const CONFIG_FIELDS: Record<
 	WEBCHAT: [
 		{ key: 'widgetColor', label: 'Цвет виджета', type: 'text' },
 		{ key: 'welcomeMessage', label: 'Приветственное сообщение', type: 'text' },
+	],
+	ALLEGRO: [
+		{ key: 'oauth_client_id', label: 'Client ID', type: 'text' },
+		{ key: 'oauth_client_secret', label: 'Client Secret', type: 'password' },
+		{
+			key: 'environment',
+			label: 'Среда (production / sandbox)',
+			type: 'text',
+		},
 	],
 };

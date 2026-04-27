@@ -29,6 +29,14 @@ export const sendAllegroSchema = z.object({
     ),
   videoId: z.string().min(1, "Выберите видео"),
   language: languageSchema,
+  /** Optional: when set, the link is also delivered into the buyer's
+   *  Allegro discussion thread via the Allegro Direct API. */
+  allegroThreadId: z.string().min(1).optional(),
+  /** Optional UI copy of the buyer login (cached on Landing for analytics). */
+  allegroBuyerLogin: z.string().min(1).optional(),
+  /** Optional message text to send to the thread (defaults to a short
+   *  language-appropriate intro + the link). */
+  allegroMessage: z.string().max(5000).optional(),
 });
 
 export const sendSchema = z.discriminatedUnion("mode", [

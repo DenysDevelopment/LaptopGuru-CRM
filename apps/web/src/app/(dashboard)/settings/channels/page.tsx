@@ -353,6 +353,16 @@ export default function ChannelsSettingsPage() {
 									Синхронизировать
 								</button>
 							)}
+							{channel.type === 'ALLEGRO' && (
+								<a
+									href={`/api/channels/allegro/connect?channelId=${channel.id}`}
+									className='text-xs text-orange-600 hover:text-orange-700 px-3 py-1.5 border border-orange-200 rounded-lg transition-colors'
+									title='Запустить OAuth-авторизацию через Allegro'>
+									{channel.config?.oauth_access_token
+										? `Переподключить${channel.config?.seller_login ? ` (${channel.config.seller_login})` : ''}`
+										: 'Подключить Allegro'}
+								</a>
+							)}
 							<button
 								onClick={() => testConnection(channel.id)}
 								disabled={testing === channel.id}
