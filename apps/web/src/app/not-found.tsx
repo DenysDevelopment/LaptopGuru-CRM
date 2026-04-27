@@ -20,16 +20,16 @@ export default function NotFound() {
           </svg>
         </div>
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold text-gray-900">Страница не найдена</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Strona nie została znaleziona</h1>
           <p className="text-sm text-gray-500">
-            Возможно, она была удалена или адрес введён с ошибкой.
+            Możliwe, że została usunięta lub adres został wpisany błędnie.
           </p>
         </div>
         <Link
           href="/dashboard"
           className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-brand hover:bg-brand-hover text-white h-10 px-4 py-2 transition-colors"
         >
-          На главную
+          Strona główna
         </Link>
       </div>
     </div>

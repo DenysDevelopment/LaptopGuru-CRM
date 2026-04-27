@@ -1,8 +1,7 @@
 "use client";
 
-import { Check, Copy, Eye } from "lucide-react";
+import { Check, CheckCircle2, Copy, Eye } from "lucide-react";
 import { useState } from "react";
-import { CopyableLink } from "@/components/ui/copyable-link";
 import type { SendMode } from "./mode-toggle";
 import type { SendLanguage } from "@/lib/schemas/send";
 
@@ -44,6 +43,7 @@ export function SendResult({
   onReset,
 }: SendResultProps) {
   const isAllegro = mode === "allegro";
+  const [copiedShort, setCopiedShort] = useState(false);
   const [copiedMessage, setCopiedMessage] = useState(false);
   const [messageLanguage, setMessageLanguage] = useState<SendLanguage>(language);
   const [allegroMessage, setAllegroMessage] = useState(
@@ -55,67 +55,94 @@ export function SendResult({
     setAllegroMessage(MESSAGE_BY_LANG[lang] ?? MESSAGE_BY_LANG.pl);
   }
 
+  function copyShortLink() {
+    navigator.clipboard.writeText(result.shortLink.url);
+    setCopiedShort(true);
+    setTimeout(() => setCopiedShort(false), 2000);
+  }
+
   function copyMessage() {
     navigator.clipboard.writeText(allegroMessage);
     setCopiedMessage(true);
     setTimeout(() => setCopiedMessage(false), 2000);
   }
 
+  const headline = isAllegro
+    ? "Ссылка сгенерирована"
+    : result.sentEmail?.status === "sent"
+      ? "Успешно отправлено"
+      : result.sentEmail
+        ? "Ошибка отправки"
+        : "Готово";
+
+  const previewHref = result.landing.previewToken
+    ? `${result.landing.url}?preview=${result.landing.previewToken}`
+    : null;
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900 mb-6">
         {isAllegro ? "Ссылка готова" : "Отправлено!"}
       </h1>
-      <div className="bg-green-50 border border-green-200 rounded-xl p-6 max-w-lg space-y-4">
-        {!isAllegro && result.sentEmail && (
-          <div className="flex items-center gap-3">
-            <svg className="w-8 h-8 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-            </svg>
-            <span className="text-lg font-bold text-green-800">
-              {result.sentEmail.status === "sent" ? "Успешно отправлено!" : "Ошибка отправки"}
-            </span>
+      <div className="bg-green-50 border border-green-200 rounded-2xl p-5 max-w-lg space-y-4">
+        {/* Header — status + preview action aligned in one row */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <CheckCircle2 className="w-6 h-6 text-emerald-500 flex-shrink-0" strokeWidth={2.2} />
+            <span className="text-base font-semibold text-emerald-800 truncate">{headline}</span>
           </div>
-        )}
-
-        {isAllegro && (
-          <div className="flex items-center gap-3">
-            <svg className="w-8 h-8 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-            </svg>
-            <span className="text-lg font-bold text-green-800">Ссылка сгенерирована</span>
-          </div>
-        )}
-
-        <div>
-          <div className="flex items-center justify-between mb-1 gap-2">
-            <p className="text-xs text-gray-400">
-              {isAllegro ? "Короткая ссылка" : "Ссылка с отслеживанием"}
-            </p>
-            {result.landing.previewToken && (
-              <a
-                href={`${result.landing.url}?preview=${result.landing.previewToken}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors"
-                title="Открыть превью без трекинга в новой вкладке"
-              >
-                <Eye className="w-3.5 h-3.5" />
-                Превью
-              </a>
-            )}
-          </div>
-          <CopyableLink url={result.shortLink.url} />
+          {previewHref && (
+            <a
+              href={previewHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs font-medium text-emerald-800/80 hover:text-emerald-900 transition-colors flex-shrink-0"
+              title="Открыть превью без трекинга"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              Превью
+            </a>
+          )}
         </div>
 
+        {/* Section: short link */}
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium text-gray-500">
+            {isAllegro ? "Короткая ссылка" : "Ссылка с отслеживанием"}
+          </p>
+          <div className="flex items-stretch gap-2">
+            <code className="flex-1 min-w-0 text-sm text-gray-900 font-mono bg-white border border-gray-200 rounded-lg px-3 py-2 truncate">
+              {result.shortLink.url}
+            </code>
+            <button
+              type="button"
+              onClick={copyShortLink}
+              className={`inline-flex items-center gap-1.5 text-sm font-medium rounded-lg px-3 transition-colors flex-shrink-0 ${
+                copiedShort
+                  ? "bg-emerald-500 text-white"
+                  : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
+              }`}
+              title="Скопировать ссылку"
+            >
+              {copiedShort ? (
+                <Check className="w-4 h-4" strokeWidth={2.5} />
+              ) : (
+                <Copy className="w-4 h-4" />
+              )}
+              <span className="hidden sm:inline">{copiedShort ? "OK" : "Копировать"}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Section: message (Allegro only) */}
         {isAllegro && (
-          <div>
-            <div className="flex items-center justify-between mb-1 gap-2">
-              <p className="text-xs text-gray-400">Готовое сообщение для клиента</p>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-medium text-gray-500">Сообщение для клиента</p>
               <select
                 value={messageLanguage}
                 onChange={(e) => handleLanguageChange(e.target.value as SendLanguage)}
-                className="text-xs text-gray-600 bg-white border border-gray-200 rounded-md px-2 py-0.5 outline-none focus:border-brand focus:ring-1 focus:ring-brand-muted"
+                className="text-xs text-gray-700 bg-white border border-gray-200 rounded-md px-2 py-0.5 outline-none focus:border-brand focus:ring-1 focus:ring-brand-muted"
               >
                 {LANGUAGE_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -124,43 +151,41 @@ export function SendResult({
                 ))}
               </select>
             </div>
-            <div className="bg-white rounded-lg border border-gray-200 p-3 space-y-2">
-              <textarea
-                value={allegroMessage}
-                onChange={(e) => setAllegroMessage(e.target.value)}
-                rows={3}
-                className="w-full text-sm text-gray-700 bg-transparent border-0 outline-none resize-none focus:ring-0 p-0"
-                placeholder="Текст сообщения..."
-              />
-              <button
-                type="button"
-                onClick={copyMessage}
-                className={`w-full inline-flex items-center justify-center gap-1.5 text-sm font-semibold rounded-lg py-2 transition-colors ${
-                  copiedMessage
-                    ? "bg-emerald-500 text-white"
-                    : "bg-brand hover:bg-brand-hover text-white"
-                }`}
-              >
-                {copiedMessage ? (
-                  <>
-                    <Check className="w-4 h-4" strokeWidth={2.5} />
-                    Скопировано
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-4 h-4" />
-                    Скопировать текст
-                  </>
-                )}
-              </button>
-            </div>
+            <textarea
+              value={allegroMessage}
+              onChange={(e) => setAllegroMessage(e.target.value)}
+              rows={3}
+              className="w-full text-sm text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 outline-none resize-none focus:border-brand focus:ring-1 focus:ring-brand-muted"
+              placeholder="Текст сообщения…"
+            />
+            <button
+              type="button"
+              onClick={copyMessage}
+              className={`w-full inline-flex items-center justify-center gap-1.5 text-sm font-semibold rounded-lg py-2 transition-colors ${
+                copiedMessage
+                  ? "bg-emerald-500 text-white"
+                  : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              {copiedMessage ? (
+                <>
+                  <Check className="w-4 h-4" strokeWidth={2.5} />
+                  Скопировано
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4" />
+                  Скопировать текст
+                </>
+              )}
+            </button>
           </div>
         )}
 
         <button
           type="button"
           onClick={onReset}
-          className="w-full mt-4 bg-brand hover:bg-brand-hover text-white font-medium py-2.5 rounded-lg transition-colors"
+          className="w-full bg-brand hover:bg-brand-hover text-white font-semibold py-2.5 rounded-lg transition-colors"
         >
           {isAllegro ? "Создать ещё" : "Отправить ещё"}
         </button>
