@@ -9,13 +9,7 @@ import { ConversationSidebar } from '@/components/messaging/conversation-sidebar
 import { ChannelIcon, getChannelLabel } from '@/components/messaging/channel-icon';
 import type { ConversationDetail } from '@/components/messaging/conversation-sidebar';
 import { SendVideoModal } from '@/components/messaging/send-video-modal';
-
-const STATUS_BADGES: Record<string, { label: string; class: string }> = {
-	NEW: { label: 'Новый', class: 'bg-blue-100 text-blue-700' },
-	OPEN: { label: 'Открыт', class: 'bg-green-100 text-green-700' },
-	WAITING: { label: 'Ожидание', class: 'bg-amber-100 text-amber-700' },
-	CLOSED: { label: 'Закрыт', class: 'bg-gray-100 text-gray-600' },
-};
+import { StatusControl } from '@/components/messaging/status-control';
 
 export default function ConversationDetailPage() {
 	const params = useParams();
@@ -74,7 +68,6 @@ export default function ConversationDetailPage() {
 
 	const contact = conversation.contact;
 	const contactName = contact?.name || contact?.email || contact?.phone || 'Без имени';
-	const statusBadge = STATUS_BADGES[conversation.status] || STATUS_BADGES.OPEN;
 
 	return (
 		<div className='flex h-full'>
@@ -135,14 +128,30 @@ export default function ConversationDetailPage() {
 					)}
 
 					<div className='flex-1 min-w-0'>
-						<div className='flex items-center gap-2'>
+						<div className='flex items-center gap-2 flex-wrap'>
 							<h1 className='text-sm font-semibold text-gray-900 truncate'>
 								{contactName}
 							</h1>
 							<ChannelIcon channel={conversation.channelType} size={14} />
-							<span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${statusBadge.class}`}>
-								{statusBadge.label}
-							</span>
+							<StatusControl
+								conversationId={conversationId}
+								status={conversation.status as Parameters<typeof StatusControl>[0]['status']}
+								lastStatusChangedAt={
+									(conversation as ConversationDetail & {
+										lastStatusChangedAt?: string | null;
+									}).lastStatusChangedAt ?? null
+								}
+								lastStatusChangedBy={
+									(conversation as ConversationDetail & {
+										lastStatusChangedBy?: {
+											id: string;
+											name: string | null;
+											email: string;
+										} | null;
+									}).lastStatusChangedBy ?? null
+								}
+								onChange={fetchConversation}
+							/>
 						</div>
 						<p className='text-xs text-gray-400 truncate'>
 							{getChannelLabel(conversation.channelType)}

@@ -14,8 +14,9 @@ interface ConversationListProps {
 const TABS = [
 	{ key: '', label: 'Все' },
 	{ key: 'NEW', label: 'Новые' },
-	{ key: 'WAITING', label: 'Ожидание' },
-	{ key: 'CLOSED', label: 'Закрытые' },
+	{ key: 'OPEN', label: 'Открытые' },
+	{ key: 'WAITING_REPLY', label: 'В работе' },
+	{ key: 'RESOLVED', label: 'Завершённые' },
 ];
 
 export function ConversationList({ status: initialStatus }: ConversationListProps) {

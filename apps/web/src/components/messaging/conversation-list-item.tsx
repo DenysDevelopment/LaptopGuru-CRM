@@ -134,17 +134,25 @@ export function ConversationListItem({
 				<p className='text-xs text-gray-500 truncate mt-0.5'>
 					{conversation.lastMessagePreview || 'Нет сообщений'}
 				</p>
-				{/* Status badge */}
-				{conversation.status === 'WAITING' && (
-					<span className='inline-block mt-1 text-[10px] font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded'>
-						Ожидание
-					</span>
-				)}
-				{conversation.status === 'CLOSED' && (
-					<span className='inline-block mt-1 text-[10px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded'>
-						Закрыт
-					</span>
-				)}
+				{/* Status badge — primary 4-status workflow */}
+				{(() => {
+					const labels: Record<string, { text: string; cls: string }> = {
+						NEW: { text: 'Новый', cls: 'text-blue-700 bg-blue-50' },
+						OPEN: { text: 'Открыт', cls: 'text-amber-700 bg-amber-50' },
+						WAITING_REPLY: { text: 'В работе', cls: 'text-purple-700 bg-purple-50' },
+						RESOLVED: { text: 'Завершён', cls: 'text-gray-500 bg-gray-100' },
+						CLOSED: { text: 'Закрыт', cls: 'text-gray-500 bg-gray-100' },
+						SPAM: { text: 'Спам', cls: 'text-red-700 bg-red-50' },
+					};
+					const badge = labels[conversation.status];
+					if (!badge) return null;
+					return (
+						<span
+							className={`inline-block mt-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${badge.cls}`}>
+							{badge.text}
+						</span>
+					);
+				})()}
 			</div>
 
 			{/* Unread badge */}

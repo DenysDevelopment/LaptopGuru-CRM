@@ -3,11 +3,22 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { MessageBubble } from './message-bubble';
 import type { Message } from './message-bubble';
+import { ConversationTimelineEvent, type TimelineEvent } from './timeline-event';
 import { useMessagingEvents } from '@/hooks/use-messaging-events';
 
 interface MessageThreadProps {
 	conversationId: string;
 }
+
+interface RawMessage extends Omit<Message, 'channelType' | 'status'> {
+	channelType?: string;
+	status?: string;
+	metadata?: Record<string, unknown> | null;
+}
+
+type TimelineItem =
+	| { kind: 'message'; data: Message; createdAt: string }
+	| { kind: 'event'; data: TimelineEvent; createdAt: string };
 
 function formatDateSeparator(dateStr: string): string {
 	const date = new Date(dateStr);
@@ -26,17 +37,17 @@ function formatDateSeparator(dateStr: string): string {
 	});
 }
 
-function groupMessagesByDate(messages: Message[]): { date: string; messages: Message[] }[] {
-	const groups: { date: string; messages: Message[] }[] = [];
+function groupByDate(items: TimelineItem[]): { date: string; items: TimelineItem[] }[] {
+	const groups: { date: string; items: TimelineItem[] }[] = [];
 	let currentDate = '';
 
-	for (const msg of messages) {
-		const dateKey = new Date(msg.createdAt).toDateString();
+	for (const item of items) {
+		const dateKey = new Date(item.createdAt).toDateString();
 		if (dateKey !== currentDate) {
 			currentDate = dateKey;
-			groups.push({ date: msg.createdAt, messages: [msg] });
+			groups.push({ date: item.createdAt, items: [item] });
 		} else {
-			groups[groups.length - 1].messages.push(msg);
+			groups[groups.length - 1].items.push(item);
 		}
 	}
 	return groups;
@@ -44,6 +55,7 @@ function groupMessagesByDate(messages: Message[]): { date: string; messages: Mes
 
 export function MessageThread({ conversationId }: MessageThreadProps) {
 	const [messages, setMessages] = useState<Message[]>([]);
+	const [events, setEvents] = useState<TimelineEvent[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [loadingMore, setLoadingMore] = useState(false);
 	const [page, setPage] = useState(1);
@@ -52,30 +64,49 @@ export function MessageThread({ conversationId }: MessageThreadProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const initialScrollDone = useRef(false);
 
-	const fetchMessages = useCallback(
+	const fetchAll = useCallback(
 		async (pageNum: number, prepend: boolean) => {
 			if (prepend) setLoadingMore(true);
 			else setLoading(true);
 
 			try {
-				const params = new URLSearchParams({
-					page: String(pageNum),
-					limit: '50',
-				});
-				const res = await fetch(
-					`/api/messaging/conversations/${conversationId}/messages?${params}`,
-				);
-				if (!res.ok) return;
-				const data = await res.json();
-				const items = data.items || data.data || data;
-				const list: Message[] = Array.isArray(items) ? items : [];
+				const [msgRes, convRes] = await Promise.all([
+					fetch(
+						`/api/messaging/conversations/${conversationId}/messages?page=${pageNum}&limit=50`,
+					),
+					fetch(`/api/messaging/conversations/${conversationId}`),
+				]);
 
-				if (prepend) {
-					setMessages((prev) => [...list.reverse(), ...prev]);
-				} else {
-					setMessages(list.reverse());
+				if (msgRes.ok) {
+					const data = await msgRes.json();
+					const items = (data.items || data.data || data) as RawMessage[];
+					const list: Message[] = (Array.isArray(items) ? items : []).map(
+						(m) => ({
+							id: m.id,
+							direction: m.direction,
+							body: m.body ?? '',
+							contentType: m.contentType,
+							channelType: m.channelType ?? '',
+							status: m.status ?? 'SENT',
+							createdAt: m.createdAt,
+							attachments: m.attachments,
+							sender: m.sender,
+							metadata: m.metadata ?? null,
+						}),
+					) as unknown as Message[];
+
+					if (prepend) {
+						setMessages((prev) => [...list.reverse(), ...prev]);
+					} else {
+						setMessages(list.reverse());
+					}
+					setHasMore(list.length >= 50);
 				}
-				setHasMore(list.length >= 50);
+
+				if (!prepend && convRes.ok) {
+					const conv = await convRes.json();
+					setEvents(Array.isArray(conv.events) ? conv.events : []);
+				}
 			} catch {
 				// silently fail
 			} finally {
@@ -90,50 +121,90 @@ export function MessageThread({ conversationId }: MessageThreadProps) {
 		initialScrollDone.current = false;
 		setPage(1);
 		setMessages([]);
-		fetchMessages(1, false);
-	}, [conversationId, fetchMessages]);
+		setEvents([]);
+		fetchAll(1, false);
+	}, [conversationId, fetchAll]);
 
-	// Auto-scroll to bottom on initial load and new messages
 	useEffect(() => {
-		if (messages.length > 0 && !initialScrollDone.current) {
+		if ((messages.length > 0 || events.length > 0) && !initialScrollDone.current) {
 			bottomRef.current?.scrollIntoView();
 			initialScrollDone.current = true;
 		}
-	}, [messages]);
+	}, [messages, events]);
 
-	// Real-time updates via SSE
 	useMessagingEvents((event) => {
 		if (
 			event.conversationId === conversationId &&
 			(event.type === 'new_message' || event.type === 'conversation_updated')
 		) {
-			fetchMessages(1, false);
+			fetchAll(1, false);
 		}
 	});
 
 	const loadMore = () => {
 		const next = page + 1;
 		setPage(next);
-		fetchMessages(next, true);
+		fetchAll(next, true);
 	};
 
-	// Public method for parent to add an optimistic message
-	const addMessage = (msg: Message) => {
-		setMessages((prev) => [...prev, msg]);
-		setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
-	};
-
-	// Attach addMessage to the container div for parent access
 	useEffect(() => {
 		const el = containerRef.current;
 		if (el) {
-			(el as HTMLDivElement & { addMessage?: (m: Message) => void }).addMessage = addMessage;
+			(el as HTMLDivElement & { addMessage?: (m: Message) => void }).addMessage =
+				(msg) => {
+					setMessages((prev) => [...prev, msg]);
+					setTimeout(
+						() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }),
+						50,
+					);
+				};
 		}
 	});
 
-	const grouped = groupMessagesByDate(messages);
+	// Build merged timeline:
+	//   1. Drop messages whose metadata.eventType === 'LANDING_SENT' (the
+	//      richer ConversationEvent card replaces them).
+	//   2. Stitch related Message bodies into LANDING_SENT events.
+	//   3. Sort by createdAt ascending.
+	const messagesByLandingId = new Map<string, Message>();
+	for (const m of messages) {
+		const meta = (m as Message & { metadata?: Record<string, unknown> | null }).metadata;
+		if (meta && meta.eventType === 'LANDING_SENT' && typeof meta.landingId === 'string') {
+			messagesByLandingId.set(meta.landingId, m);
+		}
+	}
+	const visibleMessages = messages.filter((m) => {
+		const meta = (m as Message & { metadata?: Record<string, unknown> | null }).metadata;
+		return !(meta && meta.eventType === 'LANDING_SENT');
+	});
+	const decoratedEvents: TimelineEvent[] = events.map((e) => {
+		if (e.type === 'LANDING_SENT') {
+			const landingId = e.payload?.landingId as string | undefined;
+			const related = landingId ? messagesByLandingId.get(landingId) : undefined;
+			return { ...e, relatedMessageBody: related?.body ?? null };
+		}
+		return e;
+	});
 
-	if (loading && messages.length === 0) {
+	const timeline: TimelineItem[] = [
+		...visibleMessages.map((m) => ({
+			kind: 'message' as const,
+			data: m,
+			createdAt: m.createdAt,
+		})),
+		...decoratedEvents.map((e) => ({
+			kind: 'event' as const,
+			data: e,
+			createdAt: e.createdAt,
+		})),
+	].sort(
+		(a, b) =>
+			new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+	);
+
+	const grouped = groupByDate(timeline);
+
+	if (loading && timeline.length === 0) {
 		return (
 			<div className='flex-1 flex items-center justify-center'>
 				<div className='text-center'>
@@ -146,7 +217,6 @@ export function MessageThread({ conversationId }: MessageThreadProps) {
 
 	return (
 		<div ref={containerRef} className='flex-1 overflow-y-auto py-4'>
-			{/* Load more */}
 			{hasMore && (
 				<div className='text-center py-3'>
 					<button
@@ -158,7 +228,7 @@ export function MessageThread({ conversationId }: MessageThreadProps) {
 				</div>
 			)}
 
-			{messages.length === 0 ? (
+			{timeline.length === 0 ? (
 				<div className='flex items-center justify-center h-full'>
 					<div className='text-center'>
 						<svg
@@ -180,7 +250,6 @@ export function MessageThread({ conversationId }: MessageThreadProps) {
 			) : (
 				grouped.map((group) => (
 					<div key={group.date}>
-						{/* Date separator */}
 						<div className='flex items-center gap-3 px-4 py-3'>
 							<div className='flex-1 h-px bg-gray-200' />
 							<span className='text-xs text-gray-400 font-medium'>
@@ -188,9 +257,16 @@ export function MessageThread({ conversationId }: MessageThreadProps) {
 							</span>
 							<div className='flex-1 h-px bg-gray-200' />
 						</div>
-						{group.messages.map((msg) => (
-							<MessageBubble key={msg.id} message={msg} />
-						))}
+						{group.items.map((item) =>
+							item.kind === 'message' ? (
+								<MessageBubble key={`m-${item.data.id}`} message={item.data} />
+							) : (
+								<ConversationTimelineEvent
+									key={`e-${item.data.id}`}
+									event={item.data}
+								/>
+							),
+						)}
 					</div>
 				))
 			)}
