@@ -184,6 +184,67 @@ export async function POST(request: NextRequest) {
       data: { processed: true, processedById: session.user.id },
     });
 
+    // Mirror the send into the unified messaging inbox: write an OUTBOUND
+    // Message + LANDING_SENT event onto the IncomingEmail's Conversation
+    // (created by the IMAP mirror), and bump the status to WAITING_REPLY.
+    if (status === "sent") {
+      try {
+        const conversation = await prisma.conversation.findUnique({
+          where: { incomingEmailId: emailId! },
+          select: { id: true, channelId: true, contactId: true, companyId: true },
+        });
+        if (conversation) {
+          const message = await prisma.message.create({
+            data: {
+              conversationId: conversation.id,
+              channelId: conversation.channelId,
+              direction: "OUTBOUND",
+              contentType: "TEXT",
+              body: `Видео-рецензия отправлена: ${video.title}\n${shortUrl}`,
+              metadata: { eventType: "LANDING_SENT", landingId: landing.id },
+              senderId: session.user.id,
+              contactId: conversation.contactId,
+              companyId: conversation.companyId,
+            },
+          });
+          await prisma.conversationEvent.create({
+            data: {
+              conversationId: conversation.id,
+              type: "LANDING_SENT",
+              actorUserId: session.user.id,
+              payload: {
+                landingId: landing.id,
+                slug,
+                videoId: video.id,
+                videoTitle: video.title,
+                videoThumbnail: video.thumbnail,
+                shortUrl,
+                messageId: message.id,
+              },
+              companyId: conversation.companyId,
+            },
+          });
+          await prisma.conversation.update({
+            where: { id: conversation.id },
+            data: { lastMessageAt: new Date() },
+          });
+          // Audit-aware status transition (NEW/OPEN/RESOLVED → WAITING_REPLY)
+          const { transitionConversationStatus } = await import(
+            "@/lib/messaging/transition-status"
+          );
+          await transitionConversationStatus({
+            conversationId: conversation.id,
+            toStatus: "WAITING_REPLY",
+            actorUserId: session.user.id,
+            reason: "send-from-email-mode",
+            requireFromStatus: ["NEW", "OPEN", "RESOLVED"],
+          }).catch(() => {/* non-fatal */});
+        }
+      } catch (err) {
+        console.warn("[Send] Failed to mirror into conversation:", err);
+      }
+    }
+
     return NextResponse.json({
       landing: { id: landing.id, slug, url: landingUrl, previewToken: landing.previewToken },
       shortLink: { code: shortCode, url: shortUrl },

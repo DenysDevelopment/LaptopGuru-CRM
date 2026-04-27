@@ -211,7 +211,7 @@ export class EmailsService {
 
           const extracted = parseEmail(body, subject);
 
-          await this.prisma.incomingEmail.create({
+          const created = await this.prisma.incomingEmail.create({
             data: {
               messageId,
               from,
@@ -228,6 +228,17 @@ export class EmailsService {
             },
           });
 
+          // Mirror into the unified messaging inbox so this email shows up
+          // in /messaging alongside other channels with the same ticket
+          // workflow (NEW status, audit trail, etc.).
+          try {
+            await this.upsertConversationFromEmail(created.id, companyId);
+          } catch (err) {
+            this.logger.warn(
+              `Failed to mirror IncomingEmail ${created.id} into Conversation: ${err instanceof Error ? err.message : err}`,
+            );
+          }
+
           imported++;
         }
       } finally {
@@ -241,5 +252,97 @@ export class EmailsService {
     }
 
     return imported;
+  }
+
+  /**
+   * Mirrors an IncomingEmail into the messaging inbox: ensures Contact +
+   * ContactChannel + Conversation + initial INBOUND Message exist, and
+   * leaves Conversation.status = NEW so it picks up the standard ticket
+   * workflow. Idempotent: the unique key on Conversation.incomingEmailId
+   * means a re-run is a no-op.
+   */
+  async upsertConversationFromEmail(
+    incomingEmailId: string,
+    companyId: string,
+  ): Promise<void> {
+    const email = await this.prisma.raw.incomingEmail.findUnique({
+      where: { id: incomingEmailId },
+    });
+    if (!email) return;
+    if (!email.customerEmail) return; // no addressee → can't tie to a Contact
+
+    const existing = await this.prisma.raw.conversation.findUnique({
+      where: { incomingEmailId },
+      select: { id: true },
+    });
+    if (existing) return;
+
+    // Find an EMAIL channel for this company (earliest by createdAt).
+    const channel = await this.prisma.raw.channel.findFirst({
+      where: { companyId, type: 'EMAIL', isActive: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (!channel) return; // no configured EMAIL channel — nothing to mirror into
+
+    // Contact: by displayName + companyId (unique key in this schema is
+    // displayName/email — fall back to upserting via channel identifier).
+    const contactChannel = await this.prisma.raw.contactChannel.findFirst({
+      where: {
+        companyId,
+        channelType: 'EMAIL',
+        identifier: email.customerEmail,
+      },
+      include: { contact: true },
+    });
+
+    let contactId: string;
+    if (contactChannel) {
+      contactId = contactChannel.contactId;
+    } else {
+      const contact = await this.prisma.raw.contact.create({
+        data: {
+          displayName:
+            email.customerName ||
+            email.customerEmail.split('@')[0] ||
+            'Без имени',
+          companyId,
+        },
+      });
+      contactId = contact.id;
+      await this.prisma.raw.contactChannel.create({
+        data: {
+          contactId,
+          channelType: 'EMAIL',
+          identifier: email.customerEmail,
+          companyId,
+        },
+      });
+    }
+
+    const conversation = await this.prisma.raw.conversation.create({
+      data: {
+        contactId,
+        channelId: channel.id,
+        subject: email.subject || null,
+        externalId: email.messageId,
+        status: 'NEW',
+        lastMessageAt: email.receivedAt,
+        incomingEmailId: email.id,
+        companyId,
+      },
+    });
+
+    await this.prisma.raw.message.create({
+      data: {
+        conversationId: conversation.id,
+        channelId: channel.id,
+        direction: 'INBOUND',
+        contentType: 'TEXT',
+        body: email.body,
+        externalId: email.messageId,
+        contactId,
+        companyId,
+      },
+    });
   }
 }
