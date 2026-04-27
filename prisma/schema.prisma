@@ -47,6 +47,7 @@ model Company {
   contactChannels    ContactChannel[]
   channels           Channel[]
   conversations      Conversation[]
+  conversationEvents ConversationEvent[]
   messages           Message[]
   tags               Tag[]
   templates          Template[]
@@ -94,6 +95,8 @@ model User {
   conversationAssignments    ConversationAssignment[]    @relation("ConversationAssignee")
   conversationAssigns        ConversationAssignment[]    @relation("ConversationAssigner")
   conversationTags           ConversationTag[]           @relation("TagAdder")
+  conversationStatusChanges  Conversation[]              @relation("ConversationLastStatusChanger")
+  conversationEventsActed    ConversationEvent[]         @relation("ConversationEventActor")
   msgSentMessages            Message[]                   @relation("MessageSender")
   internalNotes              InternalNote[]              @relation("NoteAuthor")
   notifications              Notification[]              @relation("UserNotifications")
@@ -130,6 +133,7 @@ model IncomingEmail {
   updatedAt     DateTime  @updatedAt
 
   landings      Landing[]
+  conversation  Conversation?
 
   @@index([processed])
   @@index([archived])
@@ -718,23 +722,33 @@ model ChannelConfig {
 // --- Conversations ---
 
 model Conversation {
-  id            String               @id @default(cuid())
-  contactId     String
-  contact       Contact              @relation(fields: [contactId], references: [id])
-  channelId     String
-  channel       Channel              @relation(fields: [channelId], references: [id])
-  subject       String?
-  status        ConversationStatus   @default(NEW)
-  priority      ConversationPriority @default(NORMAL)
-  externalId    String?
-  lastMessageAt DateTime?
-  closedAt      DateTime?
-  companyId     String
-  company       Company              @relation(fields: [companyId], references: [id])
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
+  id                     String               @id @default(cuid())
+  contactId              String
+  contact                Contact              @relation(fields: [contactId], references: [id])
+  channelId              String
+  channel                Channel              @relation(fields: [channelId], references: [id])
+  subject                String?
+  status                 ConversationStatus   @default(NEW)
+  priority               ConversationPriority @default(NORMAL)
+  externalId             String?
+  lastMessageAt          DateTime?
+  closedAt               DateTime?
+  // Denormalised for fast badge rendering: id of the last actor that touched
+  // the status (null = system / auto). Kept in sync by transitionStatus.
+  lastStatusChangedById  String?
+  lastStatusChangedBy    User?                @relation("ConversationLastStatusChanger", fields: [lastStatusChangedById], references: [id], onDelete: SetNull)
+  lastStatusChangedAt    DateTime?
+  // Backlink to the IncomingEmail that originated this conversation, when
+  // it was created from an email. Set on inbound-email handler.
+  incomingEmailId        String?              @unique
+  incomingEmail          IncomingEmail?       @relation(fields: [incomingEmailId], references: [id], onDelete: SetNull)
+  companyId              String
+  company                Company              @relation(fields: [companyId], references: [id])
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
 
   messages    Message[]
+  events      ConversationEvent[]
   tags        ConversationTag[]
   assignments ConversationAssignment[]
   notes       InternalNote[]
@@ -747,6 +761,30 @@ model Conversation {
   @@index([lastMessageAt])
   @@index([createdAt])
   @@index([companyId])
+}
+
+enum ConversationEventType {
+  STATUS_CHANGED   // payload: { from, to, reason? }
+  LANDING_SENT     // payload: { landingId, slug, videoTitle, shortUrl }
+  ASSIGNED         // payload: { assigneeUserId, assigneeName? }
+}
+
+model ConversationEvent {
+  id             String                @id @default(cuid())
+  conversationId String
+  conversation   Conversation          @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  type           ConversationEventType
+  // null = system / cron / inbound webhook
+  actorUserId    String?
+  actor          User?                 @relation("ConversationEventActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  payload        Json
+  companyId      String
+  company        Company               @relation(fields: [companyId], references: [id])
+  createdAt      DateTime              @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([companyId])
+  @@index([type])
 }
 
 model ConversationTag {
@@ -807,6 +845,11 @@ model Message {
   direction      MessageDirection
   contentType    MessageContentType @default(TEXT)
   body           String?
+  // Free-form structured metadata. Used by the timeline to detect messages
+  // that should be hidden in favour of a richer ConversationEvent card,
+  // e.g. { eventType: "LANDING_SENT", landingId } so the LANDING_SENT event
+  // card replaces this raw text bubble in the UI.
+  metadata       Json?
   externalId     String?
   senderId       String?
   senderUser     User?              @relation("MessageSender", fields: [senderId], references: [id])

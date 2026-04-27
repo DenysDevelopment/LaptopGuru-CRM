@@ -145,6 +145,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get conversationTag() { return this.client.conversationTag; }
   get conversationAssignment() { return this.client.conversationAssignment; }
   get conversationSla() { return this.client.conversationSla; }
+  get conversationEvent() { return this.client.conversationEvent; }
   get message() { return this.client.message; }
   get messageStatusEvent() { return this.client.messageStatusEvent; }
   get messageAttachment() { return this.client.messageAttachment; }
