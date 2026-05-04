@@ -197,6 +197,12 @@ export class AllegroProviderService implements ChannelProvider {
 			id: string;
 			text: string;
 			createdAt: string;
+			subject?: string | null;
+			type?: string;
+			relatesTo?: {
+				offer?: { id: string } | null;
+				order?: { id: string } | null;
+			};
 			author: { id?: string; login?: string; isInterlocutor?: boolean };
 			attachments?: Array<{
 				id: string;
@@ -223,6 +229,12 @@ export class AllegroProviderService implements ChannelProvider {
 				id: string;
 				text: string;
 				createdAt: string;
+				subject?: string | null;
+				type?: string;
+				relatesTo?: {
+					offer?: { id: string } | null;
+					order?: { id: string } | null;
+				};
 				author: { id: string; login: string; isInterlocutor: boolean };
 				attachments?: Array<{
 					id: string;
@@ -233,6 +245,53 @@ export class AllegroProviderService implements ChannelProvider {
 				}>;
 			}>;
 		};
+	}
+
+	/**
+	 * Fetches one of the seller's product-offers by id and shapes it into the
+	 * minimal subset the inbox sidebar needs (image, formatted price, name).
+	 * Returns null on 404/403/other errors so the caller can render gracefully.
+	 */
+	async getOffer(
+		channelId: string,
+		offerId: string,
+	): Promise<{
+		name: string;
+		imageUrl: string | null;
+		priceText: string | null;
+	} | null> {
+		try {
+			const headers = await this.authedHeaders(channelId);
+			const base = await this.apiBase(channelId);
+			const resp = await fetch(
+				`${base}/sale/product-offers/${encodeURIComponent(offerId)}`,
+				{ headers },
+			);
+			if (!resp.ok) {
+				this.logger.warn(
+					`Allegro getOffer ${offerId} ${resp.status}: ${(await resp.text()).slice(0, 200)}`,
+				);
+				return null;
+			}
+			const data = (await resp.json()) as {
+				name?: string;
+				images?: Array<{ url?: string }>;
+				sellingMode?: {
+					price?: { amount?: string; currency?: string };
+				};
+			};
+			const name = data.name ?? '';
+			const imageUrl = data.images?.find((i) => i.url)?.url ?? null;
+			const amount = data.sellingMode?.price?.amount;
+			const currency = data.sellingMode?.price?.currency;
+			const priceText = amount && currency ? `${amount} ${currency}` : null;
+			return { name, imageUrl, priceText };
+		} catch (err) {
+			this.logger.warn(
+				`Allegro getOffer ${offerId} threw: ${err instanceof Error ? err.message : err}`,
+			);
+			return null;
+		}
 	}
 
 	/**

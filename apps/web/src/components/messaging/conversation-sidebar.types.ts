@@ -4,6 +4,12 @@ export interface ConversationDetail {
 	priority: string;
 	channelType: string;
 	subject: string | null;
+	allegroOffer: {
+		id: string;
+		url: string;
+		imageUrl: string | null;
+		priceText: string | null;
+	} | null;
 	createdAt: string;
 	closedAt: string | null;
 	lastStatusChangedAt?: string | null;

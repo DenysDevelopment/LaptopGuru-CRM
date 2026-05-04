@@ -172,12 +172,26 @@ export async function GET(
     (ch) => ch.channelType === "SMS" || ch.channelType === "WHATSAPP",
   );
 
+  // Build the Allegro offer card payload for the sidebar. Public Allegro URLs
+  // are deterministic given the offer id, so we don't store the URL — UI links
+  // straight to allegro.pl. (Sandbox listings would need a different host but
+  // this CRM only ever runs against prod.)
+  const allegroOffer = conversation.allegroOfferId
+    ? {
+        id: conversation.allegroOfferId,
+        url: `https://allegro.pl/oferta/${conversation.allegroOfferId}`,
+        imageUrl: conversation.allegroOfferImageUrl,
+        priceText: conversation.allegroOfferPriceText,
+      }
+    : null;
+
   return NextResponse.json({
     id: conversation.id,
     status: conversation.status,
     priority: conversation.priority,
     channelType: conversation.channel.type,
     subject: conversation.subject,
+    allegroOffer,
     createdAt: conversation.createdAt,
     closedAt: conversation.closedAt,
     lastStatusChangedAt: conversation.lastStatusChangedAt,

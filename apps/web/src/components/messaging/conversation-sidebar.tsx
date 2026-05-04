@@ -8,6 +8,7 @@ import {
 	STATUS_OPTIONS,
 	type ConversationDetail,
 } from './conversation-sidebar.types';
+import { SidebarAllegroOffer } from './sidebar-allegro-offer';
 import { SidebarContact } from './sidebar-contact';
 import { SidebarMetadata } from './sidebar-metadata';
 import { SidebarNotes } from './sidebar-notes';
@@ -80,6 +81,13 @@ export function ConversationSidebar({
 				</section>
 
 				{conversation.contact && <SidebarContact contact={conversation.contact} />}
+
+				{conversation.allegroOffer && (
+					<SidebarAllegroOffer
+						subject={conversation.subject}
+						offer={conversation.allegroOffer}
+					/>
+				)}
 
 				<SidebarNotes
 					conversationId={conversation.id}

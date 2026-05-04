@@ -197,6 +197,12 @@ export class AllegroPollCron {
 			limit: 20,
 		});
 
+		// Allegro tags every message in an inquiry thread with the related
+		// offer id (and an offer-name `subject` on the first one). Pull it once
+		// per conversation so the sidebar can show a product card. Cheap idempotent
+		// query — DB write is skipped below if the offer is already known.
+		await this.maybePopulateAllegroOffer(channelId, conversation.id, messages);
+
 		const candidates = messages.filter((m) => new Date(m.createdAt) > cursor);
 		const existingIds = new Set<string>();
 		if (candidates.length > 0) {
@@ -328,5 +334,54 @@ export class AllegroPollCron {
 				respectManualCloseGrace: true,
 			});
 		}
+	}
+
+	/**
+	 * If the conversation hasn't yet captured its Allegro offer, scan the
+	 * fetched messages for the first one carrying `relatesTo.offer.id` and
+	 * persist offer id + name (subject) + image + price. The actual product
+	 * fetch is one extra `/sale/product-offers/{id}` call per thread, ever —
+	 * once the row has `allegroOfferId` we skip both the scan and the fetch.
+	 */
+	private async maybePopulateAllegroOffer(
+		channelId: string,
+		conversationId: string,
+		messages: Array<{
+			subject?: string | null;
+			relatesTo?: { offer?: { id: string } | null };
+		}>,
+	): Promise<void> {
+		const existing = await this.prisma.raw.conversation.findUnique({
+			where: { id: conversationId },
+			select: { allegroOfferId: true },
+		});
+		if (!existing || existing.allegroOfferId) return;
+
+		// Find first message that names the offer. Buyer inquiry usually puts
+		// the offer name into `subject` on the *first* message of the thread.
+		let offerId: string | null = null;
+		let subject: string | null = null;
+		for (const m of messages) {
+			const id = m.relatesTo?.offer?.id;
+			if (id && !offerId) offerId = id;
+			if (!subject && m.subject && m.subject.trim()) subject = m.subject.trim();
+			if (offerId && subject) break;
+		}
+		if (!offerId) return;
+
+		const offer = await this.provider.getOffer(channelId, offerId);
+		await this.prisma.raw.conversation.update({
+			where: { id: conversationId },
+			data: {
+				allegroOfferId: offerId,
+				allegroOfferImageUrl: offer?.imageUrl ?? null,
+				allegroOfferPriceText: offer?.priceText ?? null,
+				// Allegro polling never sets `subject`, so this only fires once
+				// per thread and `subject` is null at this point.
+				...(subject || offer?.name
+					? { subject: subject ?? offer?.name }
+					: {}),
+			},
+		});
 	}
 }

@@ -749,6 +749,12 @@ model Conversation {
   // it was created from an email. Set on inbound-email handler.
   incomingEmailId        String?              @unique
   incomingEmail          IncomingEmail?       @relation(fields: [incomingEmailId], references: [id], onDelete: SetNull)
+  // Allegro inquiry context: every Allegro Discussions thread is tied to
+  // a specific offer; we capture it from the first message that carries
+  // `relatesTo.offer.id` and render a product card in the sidebar.
+  allegroOfferId         String?
+  allegroOfferImageUrl   String?
+  allegroOfferPriceText  String?
   companyId              String
   company                Company              @relation(fields: [companyId], references: [id])
   createdAt              DateTime             @default(now())
