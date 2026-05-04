@@ -36,25 +36,15 @@ export async function POST(
   });
 
   if (unreadMessages.length > 0) {
-    // Create READ status events for all unread messages
+    // Create READ status events for all unread messages — these power the
+    // per-message read receipts. The aggregate "<agent> прочитал N
+    // сообщений" timeline event was dropped per request: it cluttered the
+    // thread without adding signal beyond the receipts themselves.
     await prisma.messageStatusEvent.createMany({
       data: unreadMessages.map((m) => ({
         messageId: m.id,
         status: "READ" as const,
       })),
-    });
-
-    // Audit-trail event: "<Agent> прочитал N сообщений" — only when there
-    // were genuinely unread messages, so reopening an already-read thread
-    // doesn't spam the timeline.
-    await prisma.conversationEvent.create({
-      data: {
-        conversationId: id,
-        type: "READ_BY_AGENT",
-        actorUserId: session.user!.id,
-        payload: { messageCount: unreadMessages.length },
-        companyId: session.user!.companyId ?? "",
-      },
     });
 
     emitMessagingEvent({

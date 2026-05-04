@@ -26,6 +26,9 @@ export interface TimelineEvent {
 		| 'LANDING_SENT'
 		| 'ASSIGNED'
 		| 'CONVERSATION_CREATED'
+		// Legacy: pre-existing rows in the DB. We no longer write these
+		// events, but the API may still return them on old conversations —
+		// the renderer skips them.
 		| 'READ_BY_AGENT';
 	actor: { id: string; name: string | null; email: string } | null;
 	payload: Record<string, unknown>;
@@ -252,22 +255,6 @@ function LandingSentCard({ event }: { event: TimelineEvent }) {
 	);
 }
 
-function ReadByAgentRow({ event }: { event: TimelineEvent }) {
-	const count = (event.payload.messageCount as number | undefined) ?? 0;
-	const text = `${actorName(event.actor)} прочитал${
-		count > 1 ? ` ${count} сообщений` : ''
-	}`;
-	return (
-		<div className='flex items-center gap-3 px-4 py-2'>
-			<div className='flex-1 h-px bg-gray-100' />
-			<span className='text-[11px] text-gray-400 whitespace-nowrap'>
-				{text} · {formatTime(event.createdAt)}
-			</span>
-			<div className='flex-1 h-px bg-gray-100' />
-		</div>
-	);
-}
-
 function ConversationCreatedRow({ event }: { event: TimelineEvent }) {
 	const date = new Date(event.createdAt);
 	const dateLabel = date.toLocaleDateString('ru-RU', {
@@ -315,7 +302,8 @@ export function ConversationTimelineEvent({
 		case 'ASSIGNED':
 			return <AssignedRow event={event} />;
 		case 'READ_BY_AGENT':
-			return <ReadByAgentRow event={event} />;
+			// Legacy events from before this row was retired — render nothing.
+			return null;
 		case 'CONVERSATION_CREATED':
 			return <ConversationCreatedRow event={event} />;
 		default:
