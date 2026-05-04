@@ -541,9 +541,7 @@ export function Sidebar() {
 								<div
 									key={item.href + item.label}
 									className={[
-										isNested
-											? 'ml-4 pl-2 border-l border-gray-200'
-											: '',
+										isNested ? 'ml-5' : '',
 										groupBreak ? 'mt-6' : '',
 									]
 										.filter(Boolean)
@@ -586,7 +584,7 @@ export function Sidebar() {
 										)}
 									</div>
 									{hasChildren && !isCollapsed && (
-										<div className='relative ml-6 mt-0.5 mb-1 pl-3 border-l border-gray-200 space-y-0.5'>
+										<div className='relative ml-9 mt-0.5 mb-1 space-y-0.5'>
 											{item.children!
 												.filter(
 													(c) =>
