@@ -358,6 +358,16 @@ export async function POST(
         lastMessagePreview: (message.body ?? "").slice(0, 120),
       },
     });
+    // The Message we emitted above carries metadata.eventType=LANDING_SENT
+    // and the thread filters those out — the rich card lives on the
+    // ConversationEvent timeline, which is fetched separately. Nudge the
+    // client to re-pull events so the LANDING_SENT card appears live
+    // without a page reload.
+    emitMessagingEvent({
+      type: "conversation_updated",
+      conversationId: id,
+      action: "landing-sent",
+    });
 
     return NextResponse.json({
       ok: true,
