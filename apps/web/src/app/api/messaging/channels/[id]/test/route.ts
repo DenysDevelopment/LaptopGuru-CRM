@@ -79,10 +79,49 @@ export async function POST(
           update: { value: data.result.username },
         });
       }
+
+      // Webhook diagnostics — getWebhookInfo is the single best signal for
+      // "почему не приходят сообщения". Surface URL + pending count +
+      // last_error so the operator can self-diagnose without opening
+      // Telegram API in the browser.
+      let webhookLine = "";
+      try {
+        const wRes = await fetch(
+          `https://api.telegram.org/bot${botToken}/getWebhookInfo`,
+        );
+        const wData = (await wRes.json()) as {
+          ok?: boolean;
+          result?: {
+            url?: string;
+            pending_update_count?: number;
+            last_error_date?: number;
+            last_error_message?: string;
+            ip_address?: string;
+          };
+        };
+        const w = wData.result;
+        if (w) {
+          const lines: string[] = [];
+          lines.push(`Webhook: ${w.url || "(не зарегистрирован)"}`);
+          if (typeof w.pending_update_count === "number") {
+            lines.push(`Очередь: ${w.pending_update_count}`);
+          }
+          if (w.last_error_message) {
+            const when = w.last_error_date
+              ? new Date(w.last_error_date * 1000).toLocaleString("ru-RU")
+              : "?";
+            lines.push(`Последняя ошибка (${when}): ${w.last_error_message}`);
+          }
+          webhookLine = "\n" + lines.join("\n");
+        }
+      } catch {
+        /* non-fatal — keep main test result */
+      }
+
       return NextResponse.json({
         ok: true,
         status: "CONNECTED",
-        message: `Бот ${handle} отвечает`,
+        message: `Бот ${handle} отвечает${webhookLine}`,
         botUsername: data.result.username ?? null,
       });
     } catch (err) {
