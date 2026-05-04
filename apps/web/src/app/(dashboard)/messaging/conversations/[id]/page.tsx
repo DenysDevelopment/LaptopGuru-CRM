@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, type CSSProperties } from 'react';
-import { useParams, usePathname, useRouter } from 'next/navigation';
+import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { MessageThread } from '@/components/messaging/message-thread';
 import { MessageInput } from '@/components/messaging/message-input';
@@ -20,9 +20,21 @@ export default function ConversationDetailPage() {
 	const params = useParams();
 	const router = useRouter();
 	const pathname = usePathname();
+	const searchParams = useSearchParams();
 	// Stay inside whichever section the user came from (/allegro vs /messaging)
 	// when they hit "back" or click "Вернуться к входящим".
-	const basePath = pathname.startsWith('/allegro') ? '/allegro' : '/messaging';
+	const baseRoot = pathname.startsWith('/allegro') ? '/allegro' : '/messaging';
+	// Preserve the channel/filter scope so "back" returns to the same
+	// filtered list instead of dumping the user into "all chats".
+	const preservedQuery = (() => {
+		const q = new URLSearchParams();
+		for (const key of ['channel', 'channelType', 'channelTypes', 'filter']) {
+			const v = searchParams.get(key);
+			if (v) q.set(key, v);
+		}
+		return q.toString();
+	})();
+	const basePath = preservedQuery ? `${baseRoot}?${preservedQuery}` : baseRoot;
 	const conversationId = params.id as string;
 
 	const [conversation, setConversation] = useState<ConversationDetail | null>(null);

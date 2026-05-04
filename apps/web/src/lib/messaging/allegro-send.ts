@@ -82,55 +82,6 @@ async function getAllegroAccessToken(channelId: string): Promise<{
 }
 
 /**
- * Looks up the offer Allegro associates with a discussion thread. Buyers
- * almost always start a thread from a specific listing, so this is the URL
- * we want behind the landing's "Buy" button. Returns null when Allegro has
- * no offer attached or the call fails.
- */
-export async function getAllegroThreadOfferUrl(args: {
-	companyId: string;
-	threadId: string;
-}): Promise<string | null> {
-	if (!args.companyId || !args.threadId) return null;
-	const channel = await prisma.channel.findFirst({
-		where: { companyId: args.companyId, type: 'ALLEGRO', isActive: true },
-		orderBy: { createdAt: 'asc' },
-		select: { id: true },
-	});
-	if (!channel) return null;
-	let token: string;
-	let apiBase: string;
-	try {
-		const got = await getAllegroAccessToken(channel.id);
-		token = got.token;
-		apiBase = got.apiBase;
-	} catch {
-		return null;
-	}
-	try {
-		const resp = await fetch(
-			`${apiBase}/messaging/threads/${encodeURIComponent(args.threadId)}`,
-			{
-				headers: {
-					Authorization: `Bearer ${token}`,
-					Accept: ALLEGRO_API_VND,
-				},
-			},
-		);
-		if (!resp.ok) return null;
-		const data = (await resp.json()) as {
-			subject?: { offer?: { id?: string } | null } | null;
-			offer?: { id?: string } | null;
-		};
-		const offerId = data.subject?.offer?.id ?? data.offer?.id;
-		if (!offerId) return null;
-		return `https://allegro.pl/oferta/${offerId}`;
-	} catch {
-		return null;
-	}
-}
-
-/**
  * Uploads a single attachment to Allegro and returns its attachment id, or
  * null on failure. Allegro requires a two-step flow: declare the attachment
  * (filename + size + mimeType), then PUT the binary to the returned id.

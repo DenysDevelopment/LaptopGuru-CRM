@@ -105,7 +105,7 @@ export default function DashboardPage() {
 	if (forbidden) {
 		return (
 			<div>
-				<h1 className='text-2xl font-bold text-gray-900 mb-6'>Dashboard</h1>
+				<h1 className='text-2xl font-bold text-gray-900 mb-6'>Главная</h1>
 				<div className='text-center py-16 bg-white rounded-xl border border-gray-100'>
 					<p className='text-gray-400'>Нет доступа к статистике.</p>
 				</div>
@@ -117,55 +117,11 @@ export default function DashboardPage() {
 		return <div className='text-center py-12 text-gray-400'>Загрузка...</div>;
 	}
 
-	const m = data.messaging;
-
 	return (
 		<div className='space-y-6'>
 			{/* Header */}
 			<div>
-				<h1 className='text-2xl font-bold text-gray-900'>Dashboard</h1>
-				<p className='mt-1 text-sm text-gray-500'>
-					Сводка по диалогам и лендингам
-				</p>
-			</div>
-
-			{/* Top stats */}
-			<div className='grid grid-cols-2 lg:grid-cols-5 gap-3'>
-				<StatTile
-					href='/messaging'
-					accent
-					label='Открытые'
-					value={m.openCount}
-					hint={`${m.newTodayCount} сегодня`}
-					icon={
-						<svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' strokeWidth={1.5} stroke='currentColor'>
-							<path strokeLinecap='round' strokeLinejoin='round' d='M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H6.911a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661Z' />
-						</svg>
-					}
-				/>
-				<StatTile
-					href='/messaging?filter=mine'
-					label='Мне назначено'
-					value={m.assignedToMeCount}
-				/>
-				<StatTile
-					href='/messaging?filter=urgent'
-					label='Срочные'
-					value={m.urgentCount}
-					tone='red'
-				/>
-				<StatTile
-					href='/messaging?status=RESOLVED'
-					label='Завершено сегодня'
-					value={m.resolvedTodayCount}
-					tone='green'
-				/>
-				<StatTile
-					href='/links'
-					label='Лендинги · 7д'
-					value={data.landings.weekTotals.count}
-					hint={`${data.landings.weekTotals.visits} визитов`}
-				/>
+				<h1 className='text-2xl font-bold text-gray-900'>Главная</h1>
 			</div>
 
 			{/* Quick actions */}
@@ -182,11 +138,6 @@ export default function DashboardPage() {
 					href='/messaging'
 					className='inline-flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 font-medium px-4 py-2 rounded-lg border border-gray-200 text-sm transition-colors'>
 					Все диалоги
-				</Link>
-				<Link
-					href='/emails'
-					className='inline-flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 font-medium px-4 py-2 rounded-lg border border-gray-200 text-sm transition-colors'>
-					Заявки с сайта
 				</Link>
 			</div>
 
@@ -293,88 +244,7 @@ export default function DashboardPage() {
 				</div>
 			</div>
 
-			{/* Recent landings */}
-			{data.landings.recent.length > 0 && (
-				<div className='bg-white rounded-xl border border-gray-100'>
-					<div className='px-4 py-3 border-b border-gray-100 flex items-center justify-between'>
-						<h2 className='text-sm font-semibold text-gray-900'>
-							Свежие лендинги
-						</h2>
-						<Link href='/links' className='text-xs text-brand hover:text-brand-hover'>
-							Все →
-						</Link>
-					</div>
-					<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 p-3'>
-						{data.landings.recent.map((l) => (
-							<Link
-								key={l.id}
-								href={`/l/${l.slug}`}
-								target='_blank'
-								className='block bg-gray-50 hover:bg-gray-100 rounded-lg overflow-hidden transition-colors'>
-								<div className='relative aspect-video bg-gray-200'>
-									{/* eslint-disable-next-line @next/next/no-img-element */}
-									<img
-										src={l.thumbnail}
-										alt={l.videoTitle}
-										className='w-full h-full object-cover'
-									/>
-								</div>
-								<div className='p-2'>
-									<p className='text-[11px] font-medium text-gray-900 truncate'>
-										{l.videoTitle}
-									</p>
-									<div className='flex items-center gap-2 text-[10px] text-gray-500 mt-1'>
-										<span>👁 {l.views}</span>
-										<span>🛒 {l.clicks}</span>
-										<span className='ml-auto uppercase text-gray-400'>{l.language}</span>
-									</div>
-								</div>
-							</Link>
-						))}
-					</div>
-				</div>
-			)}
 		</div>
 	);
 }
 
-function StatTile({
-	href,
-	label,
-	value,
-	hint,
-	tone,
-	accent,
-	icon,
-}: {
-	href: string;
-	label: string;
-	value: number;
-	hint?: string;
-	tone?: 'red' | 'green';
-	accent?: boolean;
-	icon?: React.ReactNode;
-}) {
-	const valueClass = accent
-		? 'text-brand'
-		: tone === 'red'
-			? 'text-red-600'
-			: tone === 'green'
-				? 'text-emerald-600'
-				: 'text-gray-900';
-	const bgClass = accent
-		? 'bg-brand-light/60 border-brand/20 hover:border-brand/40'
-		: 'bg-white border-gray-100 hover:border-gray-200';
-	return (
-		<Link
-			href={href}
-			className={`rounded-xl border p-3 transition-colors flex flex-col gap-1 ${bgClass}`}>
-			<div className='flex items-center gap-1.5 text-[11px] text-gray-500 font-medium'>
-				{icon && <span className={accent ? 'text-brand' : 'text-gray-400'}>{icon}</span>}
-				<span className='truncate'>{label}</span>
-			</div>
-			<p className={`text-2xl font-bold ${valueClass}`}>{value}</p>
-			{hint && <p className='text-[10px] text-gray-400 truncate'>{hint}</p>}
-		</Link>
-	);
-}

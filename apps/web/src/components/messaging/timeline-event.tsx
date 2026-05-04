@@ -130,6 +130,7 @@ function LandingSentCard({ event }: { event: TimelineEvent }) {
 	const videoTitle = event.payload.videoTitle as string;
 	const videoThumbnail = event.payload.videoThumbnail as string | undefined;
 	const shortUrl = event.payload.shortUrl as string;
+	const productUrl = event.payload.productUrl as string | null | undefined;
 	const previewToken = event.payload.previewToken as string | undefined;
 	const stats = event.landingStats ?? null;
 
@@ -175,7 +176,7 @@ function LandingSentCard({ event }: { event: TimelineEvent }) {
 								{event.relatedMessageBody}
 							</div>
 						)}
-						<div className='flex items-center gap-3 text-xs mt-auto pt-1'>
+						<div className='flex flex-wrap items-center gap-x-3 gap-y-1 text-xs mt-auto pt-1'>
 							<a
 								href={previewHref}
 								target='_blank'
@@ -184,6 +185,17 @@ function LandingSentCard({ event }: { event: TimelineEvent }) {
 								<Eye className='w-3.5 h-3.5' />
 								Превью
 							</a>
+							{productUrl && (
+								<a
+									href={productUrl}
+									target='_blank'
+									rel='noopener noreferrer'
+									title={productUrl}
+									className='inline-flex items-center gap-1 text-gray-500 hover:text-gray-700 truncate max-w-[180px]'>
+									<ShoppingBag className='w-3.5 h-3.5' />
+									<span className='truncate'>Кнопка «Купить»</span>
+								</a>
+							)}
 						</div>
 					</div>
 				</div>

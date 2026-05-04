@@ -8,10 +8,7 @@ import { buildEmailHtml } from "@/lib/email-template";
 import type { EmailLanguage } from "@/lib/email-template";
 import { emitMessagingEvent } from "@/lib/messaging-events";
 import { transitionConversationStatus } from "@/lib/messaging/transition-status";
-import {
-  getAllegroThreadOfferUrl,
-  sendViaAllegroDirect,
-} from "@/lib/messaging/allegro-send";
+import { sendViaAllegroDirect } from "@/lib/messaging/allegro-send";
 import {
   VALID_LANGUAGES,
   SUBJECT_BY_LANG,
@@ -32,11 +29,37 @@ export async function POST(
 
   const { id } = await params;
   const body = await request.json();
-  const { videoId, personalNote, language, messageBody } = body;
-  const lang: EmailLanguage = VALID_LANGUAGES.includes(language) ? language : "pl";
+  const { videoId, personalNote, language, messageBody, productUrl: clientProductUrl } = body as {
+    videoId?: string;
+    personalNote?: string;
+    language?: string;
+    messageBody?: string;
+    productUrl?: string;
+  };
+  const lang: EmailLanguage = VALID_LANGUAGES.includes(language as EmailLanguage)
+    ? (language as EmailLanguage)
+    : "pl";
 
   if (!videoId) {
     return NextResponse.json({ error: "videoId обязателен" }, { status: 400 });
+  }
+  // productUrl is now mandatory at the API boundary too — the modal
+  // enforces it client-side, but a missing value here means the landing's
+  // CTA would lead to "" or just allegro.pl, which the operator clearly
+  // didn't want. Reject early so a buyer never gets a useless landing.
+  if (!clientProductUrl || typeof clientProductUrl !== "string" || !clientProductUrl.trim()) {
+    return NextResponse.json(
+      { error: "Укажите ссылку на товар (productUrl)" },
+      { status: 400 },
+    );
+  }
+  try {
+    new URL(clientProductUrl);
+  } catch {
+    return NextResponse.json(
+      { error: "Некорректная ссылка на товар" },
+      { status: 400 },
+    );
   }
 
   const conversation = await prisma.conversation.findUnique({
@@ -64,39 +87,14 @@ export async function POST(
     return NextResponse.json({ error: "Канал не найден" }, { status: 400 });
   }
   const customerName = conversation.contact.displayName;
-  let productUrl =
-    conversation.contact.customFields.find((f) => f.fieldName === "productUrl")?.fieldValue || "";
+  // productUrl is now an explicit operator input from the modal — no
+  // auto-derivation from the contact's customFields or the Allegro
+  // discussion thread. Empty is allowed; the landing client renders
+  // an allegro.pl fallback for ALLEGRO landings without a URL.
+  const productUrl = (clientProductUrl ?? "").trim();
   const productName =
     conversation.contact.customFields.find((f) => f.fieldName === "productName")?.fieldValue ||
     null;
-
-  // For Allegro, the contact has no productUrl custom field — derive the
-  // landing's "Buy" target from the discussion thread itself: Allegro
-  // attaches the offer the buyer started the chat from. Falls back to the
-  // seller's shop URL when the thread has no offer (rare but possible),
-  // and finally to a bare allegro.pl fallback handled in the client.
-  if (!productUrl && conversation.channel?.type === "ALLEGRO" && conversation.externalId) {
-    const offerUrl = await getAllegroThreadOfferUrl({
-      companyId: conversation.companyId,
-      threadId: conversation.externalId,
-    });
-    if (offerUrl) {
-      productUrl = offerUrl;
-    } else {
-      const sellerLogin = await prisma.channelConfig.findUnique({
-        where: {
-          channelId_key: {
-            channelId: conversation.channelId,
-            key: "seller_login",
-          },
-        },
-        select: { value: true },
-      });
-      if (sellerLogin?.value) {
-        productUrl = `https://allegro.pl/uzytkownik/${encodeURIComponent(sellerLogin.value)}`;
-      }
-    }
-  }
 
   const video = await prisma.video.findUnique({ where: { id: videoId } });
   if (!video || !video.active || video.companyId !== (session.user.companyId ?? "")) {
@@ -314,6 +312,9 @@ export async function POST(
           videoTitle: video.title,
           videoThumbnail: video.thumbnail,
           shortUrl,
+          // Where the landing's "Купить" button leads — surfaced in the
+          // timeline card so the operator can verify the destination.
+          productUrl: productUrl || null,
           messageId: message.id,
           previewToken: landing.previewToken,
         },

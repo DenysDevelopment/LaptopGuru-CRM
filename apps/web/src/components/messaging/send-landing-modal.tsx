@@ -1,15 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
 
-import {
-	sendVideoFromChatSchema,
-	type SendVideoFromChatInput,
-} from '@/lib/schemas/messaging';
-import type { SendLanguage } from '@/lib/schemas/send';
-import { CHAT_TEMPLATE_BY_LANG } from '@/lib/constants/languages';
+import { Button } from '@/components/ui/button';
 import {
 	Form,
 	FormControl,
@@ -20,7 +15,12 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
+import { CHAT_TEMPLATE_BY_LANG } from '@/lib/constants/languages';
+import {
+	sendVideoFromChatSchema,
+	type SendVideoFromChatInput,
+} from '@/lib/schemas/messaging';
+import type { SendLanguage } from '@/lib/schemas/send';
 
 interface Video {
 	id: string;
@@ -67,13 +67,14 @@ export function SendLandingModal({
 			language: 'pl',
 			personalNote: '',
 			messageBody: CHAT_TEMPLATE_BY_LANG.pl,
+			productUrl: '',
 		},
 	});
 
 	useEffect(() => {
 		fetch('/api/videos')
-			.then((r) => (r.ok ? r.json() : []))
-			.then((data) => {
+			.then(r => (r.ok ? r.json() : []))
+			.then(data => {
 				setVideos(Array.isArray(data) ? data : []);
 				setLoading(false);
 			})
@@ -102,6 +103,7 @@ export function SendLandingModal({
 						personalNote: data.personalNote?.trim() || undefined,
 						language: data.language,
 						messageBody: data.messageBody?.trim() || undefined,
+						productUrl: data.productUrl?.trim() || undefined,
 					}),
 				},
 			);
@@ -118,7 +120,7 @@ export function SendLandingModal({
 	}
 
 	const filteredVideos = search
-		? videos.filter((v) => v.title.toLowerCase().includes(search.toLowerCase()))
+		? videos.filter(v => v.title.toLowerCase().includes(search.toLowerCase()))
 		: videos;
 
 	return (
@@ -137,8 +139,17 @@ export function SendLandingModal({
 								type='button'
 								onClick={onClose}
 								className='text-gray-400 hover:text-gray-600'>
-								<svg className='w-5 h-5' fill='none' viewBox='0 0 24 24' strokeWidth={2} stroke='currentColor'>
-									<path strokeLinecap='round' strokeLinejoin='round' d='M6 18L18 6M6 6l12 12' />
+								<svg
+									className='w-5 h-5'
+									fill='none'
+									viewBox='0 0 24 24'
+									strokeWidth={2}
+									stroke='currentColor'>
+									<path
+										strokeLinecap='round'
+										strokeLinejoin='round'
+										d='M6 18L18 6M6 6l12 12'
+									/>
 								</svg>
 							</button>
 						</div>
@@ -155,7 +166,7 @@ export function SendLandingModal({
 							<Input
 								type='text'
 								value={search}
-								onChange={(e) => setSearch(e.target.value)}
+								onChange={e => setSearch(e.target.value)}
 								placeholder='Поиск видео...'
 							/>
 
@@ -175,7 +186,7 @@ export function SendLandingModal({
 											</div>
 										) : (
 											<div className='grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-72 overflow-y-auto pr-1'>
-												{filteredVideos.map((video) => (
+												{filteredVideos.map(video => (
 													<button
 														key={video.id}
 														type='button'
@@ -213,7 +224,7 @@ export function SendLandingModal({
 									<FormItem>
 										<FormLabel>Язык лендинга и шаблона</FormLabel>
 										<div className='flex gap-2 flex-wrap'>
-											{LANGUAGES.map((lang) => (
+											{LANGUAGES.map(lang => (
 												<button
 													key={lang.value}
 													type='button'
@@ -232,6 +243,27 @@ export function SendLandingModal({
 								)}
 							/>
 
+							{/* Product URL — autofilled from the conversation when possible
+							    (Allegro offer for ALLEGRO, email parser for EMAIL). Empty
+							    value falls back to allegro.pl on the landing CTA. */}
+							<FormField
+								control={form.control}
+								name='productUrl'
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Ссылка на товар</FormLabel>
+										<FormControl>
+											<Input
+												type='url'
+												placeholder='https://allegro.pl/oferta/...'
+												{...field}
+											/>
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+
 							{/* Chat message body — editable per-send */}
 							<FormField
 								control={form.control}
@@ -243,7 +275,7 @@ export function SendLandingModal({
 											<Textarea
 												rows={4}
 												{...field}
-												onChange={(e) => {
+												onChange={e => {
 													setChatTouched(true);
 													field.onChange(e);
 												}}

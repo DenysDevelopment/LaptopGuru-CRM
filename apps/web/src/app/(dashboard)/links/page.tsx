@@ -17,6 +17,7 @@ interface Landing {
 	clicks: number;
 	createdAt: string;
 	previewToken: string;
+	productUrl: string | null;
 	video: { title: string; thumbnail: string; createdAt: string };
 	shortLinks: { code: string; clicks: number }[];
 	incomingEmail: {
@@ -215,6 +216,20 @@ export default function LinksPage() {
 																</>
 															)}
 														</div>
+													)}
+													{landing.productUrl && (
+														<a
+															href={landing.productUrl}
+															target='_blank'
+															rel='noopener noreferrer'
+															title={landing.productUrl}
+															className='mt-1 inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-brand max-w-full'>
+															<ShoppingBag
+																className='w-3 h-3 flex-shrink-0'
+																strokeWidth={2}
+															/>
+															<span className='truncate'>{landing.productUrl}</span>
+														</a>
 													)}
 												</div>
 											</td>

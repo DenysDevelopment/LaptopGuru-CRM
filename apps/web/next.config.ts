@@ -13,6 +13,17 @@ const nextConfig: NextConfig = {
   // React Compiler is incompatible with react-hook-form's watch/Controller pattern.
   // Disable it to avoid stale onChange handlers breaking form inputs.
   reactCompiler: false,
+  // Keep router cache warm so flipping between sidebar pages doesn't
+  // re-render / re-fetch the previous one. Default in Next 15 is 0s for
+  // dynamic routes — this restores the older "instant back/forward" feel.
+  // 5 min for static, 30s for dynamic — long enough for normal navigation,
+  // short enough that data isn't stale for hours.
+  experimental: {
+    staleTimes: {
+      dynamic: 30,
+      static: 300,
+    },
+  },
   transpilePackages: ["@laptopguru-crm/shared"],
   outputFileTracingRoot: path.resolve(__dirname, "../../"),
   turbopack: {

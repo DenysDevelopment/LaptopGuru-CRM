@@ -29,5 +29,11 @@ export const sendVideoFromChatSchema = z.object({
     .max(2000, "Максимум 2000 символов")
     .optional()
     .or(z.literal("")),
+  // Куда вести "Купить" на лендинге. Обязательное поле — без него
+  // лендинг бесполезен (CTA-кнопка не будет вести никуда).
+  productUrl: z
+    .string()
+    .min(1, "Укажите ссылку на товар")
+    .url("Некорректный URL"),
 });
 export type SendVideoFromChatInput = z.infer<typeof sendVideoFromChatSchema>;

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { ChannelIcon } from './channel-icon';
 import { ContactAvatar } from './contact-avatar';
 import { decodeEntities } from '@/lib/decode-entities';
@@ -72,16 +72,28 @@ export function ConversationListItem({
 	isActive: boolean;
 }) {
 	const pathname = usePathname();
+	const searchParams = useSearchParams();
 	// Stay within the current top-level section (/messaging or /allegro) so
 	// links don't kick the user out of the Allegro view back into the
 	// generic messaging inbox.
 	const basePath = pathname.startsWith('/allegro') ? '/allegro' : '/messaging';
+	// Preserve the active filter (channel / channelType / channelTypes /
+	// filter) when navigating into a conversation so the left list stays
+	// scoped to the same channel and pressing Back returns to the same
+	// filtered view instead of "all chats".
+	const preserved = new URLSearchParams();
+	for (const key of ['channel', 'channelType', 'channelTypes', 'filter']) {
+		const v = searchParams.get(key);
+		if (v) preserved.set(key, v);
+	}
+	const queryString = preserved.toString();
+	const href = `${basePath}/conversations/${conversation.id}${queryString ? `?${queryString}` : ''}`;
 	const contact = conversation.contact;
 	const contactName = contact?.name || contact?.email || contact?.phone || 'Без имени';
 
 	return (
 		<Link
-			href={`${basePath}/conversations/${conversation.id}`}
+			href={href}
 			className={`flex items-start gap-3 px-4 py-3 border-b border-gray-100 transition-colors ${
 				isActive
 					? 'bg-brand-light'
