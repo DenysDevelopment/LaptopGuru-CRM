@@ -122,15 +122,25 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Fetch avatar from Telegram
+      // Fetch the avatar in the background. Avatar fetching does 3 sequential
+      // Telegram API calls + a disk write; doing it inside the webhook
+      // request path was the main reason Caddy returned 502 ("Wrong response
+      // from the webhook") under load — Telegram retries piled up faster
+      // than we could finish answering. Fire-and-forget keeps the request
+      // tiny; the avatar appears on the next page load.
       if (botToken && msg.from?.id) {
-        const avatarUrl = await fetchTelegramAvatar(botToken, msg.from.id, newContact.id);
-        if (avatarUrl) {
-          await prisma.contact.update({
-            where: { id: newContact.id },
-            data: { avatarUrl },
-          });
-        }
+        const fromId = msg.from.id;
+        const newId = newContact.id;
+        const tk = botToken;
+        void fetchTelegramAvatar(tk, fromId, newId)
+          .then((avatarUrl) => {
+            if (!avatarUrl) return;
+            return prisma.contact.update({
+              where: { id: newId },
+              data: { avatarUrl },
+            });
+          })
+          .catch((err) => console.error("[TG Avatar] bg fetch failed:", err));
       }
 
       contactChannel = await prisma.contactChannel.findFirst({
@@ -144,16 +154,22 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: true });
       }
     } else {
-      // Update avatar for existing contact without one
+      // Background avatar refresh for existing contacts that don't have one
+      // yet — same reasoning as above, never block the response on it.
       const existingContact = await prisma.contact.findUnique({ where: { id: contactChannel.contactId } });
       if (existingContact && !existingContact.avatarUrl && botToken && msg.from?.id) {
-        const avatarUrl = await fetchTelegramAvatar(botToken, msg.from.id, existingContact.id);
-        if (avatarUrl) {
-          await prisma.contact.update({
-            where: { id: existingContact.id },
-            data: { avatarUrl },
-          });
-        }
+        const fromId = msg.from.id;
+        const cid = existingContact.id;
+        const tk = botToken;
+        void fetchTelegramAvatar(tk, fromId, cid)
+          .then((avatarUrl) => {
+            if (!avatarUrl) return;
+            return prisma.contact.update({
+              where: { id: cid },
+              data: { avatarUrl },
+            });
+          })
+          .catch((err) => console.error("[TG Avatar] bg fetch failed:", err));
       }
     }
 
