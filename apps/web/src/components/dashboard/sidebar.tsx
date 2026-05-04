@@ -30,6 +30,12 @@ interface NavItem {
 	collapsibleKey?: string;
 	defaultOpen?: boolean;
 	count?: number;
+	/**
+	 * When set, the item renders as a nested row under another sibling
+	 * (matched by that sibling's `collapsibleKey`). Visually indented + a
+	 * vertical rail; visibility follows the parent's collapsed state.
+	 */
+	nestedUnder?: string;
 }
 
 interface MessagingChannel {
@@ -317,6 +323,7 @@ export function Sidebar() {
 					icon: cat.icon,
 					collapsibleKey: `cat:${cat.key}`,
 					defaultOpen: true,
+					nestedUnder: 'inbox',
 					children: [
 						{
 							href: allHref,
@@ -341,7 +348,11 @@ export function Sidebar() {
 	}, [messagingCategoryItems]);
 
 	const visibleItems = navItems.filter(
-		(item) => !item.permission || hasPermission(userRole, userPermissions, item.permission),
+		(item) =>
+			(!item.permission ||
+				hasPermission(userRole, userPermissions, item.permission)) &&
+			// Nested items disappear when their parent group is collapsed.
+			!(item.nestedUnder && collapsed.has(item.nestedUnder)),
 	);
 
 	function isChildActive(child: NavChild, parentHref: string): boolean {
@@ -465,11 +476,21 @@ export function Sidebar() {
 
 							const hasChildren = !!item.children?.length;
 							const collapsibleKey = item.collapsibleKey;
+							// Inbox has no `children` of its own — its category siblings
+							// (Email/Messengers/Allegro) live as nested top-level rows
+							// pointing back via `nestedUnder`. Show the caret + collapse
+							// when either children or nested siblings exist.
+							const hasNestedSiblings = !!(
+								collapsibleKey &&
+								navItems.some((other) => other.nestedUnder === collapsibleKey)
+							);
+							const togglable = !!(collapsibleKey && (hasChildren || hasNestedSiblings));
 							const isCollapsed =
-								hasChildren && collapsibleKey
+								togglable && collapsibleKey
 									? collapsed.has(collapsibleKey) ||
 										(!collapsed.has(collapsibleKey) && item.defaultOpen === false)
 									: false;
+							const isNested = !!item.nestedUnder;
 
 							// Highlight rule: show the full brand-light background only on
 							// a *leaf* item that's the current page. Parents that merely
@@ -511,7 +532,13 @@ export function Sidebar() {
 							);
 
 							return (
-								<div key={item.href + item.label}>
+								<div
+									key={item.href + item.label}
+									className={
+										isNested
+											? 'ml-4 pl-2 border-l border-gray-200'
+											: undefined
+									}>
 									<div className='flex items-center'>
 										{isExternal ? (
 											<a
@@ -526,7 +553,7 @@ export function Sidebar() {
 												{linkContent}
 											</Link>
 										)}
-										{hasChildren && collapsibleKey && (
+										{togglable && collapsibleKey && (
 											<button
 												type='button'
 												onClick={() => toggleCollapsed(collapsibleKey)}
