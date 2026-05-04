@@ -4,8 +4,6 @@ export * from "./quicklink";
 export * from "./email";
 export * from "./company";
 export * from "./business-hours";
-export * from "./quick-reply";
 export * from "./team";
-export * from "./template";
 export * from "./channel";
 export * from "./messaging";

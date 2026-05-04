@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { listQuickReplies, type QuickReply } from '@/services/messaging/quick-replies.service';
+import { useState, useRef, useEffect } from 'react';
 import { sendMessage } from '@/services/messaging/messages.service';
 
 interface MessageInputProps {
@@ -33,36 +32,12 @@ function formatFileSize(bytes: number): string {
 	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-const QR_ENABLED_KEY = 'messaging.quickReplies.enabled';
-
 export function MessageInput({ conversationId, onMessageSent, disabled, onOpenSendLanding, onOpenPhoneCamera }: MessageInputProps) {
 	const [body, setBody] = useState('');
 	const [sending, setSending] = useState(false);
-	const [showQuickReplies, setShowQuickReplies] = useState(false);
-	const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
-	const [quickReplyFilter, setQuickReplyFilter] = useState('');
 	const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
-	// Per-browser preference toggled from /settings/quick-replies. When false,
-	// "/" in the textarea no longer opens the suggestions popover.
-	const [quickRepliesEnabled, setQuickRepliesEnabled] = useState<boolean>(
-		() => {
-			if (typeof window === 'undefined') return true;
-			return window.localStorage.getItem(QR_ENABLED_KEY) !== 'false';
-		},
-	);
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
-
-	useEffect(() => {
-		const onToggle = (e: Event) => {
-			const next = (e as CustomEvent<boolean>).detail;
-			setQuickRepliesEnabled(Boolean(next));
-			if (!next) setShowQuickReplies(false);
-		};
-		window.addEventListener('messaging:quickReplies-toggle', onToggle);
-		return () =>
-			window.removeEventListener('messaging:quickReplies-toggle', onToggle);
-	}, []);
 
 	// Auto-resize textarea
 	useEffect(() => {
@@ -72,13 +47,6 @@ export function MessageInput({ conversationId, onMessageSent, disabled, onOpenSe
 			el.style.height = Math.min(el.scrollHeight, 150) + 'px';
 		}
 	}, [body]);
-
-	// Fetch quick replies on demand
-	const loadQuickReplies = useCallback(async () => {
-		try {
-			setQuickReplies(await listQuickReplies());
-		} catch { /* ignore */ }
-	}, []);
 
 const handleSend = async () => {
 		const trimmed = body.trim();
@@ -163,14 +131,6 @@ const handleSend = async () => {
 	};
 
 	const handleKeyDown = (e: React.KeyboardEvent) => {
-		// "/" at start of text -> quick reply mode (only if feature on)
-		if (quickRepliesEnabled && e.key === '/' && body === '') {
-			e.preventDefault();
-			setShowQuickReplies(true);
-			loadQuickReplies();
-			return;
-		}
-
 		// Enter without shift sends message
 		if (e.key === 'Enter' && !e.shiftKey) {
 			e.preventDefault();
@@ -179,34 +139,8 @@ const handleSend = async () => {
 	};
 
 	const handleBodyChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-		const val = e.target.value;
-		setBody(val);
-
-		// Quick reply filtering — disabled when feature is off.
-		if (quickRepliesEnabled && val.startsWith('/')) {
-			setQuickReplyFilter(val.slice(1).toLowerCase());
-			if (!showQuickReplies) {
-				setShowQuickReplies(true);
-				loadQuickReplies();
-			}
-		} else {
-			setShowQuickReplies(false);
-			setQuickReplyFilter('');
-		}
+		setBody(e.target.value);
 	};
-
-	const selectQuickReply = (qr: QuickReply) => {
-		setBody(qr.body);
-		setShowQuickReplies(false);
-		setQuickReplyFilter('');
-		textareaRef.current?.focus();
-	};
-
-const filteredQuickReplies = quickReplies.filter(
-		(qr) =>
-			qr.shortcut.toLowerCase().includes(quickReplyFilter) ||
-			qr.title.toLowerCase().includes(quickReplyFilter),
-	);
 
 	const handleFileClick = () => {
 		fileInputRef.current?.click();
@@ -283,35 +217,7 @@ const filteredQuickReplies = quickReplies.filter(
 
 	return (
 		<div className='relative border-t border-gray-200 bg-white'>
-			{/* Quick replies dropdown */}
-			{showQuickReplies && (
-				<div className='absolute bottom-full left-0 right-0 bg-white border border-gray-200 rounded-t-xl shadow-lg max-h-48 overflow-y-auto'>
-					{filteredQuickReplies.length === 0 ? (
-						<div className='px-4 py-3 text-sm text-gray-400'>
-							Быстрые ответы не найдены
-						</div>
-					) : (
-						filteredQuickReplies.map((qr) => (
-							<button
-								key={qr.id}
-								onClick={() => selectQuickReply(qr)}
-								className='w-full text-left px-4 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0'>
-								<div className='flex items-center gap-2'>
-									<span className='text-xs font-mono text-brand bg-brand-light px-1.5 py-0.5 rounded'>
-										/{qr.shortcut}
-									</span>
-									<span className='text-sm font-medium text-gray-700'>
-										{qr.title}
-									</span>
-								</div>
-								<p className='text-xs text-gray-400 mt-0.5 truncate'>{qr.body}</p>
-							</button>
-						))
-					)}
-				</div>
-			)}
-
-{/* Pending attachment chips */}
+			{/* Pending attachment chips */}
 			{pendingAttachments.length > 0 && (
 				<div className='flex flex-wrap gap-2 px-3 pt-2'>
 					{pendingAttachments.map((a) => (
@@ -417,7 +323,7 @@ const filteredQuickReplies = quickReplies.filter(
 					value={body}
 					onChange={handleBodyChange}
 					onKeyDown={handleKeyDown}
-					placeholder='Напишите сообщение... (/ для быстрых ответов)'
+					placeholder='Напишите сообщение...'
 					disabled={disabled || sending}
 					rows={1}
 					className='flex-1 resize-none px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand placeholder:text-gray-400 disabled:opacity-50 max-h-[150px]'

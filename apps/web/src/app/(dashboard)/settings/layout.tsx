@@ -5,8 +5,6 @@ import { usePathname } from 'next/navigation';
 
 const SETTINGS_TABS = [
 	{ href: '/settings/channels', label: 'Каналы' },
-	{ href: '/settings/templates', label: 'Шаблоны' },
-	{ href: '/settings/quick-replies', label: 'Быстрые ответы' },
 	{ href: '/settings/domain', label: 'Домен' },
 	{ href: '/settings/excluded-ips', label: 'Исключённые IP' },
 ];

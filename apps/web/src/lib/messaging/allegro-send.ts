@@ -210,42 +210,57 @@ export async function sendViaAllegroDirect(args: {
 		}
 	}
 
-	try {
-		const messageBody: Record<string, unknown> = { text: args.text };
-		if (attachmentIds.length > 0) {
-			messageBody.attachments = attachmentIds.map((id) => ({ id }));
-		}
-		const resp = await fetch(
-			`${apiBase}/messaging/threads/${encodeURIComponent(args.threadId)}/messages`,
-			{
-				method: 'POST',
-				headers: {
-					Authorization: `Bearer ${token}`,
-					Accept: ALLEGRO_API_VND,
-					'Content-Type': ALLEGRO_API_VND,
-				},
-				body: JSON.stringify(messageBody),
-			},
-		);
-		if (!resp.ok) {
+	const messageBody: Record<string, unknown> = { text: args.text };
+	if (attachmentIds.length > 0) {
+		messageBody.attachments = attachmentIds.map((id) => ({ id }));
+	}
+
+	// Allegro caps per-user requests-per-second; concurrent polling cron +
+	// agent send can hit it briefly. Retry up to 2x on 429 with exponential
+	// backoff before surfacing a user-friendly Russian error.
+	const url = `${apiBase}/messaging/threads/${encodeURIComponent(args.threadId)}/messages`;
+	const headers = {
+		Authorization: `Bearer ${token}`,
+		Accept: ALLEGRO_API_VND,
+		'Content-Type': ALLEGRO_API_VND,
+	};
+	const body = JSON.stringify(messageBody);
+	const delays = [1500, 3000];
+	for (let attempt = 0; attempt <= delays.length; attempt++) {
+		try {
+			const resp = await fetch(url, { method: 'POST', headers, body });
+			if (resp.ok) {
+				const data = (await resp.json()) as { id: string };
+				return {
+					ok: true,
+					messageId: data.id,
+					...(uploadErrors.length > 0
+						? { error: `Some attachments failed: ${uploadErrors.join('; ')}` }
+						: {}),
+				};
+			}
+			if (resp.status === 429 && attempt < delays.length) {
+				await new Promise((r) => setTimeout(r, delays[attempt]));
+				continue;
+			}
 			const txt = await resp.text();
+			if (resp.status === 429) {
+				return {
+					ok: false,
+					error:
+						'Allegro временно ограничивает отправку (слишком много запросов). Подождите ~30 секунд и попробуйте снова.',
+				};
+			}
 			return {
 				ok: false,
 				error: `Allegro ${resp.status}: ${txt.slice(0, 300)}`,
 			};
+		} catch (err) {
+			return {
+				ok: false,
+				error: err instanceof Error ? err.message : 'Allegro send failed',
+			};
 		}
-		const data = (await resp.json()) as { id: string };
-		return {
-			ok: true,
-			messageId: data.id,
-			...(uploadErrors.length > 0
-				? { error: `Some attachments failed: ${uploadErrors.join('; ')}` }
-				: {}),
-		};
-	} catch (err) {
-		return {
-			ok: false,
-			error: err instanceof Error ? err.message : 'Allegro send failed',
-		};
 	}
+	return { ok: false, error: 'Allegro send failed after retries' };
 }

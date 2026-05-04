@@ -144,6 +144,25 @@ export default function ChannelsSettingsPage() {
 		setTesting(null);
 	};
 
+	const refreshTelegramWebhook = async (channelId: string) => {
+		try {
+			const res = await fetch(
+				`/api/messaging/channels/${channelId}/refresh-webhook`,
+				{ method: 'POST' },
+			);
+			const data = await res.json();
+			if (res.ok) {
+				alert(`Webhook зарегистрирован:\n${data.webhookUrl}`);
+			} else {
+				alert(`Ошибка: ${data.error || 'unknown'}`);
+			}
+		} catch (err) {
+			alert(
+				`Сетевая ошибка: ${err instanceof Error ? err.message : 'unknown'}`,
+			);
+		}
+	};
+
 	const leadEmailChannel = channels.find((ch) => ch.type === 'EMAIL');
 
 	const openEditModal = (channel: Channel) => {
@@ -340,6 +359,14 @@ export default function ChannelsSettingsPage() {
 										? `Переподключить${channel.config?.seller_login ? ` (${channel.config.seller_login})` : ''}`
 										: 'Подключить Allegro'}
 								</a>
+							)}
+							{channel.type === 'TELEGRAM' && (
+								<button
+									onClick={() => refreshTelegramWebhook(channel.id)}
+									className='text-xs text-cyan-600 hover:text-cyan-700 px-3 py-1.5 border border-cyan-200 rounded-lg transition-colors'
+									title='Перерегистрировать webhook у Telegram (если бот перестал получать сообщения)'>
+									Обновить webhook
+								</button>
 							)}
 							<button
 								onClick={() => testConnection(channel.id)}
