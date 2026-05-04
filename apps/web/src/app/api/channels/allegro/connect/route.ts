@@ -3,6 +3,7 @@ import { authorize } from '@/lib/authorize';
 import { prisma } from '@/lib/db';
 import {
 	buildAllegroAuthorizeUrl,
+	buildAllegroRedirectUri,
 	loadAllegroConfig,
 } from '@/lib/messaging/allegro';
 import { PERMISSIONS } from '@laptopguru-crm/shared';
@@ -47,10 +48,7 @@ export async function GET(request: NextRequest) {
 		);
 	}
 
-	const origin = request.nextUrl.origin;
-	const redirectUri =
-		process.env.ALLEGRO_OAUTH_REDIRECT_URI ??
-		`${origin}/api/channels/allegro/callback`;
+	const redirectUri = buildAllegroRedirectUri(request);
 
 	const url = buildAllegroAuthorizeUrl({
 		clientId,

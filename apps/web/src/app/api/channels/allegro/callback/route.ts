@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authorize } from '@/lib/authorize';
 import { prisma } from '@/lib/db';
 import {
+	buildAllegroRedirectUri,
 	exchangeAllegroCode,
 	loadAllegroConfig,
 } from '@/lib/messaging/allegro';
@@ -23,10 +24,14 @@ export async function GET(request: NextRequest) {
 	const errParam = request.nextUrl.searchParams.get('error');
 
 	if (errParam) {
+		const earlyOrigin = buildAllegroRedirectUri(request).replace(
+			/\/api\/channels\/allegro\/callback$/,
+			'',
+		);
 		return NextResponse.redirect(
 			new URL(
 				`/settings/channels?allegro=error&reason=${encodeURIComponent(errParam)}`,
-				request.nextUrl.origin,
+				earlyOrigin,
 			),
 		);
 	}
@@ -60,10 +65,10 @@ export async function GET(request: NextRequest) {
 		);
 	}
 
-	const origin = request.nextUrl.origin;
-	const redirectUri =
-		process.env.ALLEGRO_OAUTH_REDIRECT_URI ??
-		`${origin}/api/channels/allegro/callback`;
+	const redirectUri = buildAllegroRedirectUri(request);
+	// Strip the path off the redirect_uri to use as base for the user-facing
+	// post-OAuth bounce — same proxy-aware origin as above.
+	const origin = redirectUri.replace(/\/api\/channels\/allegro\/callback$/, '');
 
 	try {
 		const { sellerLogin } = await exchangeAllegroCode({

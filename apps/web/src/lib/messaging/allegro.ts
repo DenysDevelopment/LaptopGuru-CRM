@@ -1,3 +1,4 @@
+import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 
 /**
@@ -12,6 +13,43 @@ export const ALLEGRO_SCOPES = [
 	'allegro:api:orders:read',
 	'allegro:api:sale:offers:read',
 ] as const;
+
+/**
+ * Builds the OAuth redirect URI used by both /connect and /callback. The
+ * value MUST be byte-identical between the two — Allegro rejects /token
+ * exchanges whose redirect_uri differs from the original /authorize.
+ *
+ * Order of preference:
+ *   1. ALLEGRO_OAUTH_REDIRECT_URI env override (explicit pin).
+ *   2. X-Forwarded-Host + -Proto (set by Caddy/Nginx in prod) — needed
+ *      because behind a proxy `request.nextUrl.origin` reflects the
+ *      internal listen address (`https://0.0.0.0:3000`), which Allegro
+ *      can't redirect back to.
+ *   3. Host header (when the request actually hit a real public host).
+ *   4. NEXTAUTH_URL env (last-resort, also used by NextAuth itself).
+ *   5. request.nextUrl.origin (dev / direct-hit fallback).
+ */
+export function buildAllegroRedirectUri(request: NextRequest): string {
+	if (process.env.ALLEGRO_OAUTH_REDIRECT_URI) {
+		return process.env.ALLEGRO_OAUTH_REDIRECT_URI;
+	}
+	const fwdProto = request.headers.get('x-forwarded-proto');
+	const fwdHost = request.headers.get('x-forwarded-host');
+	const hostHeader = request.headers.get('host');
+	let origin = request.nextUrl.origin;
+	if (fwdHost) {
+		origin = `${fwdProto ?? 'https'}://${fwdHost}`;
+	} else if (
+		hostHeader &&
+		!hostHeader.startsWith('0.0.0.0') &&
+		!hostHeader.startsWith('localhost')
+	) {
+		origin = `${fwdProto ?? request.nextUrl.protocol.replace(':', '')}://${hostHeader}`;
+	} else if (process.env.NEXTAUTH_URL) {
+		origin = process.env.NEXTAUTH_URL.replace(/\/$/, '');
+	}
+	return `${origin}/api/channels/allegro/callback`;
+}
 
 export function allegroBaseUrls(env: string | undefined): {
 	oauth: string;
