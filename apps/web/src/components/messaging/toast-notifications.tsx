@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMessagingEvents } from '@/hooks/use-messaging-events';
 import { ChannelIcon } from './channel-icon';
 
@@ -14,16 +14,90 @@ interface Toast {
 
 export function MessagingToastNotifications() {
 	const [toasts, setToasts] = useState<Toast[]>([]);
+	// One Audio instance reused per session — created lazily on the first
+	// user interaction so Chrome's autoplay policy lets it play. Without
+	// this, audio.play() rejects silently and no sound is heard.
+	const audioRef = useRef<HTMLAudioElement | null>(null);
+
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+		const unlock = () => {
+			if (!audioRef.current) {
+				const a = new Audio('/notification.wav');
+				a.volume = 0.5;
+				audioRef.current = a;
+			}
+			// Fire-and-forget muted play to satisfy the autoplay gesture
+			// requirement; subsequent .play() calls don't need a gesture.
+			audioRef.current.muted = true;
+			audioRef.current
+				.play()
+				.then(() => {
+					audioRef.current!.pause();
+					audioRef.current!.currentTime = 0;
+					audioRef.current!.muted = false;
+				})
+				.catch(() => {
+					if (audioRef.current) audioRef.current.muted = false;
+				});
+			window.removeEventListener('click', unlock);
+			window.removeEventListener('keydown', unlock);
+		};
+		window.addEventListener('click', unlock, { once: true });
+		window.addEventListener('keydown', unlock, { once: true });
+		// Native browser notifications work even when the tab is in the
+		// background — ask permission once on mount, no-op if already
+		// granted/denied.
+		if (
+			'Notification' in window &&
+			Notification.permission === 'default'
+		) {
+			Notification.requestPermission().catch(() => {});
+		}
+		return () => {
+			window.removeEventListener('click', unlock);
+			window.removeEventListener('keydown', unlock);
+		};
+	}, []);
 
 	const addToast = useCallback((toast: Toast) => {
 		setToasts((prev) => [...prev.slice(-4), toast]); // max 5 toasts
 
-		// Play notification sound
-		try {
-			const audio = new Audio('/notification.wav');
-			audio.volume = 0.5;
-			audio.play().catch(() => {});
-		} catch {}
+		// 1) In-page sound — autoplay-unlocked Audio above.
+		if (audioRef.current) {
+			try {
+				audioRef.current.currentTime = 0;
+				audioRef.current.play().catch(() => {});
+			} catch {}
+		} else {
+			try {
+				const a = new Audio('/notification.wav');
+				a.volume = 0.5;
+				a.play().catch(() => {});
+			} catch {}
+		}
+
+		// 2) Native browser notification when the tab isn't focused, so the
+		//    user gets pinged even with the CRM in the background.
+		if (
+			typeof document !== 'undefined' &&
+			document.visibilityState !== 'visible' &&
+			'Notification' in window &&
+			Notification.permission === 'granted'
+		) {
+			try {
+				const n = new Notification(toast.senderName, {
+					body: toast.body,
+					icon: '/laptopguru-favicon.png',
+					tag: `conv-${toast.conversationId}`, // collapse repeats per chat
+				});
+				n.onclick = () => {
+					window.focus();
+					window.location.href = `/messaging/conversations/${toast.conversationId}`;
+					n.close();
+				};
+			} catch {}
+		}
 
 		// Auto-remove after 5s
 		setTimeout(() => {
@@ -32,17 +106,32 @@ export function MessagingToastNotifications() {
 	}, []);
 
 	useMessagingEvents((event) => {
-		// Toast only on inbound messages from external channels.
-		if (event.type !== 'new_message' || !event.message) return;
-		if (event.message.direction !== 'INBOUND') return;
-		const senderName = event.message.contact?.name ?? 'Клиент';
-		addToast({
-			id: `${Date.now()}-${Math.random()}`,
-			senderName,
-			body: (event.message.body || '').slice(0, 100) || 'Новое сообщение',
-			channelType: 'TELEGRAM',
-			conversationId: event.conversationId,
-		});
+		// Inbound text on an existing conversation.
+		if (event.type === 'new_message' && event.message) {
+			if (event.message.direction !== 'INBOUND') return;
+			const senderName = event.message.contact?.name ?? 'Клиент';
+			addToast({
+				id: `${Date.now()}-${Math.random()}`,
+				senderName,
+				body: (event.message.body || '').slice(0, 100) || 'Новое сообщение',
+				channelType: event.conversationPatch?.channelType ?? '',
+				conversationId: event.conversationId,
+			});
+			return;
+		}
+		// First message of a brand-new conversation arrives bundled in the
+		// new_conversation event — also worth a ping.
+		if (event.type === 'new_conversation' && event.conversation) {
+			addToast({
+				id: `${Date.now()}-${Math.random()}`,
+				senderName: event.conversation.contact?.name ?? 'Новый клиент',
+				body:
+					(event.conversation.lastMessagePreview || '').slice(0, 100) ||
+					'Новое обращение',
+				channelType: event.conversation.channelType,
+				conversationId: event.conversationId,
+			});
+		}
 	});
 
 	if (toasts.length === 0) return null;
