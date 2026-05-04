@@ -433,7 +433,13 @@ export function Sidebar() {
 
 					{/* Navigation */}
 					<nav className='flex-1 px-3 py-2 space-y-0.5 overflow-y-auto'>
-						{visibleItems.map((item) => {
+						{visibleItems.map((item, idx) => {
+							// Add a gap above the first non-nested item that follows a
+							// nested group, so Inbox + its categories breathe before the
+							// next top-level section.
+							const prev = idx > 0 ? visibleItems[idx - 1] : null;
+							const groupBreak =
+								!item.nestedUnder && !!prev?.nestedUnder;
 							if (item.comingSoon) {
 								return (
 									<div key={item.href}>
@@ -534,11 +540,14 @@ export function Sidebar() {
 							return (
 								<div
 									key={item.href + item.label}
-									className={
+									className={[
 										isNested
 											? 'ml-4 pl-2 border-l border-gray-200'
-											: undefined
-									}>
+											: '',
+										groupBreak ? 'mt-6' : '',
+									]
+										.filter(Boolean)
+										.join(' ') || undefined}>
 									<div className='flex items-center'>
 										{isExternal ? (
 											<a
