@@ -61,11 +61,29 @@ export async function POST(
     return NextResponse.json({ error: "Канал не найден" }, { status: 400 });
   }
   const customerName = conversation.contact.displayName;
-  const productUrl =
+  let productUrl =
     conversation.contact.customFields.find((f) => f.fieldName === "productUrl")?.fieldValue || "";
   const productName =
     conversation.contact.customFields.find((f) => f.fieldName === "productName")?.fieldValue ||
     null;
+
+  // For Allegro, the contact has no productUrl custom field — pull the
+  // seller's shop URL from the channel config so the landing's "Buy"
+  // button still has a sensible destination instead of disappearing.
+  if (!productUrl && conversation.channel?.type === "ALLEGRO") {
+    const sellerLogin = await prisma.channelConfig.findUnique({
+      where: {
+        channelId_key: {
+          channelId: conversation.channelId,
+          key: "seller_login",
+        },
+      },
+      select: { value: true },
+    });
+    if (sellerLogin?.value) {
+      productUrl = `https://allegro.pl/uzytkownik/${encodeURIComponent(sellerLogin.value)}`;
+    }
+  }
 
   const video = await prisma.video.findUnique({ where: { id: videoId } });
   if (!video || !video.active || video.companyId !== (session.user.companyId ?? "")) {

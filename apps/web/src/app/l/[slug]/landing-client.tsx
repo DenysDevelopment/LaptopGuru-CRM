@@ -1052,9 +1052,15 @@ export function LandingClient({ landing, video }: Props) {
 				(Date.now() - (startTimeRef.current ?? Date.now())) / 1000,
 			),
 		});
+		// Existing Allegro landings created before the seller-shop fallback
+		// have an empty productUrl; send those buyers to allegro.pl so the
+		// click does something useful instead of navigating to "".
+		const target =
+			landing.productUrl ||
+			(landing.type === 'allegro' ? 'https://allegro.pl' : '');
 		fetch(`/api/landings/${landing.slug}/click`, { method: 'POST' }).finally(
 			() => {
-				window.location.href = landing.productUrl;
+				if (target) window.location.href = target;
 			},
 		);
 	}
@@ -1452,7 +1458,7 @@ export function LandingClient({ landing, video }: Props) {
 				</div>
 			</div>
 
-			{landing.productUrl && (
+			{(landing.productUrl || landing.type === 'allegro') && (
 				<div
 					className={`pointer-events-none fixed bottom-0 inset-x-0 z-[100] to-transparent pt-16 ${showCta && (isDesktop || !isVideoPlaying) ? 'anim-slide-up' : 'opacity-0 translate-y-full'}`}
 					style={{
