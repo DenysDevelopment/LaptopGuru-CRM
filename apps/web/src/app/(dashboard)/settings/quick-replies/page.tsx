@@ -12,11 +12,34 @@ import {
 	type QuickReply,
 } from '@/services/messaging/quick-replies.service';
 
+const QR_ENABLED_KEY = 'messaging.quickReplies.enabled';
+
 export default function QuickRepliesSettingsPage() {
 	const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [showModal, setShowModal] = useState(false);
 	const [editingItem, setEditingItem] = useState<QuickReply | null>(null);
+	// Per-browser preference. Default ON. Read once on mount via lazy
+	// initialiser to dodge the react-hooks/set-state-in-effect rule.
+	const [enabled, setEnabled] = useState<boolean>(() => {
+		if (typeof window === 'undefined') return true;
+		return window.localStorage.getItem(QR_ENABLED_KEY) !== 'false';
+	});
+
+	const toggleEnabled = () => {
+		setEnabled((prev) => {
+			const next = !prev;
+			try {
+				window.localStorage.setItem(QR_ENABLED_KEY, String(next));
+				// Broadcast so any open MessageInput re-reads immediately
+				// without waiting for navigation / refresh.
+				window.dispatchEvent(
+					new CustomEvent('messaging:quickReplies-toggle', { detail: next }),
+				);
+			} catch {}
+			return next;
+		});
+	};
 
 	const fetchItems = useCallback(async () => {
 		try {
@@ -79,6 +102,25 @@ export default function QuickRepliesSettingsPage() {
 					Создать
 				</Button>
 			</div>
+
+			{/* Master toggle for the / trigger in the chat composer. */}
+			<label className='flex items-center justify-between gap-4 bg-white rounded-xl border border-gray-100 p-4 mb-4 cursor-pointer'>
+				<div>
+					<p className='text-sm font-medium text-gray-900'>
+						Показывать быстрые ответы в чате
+					</p>
+					<p className='text-xs text-gray-500 mt-0.5'>
+						Когда выключено, ввод «/» в окне сообщения не открывает
+						подсказки и шаблоны не подставляются.
+					</p>
+				</div>
+				<input
+					type='checkbox'
+					checked={enabled}
+					onChange={toggleEnabled}
+					className='w-5 h-5 accent-brand cursor-pointer flex-shrink-0'
+				/>
+			</label>
 
 			{loading ? (
 				<div className='text-center py-12 text-gray-400'>Загрузка...</div>

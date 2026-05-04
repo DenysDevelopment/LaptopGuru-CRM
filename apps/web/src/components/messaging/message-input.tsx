@@ -33,6 +33,8 @@ function formatFileSize(bytes: number): string {
 	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+const QR_ENABLED_KEY = 'messaging.quickReplies.enabled';
+
 export function MessageInput({ conversationId, onMessageSent, disabled, onOpenSendLanding, onOpenPhoneCamera }: MessageInputProps) {
 	const [body, setBody] = useState('');
 	const [sending, setSending] = useState(false);
@@ -40,8 +42,27 @@ export function MessageInput({ conversationId, onMessageSent, disabled, onOpenSe
 	const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
 	const [quickReplyFilter, setQuickReplyFilter] = useState('');
 	const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
+	// Per-browser preference toggled from /settings/quick-replies. When false,
+	// "/" in the textarea no longer opens the suggestions popover.
+	const [quickRepliesEnabled, setQuickRepliesEnabled] = useState<boolean>(
+		() => {
+			if (typeof window === 'undefined') return true;
+			return window.localStorage.getItem(QR_ENABLED_KEY) !== 'false';
+		},
+	);
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
+
+	useEffect(() => {
+		const onToggle = (e: Event) => {
+			const next = (e as CustomEvent<boolean>).detail;
+			setQuickRepliesEnabled(Boolean(next));
+			if (!next) setShowQuickReplies(false);
+		};
+		window.addEventListener('messaging:quickReplies-toggle', onToggle);
+		return () =>
+			window.removeEventListener('messaging:quickReplies-toggle', onToggle);
+	}, []);
 
 	// Auto-resize textarea
 	useEffect(() => {
@@ -142,8 +163,8 @@ const handleSend = async () => {
 	};
 
 	const handleKeyDown = (e: React.KeyboardEvent) => {
-		// "/" at start of text -> quick reply mode
-		if (e.key === '/' && body === '') {
+		// "/" at start of text -> quick reply mode (only if feature on)
+		if (quickRepliesEnabled && e.key === '/' && body === '') {
 			e.preventDefault();
 			setShowQuickReplies(true);
 			loadQuickReplies();
@@ -161,8 +182,8 @@ const handleSend = async () => {
 		const val = e.target.value;
 		setBody(val);
 
-		// Quick reply filtering
-		if (val.startsWith('/')) {
+		// Quick reply filtering — disabled when feature is off.
+		if (quickRepliesEnabled && val.startsWith('/')) {
 			setQuickReplyFilter(val.slice(1).toLowerCase());
 			if (!showQuickReplies) {
 				setShowQuickReplies(true);

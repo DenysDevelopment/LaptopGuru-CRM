@@ -174,13 +174,13 @@ export function SendLandingModal({
 												Видео не найдены
 											</div>
 										) : (
-											<div className='grid grid-cols-2 sm:grid-cols-3 gap-3'>
+											<div className='grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-72 overflow-y-auto pr-1'>
 												{filteredVideos.map((video) => (
 													<button
 														key={video.id}
 														type='button'
 														onClick={() => field.onChange(video.id)}
-														className={`text-left rounded-xl overflow-hidden border-2 transition-all ${
+														className={`text-left rounded-lg overflow-hidden border-2 transition-all ${
 															selectedVideoId === video.id
 																? 'border-brand ring-2 ring-brand/20'
 																: 'border-gray-100 hover:border-gray-200'
@@ -189,10 +189,10 @@ export function SendLandingModal({
 														<img
 															src={video.thumbnail}
 															alt={video.title}
-															className='w-full aspect-video object-cover'
+															className='w-full aspect-[16/10] object-cover bg-gray-100'
 														/>
-														<div className='p-2'>
-															<p className='text-xs font-medium text-gray-900 line-clamp-2'>
+														<div className='p-1.5'>
+															<p className='text-[11px] font-medium text-gray-900 line-clamp-2 leading-tight'>
 																{video.title}
 															</p>
 														</div>
