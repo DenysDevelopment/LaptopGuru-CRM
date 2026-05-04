@@ -168,12 +168,22 @@ export default function ConversationDetailPage() {
 				{/* Messages */}
 				<MessageThread conversationId={conversationId} />
 
-				{/* Input */}
+				{/* Input — landing/photo CTAs are Allegro-only flows
+				    (Allegro Direct: send video review, snap photo via phone QR).
+				    Other channels (Email, Telegram, …) keep just the text input. */}
 				<MessageInput
 					conversationId={conversationId}
 					disabled={conversation.status === 'CLOSED'}
-					onOpenSendLanding={() => setShowVideoModal(true)}
-					onOpenPhoneCamera={() => setShowPhotoModal(true)}
+					onOpenSendLanding={
+						conversation.channelType === 'ALLEGRO'
+							? () => setShowVideoModal(true)
+							: undefined
+					}
+					onOpenPhoneCamera={
+						conversation.channelType === 'ALLEGRO'
+							? () => setShowPhotoModal(true)
+							: undefined
+					}
 				/>
 			</div>
 
