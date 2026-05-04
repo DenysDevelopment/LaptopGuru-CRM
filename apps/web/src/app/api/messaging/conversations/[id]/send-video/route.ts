@@ -8,7 +8,10 @@ import { buildEmailHtml } from "@/lib/email-template";
 import type { EmailLanguage } from "@/lib/email-template";
 import { emitMessagingEvent } from "@/lib/messaging-events";
 import { transitionConversationStatus } from "@/lib/messaging/transition-status";
-import { sendViaAllegroDirect } from "@/lib/messaging/allegro-send";
+import {
+  getAllegroThreadOfferUrl,
+  sendViaAllegroDirect,
+} from "@/lib/messaging/allegro-send";
 import {
   VALID_LANGUAGES,
   SUBJECT_BY_LANG,
@@ -67,21 +70,31 @@ export async function POST(
     conversation.contact.customFields.find((f) => f.fieldName === "productName")?.fieldValue ||
     null;
 
-  // For Allegro, the contact has no productUrl custom field — pull the
-  // seller's shop URL from the channel config so the landing's "Buy"
-  // button still has a sensible destination instead of disappearing.
-  if (!productUrl && conversation.channel?.type === "ALLEGRO") {
-    const sellerLogin = await prisma.channelConfig.findUnique({
-      where: {
-        channelId_key: {
-          channelId: conversation.channelId,
-          key: "seller_login",
-        },
-      },
-      select: { value: true },
+  // For Allegro, the contact has no productUrl custom field — derive the
+  // landing's "Buy" target from the discussion thread itself: Allegro
+  // attaches the offer the buyer started the chat from. Falls back to the
+  // seller's shop URL when the thread has no offer (rare but possible),
+  // and finally to a bare allegro.pl fallback handled in the client.
+  if (!productUrl && conversation.channel?.type === "ALLEGRO" && conversation.externalId) {
+    const offerUrl = await getAllegroThreadOfferUrl({
+      companyId: conversation.companyId,
+      threadId: conversation.externalId,
     });
-    if (sellerLogin?.value) {
-      productUrl = `https://allegro.pl/uzytkownik/${encodeURIComponent(sellerLogin.value)}`;
+    if (offerUrl) {
+      productUrl = offerUrl;
+    } else {
+      const sellerLogin = await prisma.channelConfig.findUnique({
+        where: {
+          channelId_key: {
+            channelId: conversation.channelId,
+            key: "seller_login",
+          },
+        },
+        select: { value: true },
+      });
+      if (sellerLogin?.value) {
+        productUrl = `https://allegro.pl/uzytkownik/${encodeURIComponent(sellerLogin.value)}`;
+      }
     }
   }
 
