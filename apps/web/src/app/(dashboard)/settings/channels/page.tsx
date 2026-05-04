@@ -6,7 +6,7 @@ import { ChannelIcon, getChannelLabel } from '@/components/messaging/channel-ico
 import { AddChannelModal } from './add-channel-modal';
 import { type Channel, EMAIL_DEFAULTS } from './channels.config';
 import { DeleteChannelModal } from './delete-channel-modal';
-import { EditEmailModal } from './edit-email-modal';
+import { EditChannelModal } from './edit-channel-modal';
 import {
 	listChannels as fetchChannelsRaw,
 	createChannel,
@@ -136,10 +136,18 @@ export default function ChannelsSettingsPage() {
 	const testConnection = async (channelId: string) => {
 		setTesting(channelId);
 		try {
-			await testChannel(channelId);
-			alert('Подключение успешно!');
-		} catch {
-			alert('Ошибка подключения');
+			const result = await testChannel(channelId);
+			alert(result.message ? `✓ ${result.message}` : 'Подключение успешно!');
+			// Telegram test persists `bot_username` on success — refetch so the
+			// channel row picks up the @handle.
+			fetchChannels();
+		} catch (err) {
+			const msg =
+				err && typeof err === 'object' && 'response' in err
+					? ((err as { response?: { data?: { error?: string } } }).response?.data
+							?.error ?? null)
+					: null;
+			alert(msg ? `Ошибка: ${msg}` : 'Ошибка подключения');
 		}
 		setTesting(null);
 	};
@@ -153,6 +161,7 @@ export default function ChannelsSettingsPage() {
 			const data = await res.json();
 			if (res.ok) {
 				alert(`Webhook зарегистрирован:\n${data.webhookUrl}`);
+				fetchChannels();
 			} else {
 				alert(`Ошибка: ${data.error || 'unknown'}`);
 			}
@@ -168,10 +177,13 @@ export default function ChannelsSettingsPage() {
 	const openEditModal = (channel: Channel) => {
 		setEditingChannel(channel);
 		setEditChannelName(channel.name);
-		// Don't prefill secret values — show empty so user can re-enter if needed
+		// Don't prefill secret values — show empty so the user can leave the
+		// field blank to keep the existing token. The list endpoint masks with
+		// "••••••••", PATCH returns "--------"; treat both as "no real value".
 		const cleanConfig: Record<string, string> = {};
+		const MASKED = new Set(['••••••••', '--------']);
 		for (const [k, v] of Object.entries(channel.config)) {
-			cleanConfig[k] = v === '--------' ? '' : v;
+			cleanConfig[k] = MASKED.has(v) ? '' : v;
 		}
 		setEditChannelConfig(cleanConfig);
 	};
@@ -323,6 +335,11 @@ export default function ChannelsSettingsPage() {
 									<span className='text-xs text-gray-400'>
 										{getChannelLabel(channel.type)}
 									</span>
+									{channel.type === 'TELEGRAM' && channel.config?.bot_username && (
+										<span className='text-xs text-cyan-600 font-mono'>
+											@{channel.config.bot_username}
+										</span>
+									)}
 								</div>
 								<div className='flex items-center gap-2 mt-0.5'>
 									<span
@@ -341,6 +358,19 @@ export default function ChannelsSettingsPage() {
 												? 'Ошибка'
 												: 'Отключён'}
 									</span>
+									{channel.type === 'TELEGRAM' && channel.config?.webhook_url && (
+										<span
+											className='text-xs text-gray-400 font-mono truncate max-w-[280px]'
+											title={channel.config.webhook_url}>
+											· {(() => {
+												try {
+													return new URL(channel.config.webhook_url).host;
+												} catch {
+													return channel.config.webhook_url;
+												}
+											})()}
+										</span>
+									)}
 								</div>
 							</div>
 							{channel.type === 'EMAIL' && (
@@ -361,12 +391,23 @@ export default function ChannelsSettingsPage() {
 								</a>
 							)}
 							{channel.type === 'TELEGRAM' && (
-								<button
-									onClick={() => refreshTelegramWebhook(channel.id)}
-									className='text-xs text-cyan-600 hover:text-cyan-700 px-3 py-1.5 border border-cyan-200 rounded-lg transition-colors'
-									title='Перерегистрировать webhook у Telegram (если бот перестал получать сообщения)'>
-									Обновить webhook
-								</button>
+								<>
+									<button
+										onClick={() => refreshTelegramWebhook(channel.id)}
+										className='text-xs text-cyan-600 hover:text-cyan-700 px-3 py-1.5 border border-cyan-200 rounded-lg transition-colors'
+										title='Перерегистрировать webhook у Telegram (если бот перестал получать сообщения)'>
+										Обновить webhook
+									</button>
+									<button
+										onClick={() => openEditModal(channel)}
+										className='text-xs text-gray-400 hover:text-gray-600 p-1.5 border border-gray-200 rounded-lg transition-colors'
+										title='Настройки'>
+										<svg className='w-4 h-4' fill='none' viewBox='0 0 24 24' strokeWidth={1.5} stroke='currentColor'>
+											<path strokeLinecap='round' strokeLinejoin='round' d='M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z' />
+											<path strokeLinecap='round' strokeLinejoin='round' d='M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z' />
+										</svg>
+									</button>
+								</>
 							)}
 							<button
 								onClick={() => testConnection(channel.id)}
@@ -421,7 +462,20 @@ export default function ChannelsSettingsPage() {
 			)}
 
 			{editingChannel && (
-				<EditEmailModal
+				<EditChannelModal
+					type={editingChannel.type}
+					title={
+						editingChannel.type === 'TELEGRAM'
+							? 'Настройки Telegram-бота'
+							: editingChannel.type === 'EMAIL'
+								? 'Настройки почты'
+								: 'Настройки канала'
+					}
+					helpText={
+						editingChannel.type === 'TELEGRAM'
+							? 'Если бот не отвечает или перестал получать сообщения — нажмите «Обновить webhook». Чтобы заменить бота, введите новый Bot Token; webhook перерегистрируется автоматически.'
+							: undefined
+					}
 					name={editChannelName}
 					setName={setEditChannelName}
 					config={editChannelConfig}

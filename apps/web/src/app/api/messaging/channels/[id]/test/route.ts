@@ -26,13 +26,75 @@ export async function POST(
     return NextResponse.json({ error: "Channel not found" }, { status: 404 });
   }
 
-  // For now, return success if channel exists and is active.
-  // Real implementation would test actual connection (IMAP, Telegram bot, etc.)
   if (!channel.isActive) {
     return NextResponse.json(
       { error: "Channel is disabled" },
       { status: 400 },
     );
+  }
+
+  // Real liveness check per channel type. Telegram is the only one with a
+  // cheap server-side probe right now (`getMe` returns the bot identity).
+  // Other types fall back to "channel exists + active".
+  if (channel.type === "TELEGRAM") {
+    const botToken = channel.config.find((c) => c.key === "bot_token")?.value;
+    if (!botToken) {
+      return NextResponse.json(
+        { error: "Bot token is missing — open settings and paste it again" },
+        { status: 400 },
+      );
+    }
+    try {
+      const res = await fetch(
+        `https://api.telegram.org/bot${botToken}/getMe`,
+      );
+      const data = (await res.json()) as {
+        ok?: boolean;
+        description?: string;
+        result?: { username?: string; first_name?: string; id?: number };
+      };
+      if (!data.ok || !data.result) {
+        return NextResponse.json(
+          {
+            error:
+              data.description ||
+              "Telegram отклонил bot token — проверьте, что токен от @BotFather введён правильно",
+          },
+          { status: 400 },
+        );
+      }
+      const handle = data.result.username
+        ? `@${data.result.username}`
+        : data.result.first_name || "bot";
+      // Persist the username so the channel list can label the row with it
+      // without re-querying Telegram on every load.
+      if (data.result.username) {
+        await prisma.channelConfig.upsert({
+          where: { channelId_key: { channelId: id, key: "bot_username" } },
+          create: {
+            channelId: id,
+            key: "bot_username",
+            value: data.result.username,
+          },
+          update: { value: data.result.username },
+        });
+      }
+      return NextResponse.json({
+        ok: true,
+        status: "CONNECTED",
+        message: `Бот ${handle} отвечает`,
+        botUsername: data.result.username ?? null,
+      });
+    } catch (err) {
+      return NextResponse.json(
+        {
+          error: `Telegram unreachable: ${
+            err instanceof Error ? err.message : "unknown"
+          }`,
+        },
+        { status: 502 },
+      );
+    }
   }
 
   return NextResponse.json({ ok: true, status: "CONNECTED" });

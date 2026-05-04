@@ -216,8 +216,8 @@ export async function sendViaAllegroDirect(args: {
 	}
 
 	// Allegro caps per-user requests-per-second; concurrent polling cron +
-	// agent send can hit it briefly. Retry up to 2x on 429 with exponential
-	// backoff before surfacing a user-friendly Russian error.
+	// agent send can hit it briefly. Retry on 429 with growing backoff before
+	// surfacing a user-friendly Russian error (4 attempts ≈ 14s total wait).
 	const url = `${apiBase}/messaging/threads/${encodeURIComponent(args.threadId)}/messages`;
 	const headers = {
 		Authorization: `Bearer ${token}`,
@@ -225,7 +225,7 @@ export async function sendViaAllegroDirect(args: {
 		'Content-Type': ALLEGRO_API_VND,
 	};
 	const body = JSON.stringify(messageBody);
-	const delays = [1500, 3000];
+	const delays = [2000, 4000, 8000];
 	for (let attempt = 0; attempt <= delays.length; attempt++) {
 		try {
 			const resp = await fetch(url, { method: 'POST', headers, body });
@@ -243,7 +243,6 @@ export async function sendViaAllegroDirect(args: {
 				await new Promise((r) => setTimeout(r, delays[attempt]));
 				continue;
 			}
-			const txt = await resp.text();
 			if (resp.status === 429) {
 				return {
 					ok: false,
@@ -251,10 +250,7 @@ export async function sendViaAllegroDirect(args: {
 						'Allegro временно ограничивает отправку (слишком много запросов). Подождите ~30 секунд и попробуйте снова.',
 				};
 			}
-			return {
-				ok: false,
-				error: `Allegro ${resp.status}: ${txt.slice(0, 300)}`,
-			};
+			return { ok: false, error: await formatAllegroError(resp) };
 		} catch (err) {
 			return {
 				ok: false,
@@ -263,4 +259,30 @@ export async function sendViaAllegroDirect(args: {
 		}
 	}
 	return { ok: false, error: 'Allegro send failed after retries' };
+}
+
+/**
+ * Pulls the friendliest message we can out of an Allegro error response.
+ * Allegro returns `{ errors: [{ userMessage, message, code }, ...] }` for
+ * structured errors — preferring `userMessage` keeps the operator from
+ * staring at raw JSON. Falls back to the status + first 200 chars of the
+ * body when the response isn't valid JSON.
+ */
+async function formatAllegroError(resp: Response): Promise<string> {
+	const txt = await resp.text();
+	try {
+		const parsed = JSON.parse(txt) as {
+			errors?: Array<{
+				userMessage?: string;
+				message?: string;
+				code?: string;
+			}>;
+		};
+		const first = parsed.errors?.[0];
+		const friendly = first?.userMessage || first?.message;
+		if (friendly) return `Allegro ${resp.status}: ${friendly}`;
+	} catch {
+		/* fall through to raw */
+	}
+	return `Allegro ${resp.status}: ${txt.slice(0, 200)}`;
 }

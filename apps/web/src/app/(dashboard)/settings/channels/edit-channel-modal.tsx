@@ -3,6 +3,9 @@
 import { CONFIG_FIELDS } from './channels.config';
 
 interface Props {
+	type: string;
+	title?: string;
+	helpText?: string;
 	name: string;
 	setName: (v: string) => void;
 	config: Record<string, string>;
@@ -12,7 +15,10 @@ interface Props {
 	onSave: () => void;
 }
 
-export function EditEmailModal({
+export function EditChannelModal({
+	type,
+	title,
+	helpText,
 	name,
 	setName,
 	config,
@@ -21,7 +27,7 @@ export function EditEmailModal({
 	onClose,
 	onSave,
 }: Props) {
-	const fields = CONFIG_FIELDS['EMAIL'] || [];
+	const fields = CONFIG_FIELDS[type] || [];
 
 	return (
 		<div className='fixed inset-0 z-50 flex items-center justify-center p-4'>
@@ -29,8 +35,14 @@ export function EditEmailModal({
 			<div className='relative bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[80vh] overflow-y-auto'>
 				<div className='p-6'>
 					<h2 className='text-lg font-bold text-gray-900 mb-4'>
-						Настройки почты
+						{title ?? 'Настройки канала'}
 					</h2>
+
+					{helpText && (
+						<p className='text-xs text-gray-500 mb-4 leading-relaxed'>
+							{helpText}
+						</p>
+					)}
 
 					<div className='mb-4'>
 						<label className='block text-sm font-medium text-gray-700 mb-1'>
