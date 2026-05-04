@@ -8,14 +8,12 @@ interface Props {
 	className?: string;
 }
 
-const DICEBEAR_URL = 'https://api.dicebear.com/9.x/dylan/svg';
-
-function dicebearSrc(seed: string): string {
-	return `${DICEBEAR_URL}?seed=${encodeURIComponent(seed)}`;
+function multiavatarSrc(seed: string): string {
+	return `https://api.multiavatar.com/${encodeURIComponent(seed)}.svg`;
 }
 
 export function ContactAvatar({ name, seed, avatarUrl, size = 40, className = '' }: Props) {
-	const src = avatarUrl || dicebearSrc(seed || name);
+	const src = avatarUrl || multiavatarSrc(seed || name);
 	return (
 		<img
 			src={src}

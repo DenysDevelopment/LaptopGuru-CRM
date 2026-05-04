@@ -29,6 +29,37 @@ interface Video {
 	youtubeId: string | null;
 }
 
+/**
+ * Video thumbnail with a graceful fallback. If the CloudFront signature is
+ * absent (missing env vars in dev) or the URL 404s, browsers render the
+ * `<img alt>` text across the full 16:10 box — long titles wrap into many
+ * lines and look like a stack of black bars. We swap to a play-icon
+ * placeholder instead so the grid stays readable either way.
+ */
+function VideoThumb({ src, title }: { src: string | null; title: string }) {
+	const [failed, setFailed] = useState(!src);
+	if (failed || !src) {
+		return (
+			<div
+				className='w-full aspect-[16/10] bg-gray-100 flex items-center justify-center text-gray-300'
+				aria-label={title}>
+				<svg className='w-8 h-8' fill='currentColor' viewBox='0 0 24 24'>
+					<path d='M8 5v14l11-7z' />
+				</svg>
+			</div>
+		);
+	}
+	return (
+		// eslint-disable-next-line @next/next/no-img-element
+		<img
+			src={src}
+			alt=''
+			onError={() => setFailed(true)}
+			className='w-full aspect-[16/10] object-cover bg-gray-100'
+		/>
+	);
+}
+
 interface SendLandingModalProps {
 	conversationId: string;
 	onClose: () => void;
@@ -196,11 +227,9 @@ export function SendLandingModal({
 																? 'border-brand ring-2 ring-brand/20'
 																: 'border-gray-100 hover:border-gray-200'
 														}`}>
-														{/* eslint-disable-next-line @next/next/no-img-element */}
-														<img
+														<VideoThumb
 															src={video.thumbnail}
-															alt={video.title}
-															className='w-full aspect-[16/10] object-cover bg-gray-100'
+															title={video.title}
 														/>
 														<div className='p-1.5'>
 															<p className='text-[11px] font-medium text-gray-900 line-clamp-2 leading-tight'>
