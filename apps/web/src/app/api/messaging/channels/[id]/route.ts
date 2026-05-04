@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
+import { publicOriginFromRequest } from "@/lib/public-origin";
 import { PERMISSIONS } from "@laptopguru-crm/shared";
 
 export async function PATCH(
@@ -66,6 +67,64 @@ export async function PATCH(
       },
     });
   });
+
+  // Telegram webhook re-registration. Two cases warrant a fresh setWebhook
+  // call: (1) bot_token was just changed, or (2) the stored webhook_url
+  // points at localhost / 0.0.0.0 (a stale value from a channel that was
+  // first created via local dev). Either way, ask Telegram to point at the
+  // current public origin and persist the new url + secret.
+  if (channel.type === "TELEGRAM") {
+    const botToken = channel.config.find((c) => c.key === "bot_token")?.value;
+    const storedWebhook = channel.config.find((c) => c.key === "webhook_url")?.value;
+    const tokenJustChanged = Array.isArray(body.config)
+      ? body.config.some(
+          (e: { key?: string; value?: string }) =>
+            e.key === "bot_token" && e.value && e.value !== "--------",
+        )
+      : false;
+    const stale =
+      !storedWebhook ||
+      storedWebhook.includes("localhost") ||
+      storedWebhook.includes("0.0.0.0") ||
+      storedWebhook.includes("127.0.0.1");
+    if (botToken && (tokenJustChanged || stale)) {
+      const appUrl = publicOriginFromRequest(request);
+      const webhookUrl = `${appUrl}/api/messaging/webhooks/telegram`;
+      const webhookSecret = crypto.randomUUID().replace(/-/g, "");
+      try {
+        const res = await fetch(
+          `https://api.telegram.org/bot${botToken}/setWebhook`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: webhookUrl, secret_token: webhookSecret }),
+          },
+        );
+        const result = await res.json();
+        if (!result.ok) {
+          console.error("[Telegram] setWebhook failed:", result.description);
+        } else {
+          await prisma.channelConfig.upsert({
+            where: { channelId_key: { channelId: id, key: "webhook_url" } },
+            create: { channelId: id, key: "webhook_url", value: webhookUrl },
+            update: { value: webhookUrl },
+          });
+          await prisma.channelConfig.upsert({
+            where: { channelId_key: { channelId: id, key: "webhook_secret" } },
+            create: {
+              channelId: id,
+              key: "webhook_secret",
+              value: webhookSecret,
+              isSecret: true,
+            },
+            update: { value: webhookSecret, isSecret: true },
+          });
+        }
+      } catch (err) {
+        console.error("[Telegram] Failed to set webhook:", err);
+      }
+    }
+  }
 
   return NextResponse.json({
     ...channel,

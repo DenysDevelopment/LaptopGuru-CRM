@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorize } from "@/lib/authorize";
 import { prisma } from "@/lib/db";
+import { publicOriginFromRequest } from "@/lib/public-origin";
 import { PERMISSIONS } from "@laptopguru-crm/shared";
 
 export async function GET() {
@@ -134,10 +135,7 @@ export async function POST(request: NextRequest) {
   if (type === "TELEGRAM") {
     const botToken = config?.find((c: { key: string }) => c.key === "bot_token")?.value;
     if (botToken) {
-        const appUrl =
-          process.env.APP_URL && !process.env.APP_URL.includes('localhost')
-            ? process.env.APP_URL
-            : request.nextUrl.origin;
+      const appUrl = publicOriginFromRequest(request);
       const webhookUrl = `${appUrl}/api/messaging/webhooks/telegram`;
       const webhookSecret = crypto.randomUUID().replace(/-/g, "");
       try {
