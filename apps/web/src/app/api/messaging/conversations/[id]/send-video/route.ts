@@ -72,6 +72,34 @@ export async function POST(
     return NextResponse.json({ error: "Видео не найдено" }, { status: 400 });
   }
 
+  // Idempotency guard: refuse a second landing-send to the same conversation
+  // within DEBOUNCE_SEC. Without this, a frustrated agent who didn't see the
+  // message land instantly clicks "Send" again, the API duplicates the
+  // landing + chat messages, and Allegro starts rate-limiting the channel.
+  const DEBOUNCE_SEC = 30;
+  const recentSend = await prisma.message.findFirst({
+    where: {
+      conversationId: id,
+      direction: "OUTBOUND",
+      createdAt: { gte: new Date(Date.now() - DEBOUNCE_SEC * 1000) },
+      // metadata.eventType = "LANDING_SENT" → the message marker we set below.
+      AND: [{ metadata: { path: ["eventType"], equals: "LANDING_SENT" } }],
+    },
+    select: { id: true, createdAt: true },
+    orderBy: { createdAt: "desc" },
+  });
+  if (recentSend) {
+    const ageSec = Math.round(
+      (Date.now() - recentSend.createdAt.getTime()) / 1000,
+    );
+    return NextResponse.json(
+      {
+        error: `Лендинг уже отправлен ${ageSec} с назад. Подождите ${DEBOUNCE_SEC - ageSec} с перед повтором.`,
+      },
+      { status: 429 },
+    );
+  }
+
   const appUrl = process.env.APP_URL || "http://localhost:3000";
 
   try {
