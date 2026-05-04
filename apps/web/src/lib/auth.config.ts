@@ -9,6 +9,7 @@ const PUBLIC_PREFIXES = [
   "/api/auth",
   "/api/domain-check",
   "/api/public/",
+  "/api/messaging/webhooks/",
   "/l/",
   "/r/",
   "/m/",
