@@ -158,7 +158,9 @@ export class AllegroProviderService implements ChannelProvider {
 		threads: Array<{
 			id: string;
 			lastMessageDateTime: string;
-			interlocutor: { id: string; login: string };
+			// Allegro returns at least one of id/login; both are optional
+			// in the public schema so callers must defensive-check.
+			interlocutor: { id?: string; login?: string };
 			read: boolean;
 		}>;
 		count: number;
@@ -166,7 +168,8 @@ export class AllegroProviderService implements ChannelProvider {
 		const headers = await this.authedHeaders(channelId);
 		const base = await this.apiBase(channelId);
 		const url = new URL(`${base}/messaging/threads`);
-		url.searchParams.set('limit', String(opts.limit ?? 50));
+		// Allegro hard-caps `limit` at 20 for this endpoint (422 above 20).
+		url.searchParams.set('limit', String(Math.min(opts.limit ?? 20, 20)));
 		url.searchParams.set('offset', String(opts.offset ?? 0));
 		const resp = await fetch(url.toString(), { headers });
 		if (!resp.ok) {
@@ -194,13 +197,20 @@ export class AllegroProviderService implements ChannelProvider {
 			id: string;
 			text: string;
 			createdAt: string;
-			author: { id: string; login: string; isInterlocutor: boolean };
+			author: { id?: string; login?: string; isInterlocutor?: boolean };
+			attachments?: Array<{
+				id: string;
+				fileName?: string;
+				mimeType?: string;
+				size?: number;
+				status?: string;
+			}>;
 		}>;
 	}> {
 		const headers = await this.authedHeaders(channelId);
 		const base = await this.apiBase(channelId);
 		const url = new URL(`${base}/messaging/threads/${threadId}/messages`);
-		url.searchParams.set('limit', String(opts.limit ?? 20));
+		url.searchParams.set('limit', String(Math.min(opts.limit ?? 20, 20)));
 		url.searchParams.set('offset', String(opts.offset ?? 0));
 		const resp = await fetch(url.toString(), { headers });
 		if (!resp.ok) {
@@ -214,7 +224,46 @@ export class AllegroProviderService implements ChannelProvider {
 				text: string;
 				createdAt: string;
 				author: { id: string; login: string; isInterlocutor: boolean };
+				attachments?: Array<{
+					id: string;
+					fileName?: string;
+					mimeType?: string;
+					size?: number;
+					status?: string;
+				}>;
 			}>;
 		};
+	}
+
+	/**
+	 * Downloads an Allegro message attachment by id and returns the binary
+	 * along with the filename inferred from headers (or null if download
+	 * fails). Allegro responds with the file directly OR a 302 to a CDN URL —
+	 * `fetch` follows redirects automatically.
+	 */
+	async downloadAttachment(
+		channelId: string,
+		attachmentId: string,
+	): Promise<{ buffer: Buffer; mimeType: string; fileName?: string } | null> {
+		const headers = await this.authedHeaders(channelId);
+		const base = await this.apiBase(channelId);
+		const resp = await fetch(
+			`${base}/messaging/message-attachments/${encodeURIComponent(attachmentId)}`,
+			{ headers: { Authorization: (headers as Record<string, string>).Authorization } },
+		);
+		if (!resp.ok) {
+			this.logger.warn(
+				`Allegro attachment ${attachmentId} download ${resp.status}`,
+			);
+			return null;
+		}
+		const ab = await resp.arrayBuffer();
+		const buffer = Buffer.from(ab);
+		const mimeType = resp.headers.get('content-type') ?? 'application/octet-stream';
+		// content-disposition: attachment; filename="foo.jpg"
+		const cd = resp.headers.get('content-disposition') ?? '';
+		const m = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(cd);
+		const fileName = m ? decodeURIComponent(m[1]) : undefined;
+		return { buffer, mimeType, fileName };
 	}
 }

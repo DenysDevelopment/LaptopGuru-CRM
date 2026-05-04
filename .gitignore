@@ -47,6 +47,7 @@ apps/api/src/generated/prisma
 
 # claude worktrees
 .claude/worktrees/
+.claude/scheduled_tasks.lock
 
 # deploy keys — never commit
 deploy_key

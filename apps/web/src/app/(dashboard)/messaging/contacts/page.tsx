@@ -3,21 +3,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { ChannelIcon } from '@/components/messaging/channel-icon';
-
-interface Contact {
-	id: string;
-	name: string | null;
-	email: string | null;
-	phone: string | null;
-	avatarUrl: string | null;
-	company: string | null;
-	channels: { type: string; externalId: string }[];
-	conversationCount: number;
-	createdAt: string;
-}
+import { listContacts, type ContactListItem } from '@/services/messaging/contacts.service';
 
 export default function ContactsPage() {
-	const [contacts, setContacts] = useState<Contact[]>([]);
+	const [contacts, setContacts] = useState<ContactListItem[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [search, setSearch] = useState('');
@@ -28,20 +17,11 @@ export default function ContactsPage() {
 		if (!append) setLoading(true);
 		setError(null);
 		try {
-			const params = new URLSearchParams({
-				page: String(pageNum),
-				limit: '25',
+			const list = await listContacts({
+				page: pageNum,
+				limit: 25,
+				...(search ? { search } : {}),
 			});
-			if (search) params.set('search', search);
-
-			const res = await fetch(`/api/messaging/contacts?${params}`);
-			if (!res.ok) {
-				setError(res.status === 403 ? 'Нет прав для просмотра контактов' : 'Ошибка загрузки контактов');
-				return;
-			}
-			const data = await res.json();
-			const items = data.items || data.data || data;
-			const list: Contact[] = Array.isArray(items) ? items : [];
 
 			if (append) {
 				setContacts((prev) => [...prev, ...list]);

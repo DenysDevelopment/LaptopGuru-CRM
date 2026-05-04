@@ -1,18 +1,16 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { normalizeListResponse } from '@/lib/utils/normalize-response';
 import { QuickReplyForm } from '@/components/dashboard/settings/quick-reply-form';
 import { Button } from '@/components/ui/button';
 import type { QuickReplyInput } from '@/lib/schemas/quick-reply';
-
-interface QuickReply {
-	id: string;
-	shortcut: string;
-	title: string;
-	body: string;
-	createdAt: string;
-}
+import {
+	listQuickReplies,
+	createQuickReply,
+	updateQuickReply,
+	deleteQuickReply,
+	type QuickReply,
+} from '@/services/messaging/quick-replies.service';
 
 export default function QuickRepliesSettingsPage() {
 	const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
@@ -22,11 +20,7 @@ export default function QuickRepliesSettingsPage() {
 
 	const fetchItems = useCallback(async () => {
 		try {
-			const res = await fetch('/api/messaging/quick-replies');
-			if (res.ok) {
-				const data = await res.json();
-				setQuickReplies(normalizeListResponse(data));
-			}
+			setQuickReplies(await listQuickReplies());
 		} catch { /* ignore */ }
 		setLoading(false);
 	}, []);
@@ -47,25 +41,21 @@ export default function QuickRepliesSettingsPage() {
 	};
 
 	const handleSave = async (data: QuickReplyInput) => {
-		const url = editingItem
-			? `/api/messaging/quick-replies/${editingItem.id}`
-			: '/api/messaging/quick-replies';
-		const method = editingItem ? 'PATCH' : 'POST';
-		const res = await fetch(url, {
-			method,
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(data),
-		});
-		if (res.ok) {
+		try {
+			if (editingItem) {
+				await updateQuickReply(editingItem.id, data);
+			} else {
+				await createQuickReply(data);
+			}
 			setShowModal(false);
 			fetchItems();
-		}
+		} catch { /* ignore */ }
 	};
 
 	const handleDelete = async (id: string) => {
 		if (!confirm('Удалить этот быстрый ответ?')) return;
 		try {
-			await fetch(`/api/messaging/quick-replies/${id}`, { method: 'DELETE' });
+			await deleteQuickReply(id);
 			setQuickReplies((prev) => prev.filter((qr) => qr.id !== id));
 		} catch { /* ignore */ }
 	};

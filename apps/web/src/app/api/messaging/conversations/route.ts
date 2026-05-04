@@ -14,6 +14,10 @@ export async function GET(request: NextRequest) {
   const status = url.searchParams.get("status");
   const search = url.searchParams.get("search");
   const assigneeId = url.searchParams.get("assigneeId");
+  const channelId = url.searchParams.get("channelId");
+  const channelType = url.searchParams.get("channelType");
+  const channelTypesParam = url.searchParams.get("channelTypes");
+  const priorityParam = url.searchParams.get("priority");
 
   const where: Prisma.ConversationWhereInput = {
     companyId: session.user.companyId ?? "",
@@ -21,6 +25,44 @@ export async function GET(request: NextRequest) {
 
   if (status) {
     where.status = status as Prisma.EnumConversationStatusFilter;
+  }
+
+  if (channelId) {
+    where.channelId = channelId;
+  }
+
+  if (channelType) {
+    // Allow filtering by channel TYPE (EMAIL / ALLEGRO / …) when no specific
+    // channel id is given — used by the sidebar's "all channels of this type"
+    // shortcuts.
+    where.channel = {
+      type: channelType as Prisma.EnumChannelTypeFilter,
+    };
+  }
+
+  if (channelTypesParam) {
+    // Multi-type filter for sidebar categories — e.g. "Мессенджеры" maps to
+    // TELEGRAM,WHATSAPP,SMS,FACEBOOK_MESSENGER,INSTAGRAM_DIRECT.
+    const types = channelTypesParam
+      .split(",")
+      .map((t) => t.trim().toUpperCase())
+      .filter(Boolean);
+    if (types.length > 0) {
+      where.channel = {
+        ...(where.channel as object),
+        type: { in: types as Prisma.EnumChannelTypeFilter[] as never },
+      } as Prisma.ConversationWhereInput["channel"];
+    }
+  }
+
+  if (priorityParam) {
+    const priorities = priorityParam
+      .split(",")
+      .map((p) => p.trim().toUpperCase())
+      .filter(Boolean);
+    if (priorities.length > 0) {
+      where.priority = { in: priorities as Prisma.EnumConversationPriorityFilter["in"] };
+    }
   }
 
   if (assigneeId) {

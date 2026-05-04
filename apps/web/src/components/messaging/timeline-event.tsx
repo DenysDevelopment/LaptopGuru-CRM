@@ -1,19 +1,39 @@
 'use client';
 
-import { ChevronDown, ChevronUp, Eye, PlayCircle } from 'lucide-react';
+import {
+	Eye,
+	PlayCircle,
+	ShoppingBag,
+	CheckCircle2,
+	Clock,
+} from 'lucide-react';
 import Image from 'next/image';
-import { useState } from 'react';
 import { STATUS_DICTIONARY } from '@/lib/messaging/status';
 import type { ConversationStatus } from '@/generated/prisma/client';
 
+export interface LandingStats {
+	views: number;
+	clicks: number;
+	firstVisitAt: string | null;
+	videoPlays: number;
+	bestCompletionPercent: number | null;
+}
+
 export interface TimelineEvent {
 	id: string;
-	type: 'STATUS_CHANGED' | 'LANDING_SENT' | 'ASSIGNED';
+	type:
+		| 'STATUS_CHANGED'
+		| 'LANDING_SENT'
+		| 'ASSIGNED'
+		| 'CONVERSATION_CREATED'
+		| 'READ_BY_AGENT';
 	actor: { id: string; name: string | null; email: string } | null;
 	payload: Record<string, unknown>;
 	createdAt: string;
 	/** Optional related message body to show in expanded LANDING_SENT card. */
 	relatedMessageBody?: string | null;
+	/** Stats for LANDING_SENT events; null on other event types. */
+	landingStats?: LandingStats | null;
 }
 
 function actorName(
@@ -62,13 +82,56 @@ function StatusChangedRow({ event }: { event: TimelineEvent }) {
 	);
 }
 
+function relativeTime(iso: string): string {
+	const ms = Date.now() - new Date(iso).getTime();
+	const min = Math.floor(ms / 60000);
+	if (min < 1) return 'только что';
+	if (min < 60) return `${min} мин назад`;
+	const hr = Math.floor(min / 60);
+	if (hr < 24) return `${hr} ч назад`;
+	const day = Math.floor(hr / 24);
+	if (day < 30) return `${day} д назад`;
+	const month = Math.floor(day / 30);
+	return `${month} мес назад`;
+}
+
+function StatChip({
+	icon,
+	label,
+	value,
+	tone,
+	title,
+}: {
+	icon: React.ReactNode;
+	label: string;
+	value: string;
+	tone: 'muted' | 'active';
+	title?: string;
+}) {
+	const cls =
+		tone === 'active'
+			? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+			: 'bg-gray-50 text-gray-500 ring-gray-200';
+	return (
+		<span
+			title={title}
+			className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium ring-1 ring-inset ${cls}`}>
+			<span className='inline-flex items-center'>{icon}</span>
+			<span className='whitespace-nowrap'>
+				<span className='font-semibold'>{value}</span>{' '}
+				<span className='text-[10px] opacity-80'>{label}</span>
+			</span>
+		</span>
+	);
+}
+
 function LandingSentCard({ event }: { event: TimelineEvent }) {
-	const [expanded, setExpanded] = useState(false);
 	const slug = event.payload.slug as string;
 	const videoTitle = event.payload.videoTitle as string;
 	const videoThumbnail = event.payload.videoThumbnail as string | undefined;
 	const shortUrl = event.payload.shortUrl as string;
 	const previewToken = event.payload.previewToken as string | undefined;
+	const stats = event.landingStats ?? null;
 
 	const previewHref = previewToken
 		? `${shortUrl}?preview=${previewToken}`
@@ -100,16 +163,19 @@ function LandingSentCard({ event }: { event: TimelineEvent }) {
 							<PlayCircle className='w-8 h-8' />
 						</div>
 					)}
-					<div className='flex-1 min-w-0 flex flex-col justify-between'>
-						<div>
-							<p className='text-sm font-medium text-gray-900 line-clamp-2' title={videoTitle}>
-								{videoTitle}
-							</p>
-							<p className='text-xs text-gray-400 mt-1 truncate' title={shortUrl}>
-								{shortUrl}
-							</p>
-						</div>
-						<div className='flex items-center gap-3 mt-2 text-xs'>
+					<div className='flex-1 min-w-0 flex flex-col gap-1.5'>
+						<p className='text-sm font-medium text-gray-900 line-clamp-2' title={videoTitle}>
+							{videoTitle}
+						</p>
+						<p className='text-xs text-gray-400 truncate' title={shortUrl}>
+							{shortUrl}
+						</p>
+						{event.relatedMessageBody && (
+							<div className='text-xs text-gray-700 bg-gray-50 border border-gray-100 rounded-md px-2.5 py-1.5 whitespace-pre-wrap break-words'>
+								{event.relatedMessageBody}
+							</div>
+						)}
+						<div className='flex items-center gap-3 text-xs mt-auto pt-1'>
 							<a
 								href={previewHref}
 								target='_blank'
@@ -118,38 +184,92 @@ function LandingSentCard({ event }: { event: TimelineEvent }) {
 								<Eye className='w-3.5 h-3.5' />
 								Превью
 							</a>
-							{event.relatedMessageBody && (
-								<button
-									type='button'
-									onClick={() => setExpanded((e) => !e)}
-									className='inline-flex items-center gap-1 text-gray-500 hover:text-gray-900'>
-									{expanded ? (
-										<>
-											<ChevronUp className='w-3.5 h-3.5' />
-											Скрыть текст
-										</>
-									) : (
-										<>
-											<ChevronDown className='w-3.5 h-3.5' />
-											Показать текст
-										</>
-									)}
-								</button>
-							)}
 						</div>
 					</div>
 				</div>
-				{expanded && event.relatedMessageBody && (
-					<div className='px-3 pb-3 -mt-1'>
-						<div className='text-[11px] text-gray-400 mb-1'>
-							Текст, отправленный клиенту:
-						</div>
-						<div className='text-xs text-gray-700 bg-gray-50 border border-gray-100 rounded-md px-3 py-2 whitespace-pre-wrap'>
-							{event.relatedMessageBody}
+				{stats && (
+					<div className='px-3 pb-3 pt-2 border-t border-gray-100'>
+						<div className='flex flex-wrap gap-1.5'>
+							<StatChip
+								icon={<Eye className='w-3 h-3' />}
+								label='просмотры'
+								value={String(stats.views)}
+								tone={stats.views > 0 ? 'active' : 'muted'}
+								title='Уникальные открытия страницы лендинга'
+							/>
+							<StatChip
+								icon={<PlayCircle className='w-3 h-3' />}
+								label={
+									stats.bestCompletionPercent != null
+										? `запуски · до ${Math.round(stats.bestCompletionPercent)}%`
+										: 'запуски'
+								}
+								value={String(stats.videoPlays)}
+								tone={stats.videoPlays > 0 ? 'active' : 'muted'}
+								title='Сколько раз клиент запускал видео и максимальный процент досмотра'
+							/>
+							<StatChip
+								icon={<ShoppingBag className='w-3 h-3' />}
+								label='купить'
+								value={String(stats.clicks)}
+								tone={stats.clicks > 0 ? 'active' : 'muted'}
+								title='Клики по кнопке «Купить» на лендинге'
+							/>
+							{stats.firstVisitAt ? (
+								<StatChip
+									icon={<CheckCircle2 className='w-3 h-3' />}
+									label={relativeTime(stats.firstVisitAt)}
+									value='открыто'
+									tone='active'
+									title={`Первое открытие: ${new Date(stats.firstVisitAt).toLocaleString('ru-RU')}`}
+								/>
+							) : (
+								<StatChip
+									icon={<Clock className='w-3 h-3' />}
+									label='не открывалось'
+									value=''
+									tone='muted'
+									title='Клиент пока не открывал лендинг'
+								/>
+							)}
 						</div>
 					</div>
 				)}
 			</div>
+		</div>
+	);
+}
+
+function ReadByAgentRow({ event }: { event: TimelineEvent }) {
+	const count = (event.payload.messageCount as number | undefined) ?? 0;
+	const text = `${actorName(event.actor)} прочитал${
+		count > 1 ? ` ${count} сообщений` : ''
+	}`;
+	return (
+		<div className='flex items-center gap-3 px-4 py-2'>
+			<div className='flex-1 h-px bg-gray-100' />
+			<span className='text-[11px] text-gray-400 whitespace-nowrap'>
+				{text} · {formatTime(event.createdAt)}
+			</span>
+			<div className='flex-1 h-px bg-gray-100' />
+		</div>
+	);
+}
+
+function ConversationCreatedRow({ event }: { event: TimelineEvent }) {
+	const date = new Date(event.createdAt);
+	const dateLabel = date.toLocaleDateString('ru-RU', {
+		day: 'numeric',
+		month: 'long',
+		year: 'numeric',
+	});
+	return (
+		<div className='flex items-center gap-3 px-4 py-3'>
+			<div className='flex-1 h-px bg-gray-200' />
+			<span className='text-[11px] font-medium text-gray-500 whitespace-nowrap'>
+				Чат создан · {dateLabel}, {formatTime(event.createdAt)}
+			</span>
+			<div className='flex-1 h-px bg-gray-200' />
 		</div>
 	);
 }
@@ -182,6 +302,10 @@ export function ConversationTimelineEvent({
 			return <LandingSentCard event={event} />;
 		case 'ASSIGNED':
 			return <AssignedRow event={event} />;
+		case 'READ_BY_AGENT':
+			return <ReadByAgentRow event={event} />;
+		case 'CONVERSATION_CREATED':
+			return <ConversationCreatedRow event={event} />;
 		default:
 			return null;
 	}

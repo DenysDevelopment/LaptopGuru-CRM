@@ -7,6 +7,7 @@ export const CHANNEL_TYPES = [
   "TELEGRAM",
   "FACEBOOK_MESSENGER",
   "INSTAGRAM_DIRECT",
+  "ALLEGRO",
 ] as const;
 export type ChannelType = (typeof CHANNEL_TYPES)[number];
 

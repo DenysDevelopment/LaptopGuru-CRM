@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { emitMessagingEvent } from "@/lib/messaging-events";
+import { buildConversationSummary } from "@/lib/messaging/conversation-summary";
 import fs from "fs";
 import path from "path";
 
@@ -179,6 +180,15 @@ export async function POST(request: NextRequest) {
           companyId: channel.companyId,
         },
       });
+      await prisma.conversationEvent.create({
+        data: {
+          conversationId: conversation.id,
+          type: "CONVERSATION_CREATED",
+          actorUserId: null,
+          payload: { source: "telegram" },
+          companyId: channel.companyId,
+        },
+      });
     }
 
     // Determine content type
@@ -232,18 +242,41 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Emit real-time event via SSE
-    emitMessagingEvent({
-      type: isNewConversation ? "new_conversation" : "new_message",
-      conversationId: conversation.id,
-      data: {
-        messageId: message.id,
-        body: text,
-        senderName,
-        channelType: "TELEGRAM",
-        contactId: contact.id,
-      },
-    });
+    // Emit real-time event via SSE — clients append/prepend instead of
+    // refetching the full conversation list / message thread.
+    if (isNewConversation) {
+      const summary = await buildConversationSummary(conversation.id);
+      if (summary) {
+        emitMessagingEvent({
+          type: "new_conversation",
+          conversationId: conversation.id,
+          conversation: summary,
+        });
+      }
+    } else {
+      emitMessagingEvent({
+        type: "new_message",
+        conversationId: conversation.id,
+        message: {
+          id: message.id,
+          conversationId: conversation.id,
+          direction: "INBOUND",
+          contentType,
+          body: text ?? "",
+          createdAt: message.createdAt.toISOString(),
+          contact: {
+            id: contact.id,
+            name: contact.displayName,
+            avatarUrl: contact.avatarUrl,
+          },
+          status: "DELIVERED",
+        },
+        conversationPatch: {
+          lastMessageAt: new Date().toISOString(),
+          lastMessagePreview: (text ?? "").slice(0, 120),
+        },
+      });
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {

@@ -1,0 +1,13 @@
+# Auto-loaded by `docker compose` for local development.
+# Publishes db + redis on host ports so apps running via `npm run dev`
+# can reach them. Not used in CI/prod (those use explicit -f flags).
+services:
+  db:
+    ports: !override
+      - "5435:5432"
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shorterlink_dev}
+
+  redis:
+    ports:
+      - "6379:6379"

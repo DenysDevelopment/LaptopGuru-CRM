@@ -6,6 +6,12 @@ export interface ConversationDetail {
 	subject: string | null;
 	createdAt: string;
 	closedAt: string | null;
+	lastStatusChangedAt?: string | null;
+	lastStatusChangedBy?: {
+		id: string;
+		name: string | null;
+		email: string;
+	} | null;
 	contact: {
 		id: string;
 		name: string | null;
@@ -42,12 +48,24 @@ export interface Team {
 	members: { id: string; name: string | null; email: string }[];
 }
 
-export const STATUS_OPTIONS = [
-	{ value: 'NEW', label: 'Новый', color: 'bg-blue-100 text-blue-700' },
-	{ value: 'OPEN', label: 'Открыт', color: 'bg-green-100 text-green-700' },
-	{ value: 'WAITING', label: 'Ожидание', color: 'bg-amber-100 text-amber-700' },
-	{ value: 'CLOSED', label: 'Закрыт', color: 'bg-gray-100 text-gray-600' },
+import { STATUS_DICTIONARY } from '@/lib/messaging/status';
+import type { ConversationStatus } from '@/generated/prisma/client';
+
+// Sidebar dropdown — only the 4 primary workflow statuses. CLOSED and SPAM
+// were removed at the user's request: SPAM is reachable via a separate
+// action and CLOSED is an internal/legacy state, so neither belongs in the
+// everyday status switcher.
+const STATUS_ORDER: ConversationStatus[] = [
+	'NEW',
+	'OPEN',
+	'WAITING_REPLY',
+	'RESOLVED',
 ];
+
+export const STATUS_OPTIONS = STATUS_ORDER.map((value) => ({
+	value,
+	label: STATUS_DICTIONARY[value].label,
+}));
 
 export const PRIORITY_OPTIONS = [
 	{ value: 'LOW', label: 'Низкий' },

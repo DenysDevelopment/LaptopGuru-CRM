@@ -1,6 +1,7 @@
 'use client';
 
 import { ChannelIcon } from './channel-icon';
+import { decodeEntities } from '@/lib/decode-entities';
 
 interface Message {
 	id: string;
@@ -32,6 +33,14 @@ function formatTime(dateStr: string): string {
 
 function DeliveryStatusIcon({ status }: { status: string }) {
 	switch (status) {
+		case 'SENDING':
+		case 'PENDING':
+			return (
+				<div
+					className='w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin'
+					title='Отправляется...'
+				/>
+			);
 		case 'SENT':
 			return (
 				<svg className='w-3.5 h-3.5 text-gray-400' fill='none' viewBox='0 0 24 24' strokeWidth={2} stroke='currentColor'>
@@ -83,10 +92,10 @@ export function MessageBubble({ message }: { message: Message }) {
 	return (
 		<div className={`flex ${isOutbound ? 'justify-end' : 'justify-start'} mb-2 px-4`}>
 			<div
-				className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${
+				className={`max-w-[75%] rounded-2xl px-4 py-2.5 shadow-sm ring-1 ${
 					isOutbound
-						? 'bg-brand text-white rounded-br-md'
-						: 'bg-gray-100 text-gray-900 rounded-bl-md'
+						? 'bg-slate-700 text-white rounded-br-md ring-slate-700/10'
+						: 'bg-gray-50 text-gray-900 rounded-bl-md ring-gray-200/70'
 				}`}>
 				{/* Sender name for outbound */}
 				{isOutbound && message.sender?.name && (
@@ -151,7 +160,9 @@ export function MessageBubble({ message }: { message: Message }) {
 
 				{/* Body */}
 				{message.body && (
-					<p className='text-sm whitespace-pre-wrap break-words'>{message.body}</p>
+					<p className='text-sm whitespace-pre-wrap break-words leading-relaxed'>
+						{decodeEntities(message.body)}
+					</p>
 				)}
 
 				{/* Footer: time + status */}

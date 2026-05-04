@@ -4,26 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ChannelIcon, getChannelLabel } from '@/components/messaging/channel-icon';
-
-interface ContactDetail {
-	id: string;
-	name: string | null;
-	email: string | null;
-	phone: string | null;
-	avatarUrl: string | null;
-	company: string | null;
-	channels: { type: string; externalId: string }[];
-	customFields: Record<string, string>;
-	conversations: {
-		id: string;
-		status: string;
-		channelType: string;
-		lastMessageAt: string | null;
-		lastMessagePreview: string | null;
-		createdAt: string;
-	}[];
-	createdAt: string;
-}
+import { getContact, type ContactDetail } from '@/services/messaging/contacts.service';
 
 const STATUS_LABEL: Record<string, string> = {
 	NEW: 'Новый',
@@ -39,11 +20,8 @@ export default function ContactDetailPage() {
 	const [loading, setLoading] = useState(true);
 
 	useEffect(() => {
-		fetch(`/api/messaging/contacts/${contactId}`)
-			.then((r) => (r.ok ? r.json() : null))
-			.then((data) => {
-				if (data) setContact(data);
-			})
+		getContact(contactId)
+			.then((data) => setContact(data))
 			.catch(() => {})
 			.finally(() => setLoading(false));
 	}, [contactId]);

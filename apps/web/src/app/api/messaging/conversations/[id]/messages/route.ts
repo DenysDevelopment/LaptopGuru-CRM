@@ -5,6 +5,7 @@ import { PERMISSIONS } from "@laptopguru-crm/shared";
 import { emitMessagingEvent } from "@/lib/messaging-events";
 import { transitionConversationStatus } from "@/lib/messaging/transition-status";
 import { formatSmtpFrom } from "@/lib/smtp";
+import { sendViaAllegroDirect } from "@/lib/messaging/allegro-send";
 
 function escapeHtml(str: string): string {
   return str
@@ -100,11 +101,38 @@ export async function POST(
 
   const conversation = await prisma.conversation.findUnique({
     where: { id },
-    select: { id: true, channelId: true, contactId: true, companyId: true },
+    select: {
+      id: true,
+      channelId: true,
+      contactId: true,
+      companyId: true,
+      externalId: true,
+    },
   });
 
   if (!conversation || conversation.companyId !== (session.user!.companyId ?? "")) {
     return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
+  }
+
+  // Validate attachments shape — { fileName, mimeType, fileSize, storageKey, storageUrl }[]
+  type AttachmentInput = {
+    fileName: string;
+    mimeType: string;
+    fileSize: number;
+    storageKey: string;
+    storageUrl: string;
+  };
+  const attachmentsInput: AttachmentInput[] = Array.isArray(body.attachments)
+    ? (body.attachments as AttachmentInput[]).filter(
+        (a) => a && a.fileName && a.storageKey && a.storageUrl,
+      )
+    : [];
+
+  if (!body.body?.trim() && attachmentsInput.length === 0) {
+    return NextResponse.json(
+      { error: "Message must have body or attachments" },
+      { status: 400 },
+    );
   }
 
   const message = await prisma.message.create({
@@ -119,6 +147,20 @@ export async function POST(
       companyId: session.user!.companyId ?? "",
     },
   });
+
+  // Bind any uploaded attachments to this Message.
+  if (attachmentsInput.length > 0) {
+    await prisma.messageAttachment.createMany({
+      data: attachmentsInput.map((a) => ({
+        messageId: message.id,
+        fileName: a.fileName,
+        mimeType: a.mimeType,
+        fileSize: a.fileSize,
+        storageKey: a.storageKey,
+        storageUrl: a.storageUrl,
+      })),
+    });
+  }
 
   // Bump last-message timestamp; status moves through the audited
   // helper so the transition is logged in ConversationEvent.
@@ -139,6 +181,11 @@ export async function POST(
     where: { id: conversation.channelId },
     include: { config: true },
   });
+
+  // Hoisted so the final response can include them — the client uses these
+  // to flip an optimistic "SENDING" bubble to SENT/FAILED.
+  let finalDeliveryStatus: "SENT" | "FAILED" = "FAILED";
+  let finalExternalId: string | undefined;
 
   if (channel) {
     const configMap = Object.fromEntries(
@@ -173,6 +220,33 @@ export async function POST(
           } else {
             console.error("[TG Send] Error:", result);
           }
+
+          // Send each attachment as a separate Telegram message — Bot API
+          // doesn't multiplex media+text in one call. Telegram fetches the
+          // file by URL, so APP_URL must be reachable from telegram.org.
+          if (attachmentsInput.length > 0) {
+            const appUrl = process.env.APP_URL || "http://localhost:3000";
+            for (const a of attachmentsInput) {
+              try {
+                const isImg = a.mimeType.startsWith("image/");
+                const tgMethod = isImg ? "sendPhoto" : "sendDocument";
+                const tgField = isImg ? "photo" : "document";
+                await fetch(
+                  `https://api.telegram.org/bot${configMap.bot_token}/${tgMethod}`,
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      chat_id: contactChannel.identifier,
+                      [tgField]: `${appUrl}${a.storageUrl}`,
+                    }),
+                  },
+                );
+              } catch (err) {
+                console.error(`[TG Attachment] ${a.fileName}:`, err);
+              }
+            }
+          }
         }
       }
       if (channel.type === "EMAIL") {
@@ -200,18 +274,52 @@ export async function POST(
             select: { subject: true, externalId: true },
           });
 
+          // Resolve attachment file paths relative to public/ for nodemailer.
+          const path = await import("path");
+          const mailAttachments = attachmentsInput.map((a) => ({
+            filename: a.fileName,
+            path: path.join(process.cwd(), "public", a.storageKey),
+            contentType: a.mimeType,
+          }));
+
           const info = await transporter.sendMail({
             from: formatSmtpFrom(configMap.smtp_display_name, smtpFrom),
             to: contactChannel.identifier,
             subject: conv?.subject ? `Re: ${conv.subject}` : "Сообщение от LaptopGuru",
             text: body.body,
-            html: `<div style="font-family:sans-serif;">${escapeHtml(body.body).replace(/\n/g, "<br/>")}</div>`,
+            html: `<div style="font-family:sans-serif;">${escapeHtml(body.body || "").replace(/\n/g, "<br/>")}</div>`,
+            ...(mailAttachments.length > 0 ? { attachments: mailAttachments } : {}),
             ...(conv?.externalId ? { inReplyTo: conv.externalId, references: conv.externalId } : {}),
           });
 
           transporter.close();
           deliveryStatus = "SENT";
           externalId = info.messageId;
+        }
+      }
+      if (channel.type === "ALLEGRO") {
+        // Allegro discussion threads: conversation.externalId is the thread ID
+        // we ingested from Allegro's polling API.
+        if (!conversation.externalId) {
+          console.error("[Allegro Send] Conversation has no externalId (threadId)");
+        } else {
+          const result = await sendViaAllegroDirect({
+            companyId: conversation.companyId,
+            threadId: conversation.externalId,
+            text: body.body ?? "",
+            attachments: attachmentsInput.map((a) => ({
+              fileName: a.fileName,
+              mimeType: a.mimeType,
+              storageKey: a.storageKey,
+            })),
+          });
+          if (result.ok) {
+            deliveryStatus = "SENT";
+            externalId = result.messageId;
+            if (result.error) console.warn("[Allegro Send] Partial:", result.error);
+          } else {
+            console.error("[Allegro Send] Error:", result.error);
+          }
         }
       }
     } catch (err) {
@@ -230,14 +338,67 @@ export async function POST(
         status: deliveryStatus,
       },
     });
+
+    finalDeliveryStatus = deliveryStatus;
+    finalExternalId = externalId;
   }
 
-  // Emit SSE event
+  // Emit SSE event with the full message so connected clients can append it
+  // directly to the open thread (no refetch).
+  const senderUser = await prisma.user.findUnique({
+    where: { id: session.user!.id },
+    select: { id: true, name: true, email: true },
+  });
+  // Re-load attachments freshly so the SSE payload includes the persisted
+  // ids/urls (createMany above doesn't return rows).
+  const persistedAttachments =
+    attachmentsInput.length > 0
+      ? await prisma.messageAttachment.findMany({
+          where: { messageId: message.id },
+          select: {
+            id: true,
+            fileName: true,
+            mimeType: true,
+            fileSize: true,
+            storageUrl: true,
+          },
+        })
+      : [];
+
   emitMessagingEvent({
     type: "new_message",
     conversationId: id,
-    data: { messageId: message.id, direction: "OUTBOUND" },
+    message: {
+      id: message.id,
+      conversationId: id,
+      direction: "OUTBOUND",
+      contentType: message.contentType,
+      body: message.body ?? "",
+      createdAt: message.createdAt.toISOString(),
+      sender: senderUser
+        ? { id: senderUser.id, name: senderUser.name, email: senderUser.email }
+        : null,
+      attachments: persistedAttachments.map((a) => ({
+        id: a.id,
+        fileName: a.fileName,
+        mimeType: a.mimeType,
+        url: a.storageUrl,
+        size: a.fileSize,
+      })),
+      status: "SENT",
+    },
+    conversationPatch: {
+      lastMessageAt: new Date().toISOString(),
+      lastMessagePreview: (message.body ?? "").slice(0, 120),
+    },
   });
 
-  return NextResponse.json(message, { status: 201 });
+  return NextResponse.json(
+    {
+      ...message,
+      externalId: finalExternalId ?? null,
+      deliveryStatus: finalDeliveryStatus,
+    },
+    { status: 201 },
+  );
 }

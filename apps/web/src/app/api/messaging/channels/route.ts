@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const { name, type, isActive, config } = body;
 
-  const ALLOWED_TYPES = ["EMAIL", "SMS", "WHATSAPP", "TELEGRAM", "FACEBOOK", "FACEBOOK_MESSENGER", "INSTAGRAM", "INSTAGRAM_DIRECT", "WEBCHAT"];
+  const ALLOWED_TYPES = ["EMAIL", "SMS", "WHATSAPP", "TELEGRAM", "FACEBOOK", "FACEBOOK_MESSENGER", "INSTAGRAM", "INSTAGRAM_DIRECT", "WEBCHAT", "ALLEGRO"];
 
   if (!name || !type) {
     return NextResponse.json(

@@ -258,7 +258,7 @@ model Landing {
   // Token that can be appended as ?preview=<token> on the public landing URL
   // to bypass analytics tracking (used for admin previews on foreign devices).
   // DB-level default so existing rows get populated during migration.
-  previewToken  String    @unique @default(dbgenerated("gen_random_uuid()::text"))
+  previewToken  String    @unique @default(dbgenerated("(gen_random_uuid())::text"))
   // Allegro Direct: id of the Allegro discussion thread the link was sent to,
   // and the buyer's Allegro login (cached for analytics / sidebar display).
   allegroThreadId   String?
@@ -280,6 +280,8 @@ model Landing {
   @@index([createdAt])
   @@index([userId])
   @@index([companyId])
+  @@index([allegroThreadId])
+  @@index([allegroBuyerLogin])
 }
 
 model ShortLink {
@@ -769,9 +771,11 @@ model Conversation {
 }
 
 enum ConversationEventType {
-  STATUS_CHANGED   // payload: { from, to, reason? }
-  LANDING_SENT     // payload: { landingId, slug, videoTitle, shortUrl }
-  ASSIGNED         // payload: { assigneeUserId, assigneeName? }
+  STATUS_CHANGED        // payload: { from, to, reason? }
+  LANDING_SENT          // payload: { landingId, slug, videoTitle, shortUrl }
+  ASSIGNED              // payload: { assigneeUserId, assigneeName? }
+  CONVERSATION_CREATED  // payload: { source? }  — once, when the thread first appears
+  READ_BY_AGENT         // payload: { messageCount }  — every time an agent reads new inbound messages
 }
 
 model ConversationEvent {
@@ -784,7 +788,7 @@ model ConversationEvent {
   actor          User?                 @relation("ConversationEventActor", fields: [actorUserId], references: [id], onDelete: SetNull)
   payload        Json
   companyId      String
-  company        Company               @relation(fields: [companyId], references: [id])
+  company        Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdAt      DateTime              @default(now())
 
   @@index([conversationId, createdAt])

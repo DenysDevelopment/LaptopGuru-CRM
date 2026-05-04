@@ -1,25 +1,15 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { normalizeListResponse } from '@/lib/utils/normalize-response';
 import { TeamForm } from '@/components/dashboard/settings/team-form';
 import { Button } from '@/components/ui/button';
 import type { TeamInput } from '@/lib/schemas/team';
-
-interface TeamMember {
-	id: string;
-	name: string | null;
-	email: string;
-	role: string;
-}
-
-interface Team {
-	id: string;
-	name: string;
-	description: string | null;
-	members: TeamMember[];
-	createdAt: string;
-}
+import {
+	listTeams,
+	createTeam,
+	removeTeamMember,
+	type Team,
+} from '@/services/messaging/teams.service';
 
 export default function TeamsSettingsPage() {
 	const [teams, setTeams] = useState<Team[]>([]);
@@ -29,11 +19,7 @@ export default function TeamsSettingsPage() {
 
 	const fetchTeams = useCallback(async () => {
 		try {
-			const res = await fetch('/api/messaging/teams');
-			if (res.ok) {
-				const data = await res.json();
-				setTeams(normalizeListResponse(data));
-			}
+			setTeams(await listTeams());
 		} catch { /* ignore */ }
 		setLoading(false);
 	}, []);
@@ -44,25 +30,16 @@ export default function TeamsSettingsPage() {
 	}, [fetchTeams]);
 
 	const handleCreate = async (data: TeamInput) => {
-		const res = await fetch('/api/messaging/teams', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				name: data.name,
-				description: data.description || null,
-			}),
-		});
-		if (res.ok) {
+		try {
+			await createTeam({ name: data.name, description: data.description || undefined });
 			setShowCreateModal(false);
 			fetchTeams();
-		}
+		} catch { /* ignore */ }
 	};
 
 	const removeMember = async (teamId: string, memberId: string) => {
 		try {
-			await fetch(`/api/messaging/teams/${teamId}/members/${memberId}`, {
-				method: 'DELETE',
-			});
+			await removeTeamMember(teamId, memberId);
 			setTeams((prev) =>
 				prev.map((t) =>
 					t.id === teamId

@@ -4,6 +4,10 @@ import {
 	loadAllegroConfig,
 	upsertAllegroConfig,
 } from '@/lib/messaging/allegro';
+import fs from 'fs';
+import path from 'path';
+
+const ALLEGRO_API_VND = 'application/vnd.allegro.public.v1+json';
 
 const REFRESH_AHEAD_SEC = 60;
 
@@ -78,13 +82,86 @@ async function getAllegroAccessToken(channelId: string): Promise<{
 }
 
 /**
+ * Uploads a single attachment to Allegro and returns its attachment id, or
+ * null on failure. Allegro requires a two-step flow: declare the attachment
+ * (filename + size + mimeType), then PUT the binary to the returned id.
+ */
+async function uploadAllegroAttachment(args: {
+	apiBase: string;
+	token: string;
+	fileName: string;
+	mimeType: string;
+	storageKey: string; // path under public/
+}): Promise<{ id: string } | { error: string }> {
+	const filePath = path.join(process.cwd(), 'public', args.storageKey);
+	let buffer: Buffer;
+	try {
+		buffer = fs.readFileSync(filePath);
+	} catch (err) {
+		return {
+			error: `Local file missing: ${err instanceof Error ? err.message : err}`,
+		};
+	}
+
+	// Step 1: declare the attachment.
+	const declareResp = await fetch(`${args.apiBase}/messaging/message-attachments`, {
+		method: 'POST',
+		headers: {
+			Authorization: `Bearer ${args.token}`,
+			Accept: ALLEGRO_API_VND,
+			'Content-Type': ALLEGRO_API_VND,
+		},
+		body: JSON.stringify({
+			filename: args.fileName,
+			size: buffer.length,
+			mimeType: args.mimeType,
+		}),
+	});
+	if (!declareResp.ok) {
+		const txt = await declareResp.text();
+		return {
+			error: `Allegro declare ${declareResp.status}: ${txt.slice(0, 200)}`,
+		};
+	}
+	const declared = (await declareResp.json()) as { id: string };
+
+	// Step 2: PUT the binary to the same id (octet-stream upload endpoint).
+	const uploadResp = await fetch(
+		`${args.apiBase}/messaging/message-attachments/${encodeURIComponent(declared.id)}`,
+		{
+			method: 'PUT',
+			headers: {
+				Authorization: `Bearer ${args.token}`,
+				Accept: ALLEGRO_API_VND,
+				'Content-Type': args.mimeType || 'application/octet-stream',
+			},
+			body: new Uint8Array(buffer),
+		},
+	);
+	if (!uploadResp.ok) {
+		const txt = await uploadResp.text();
+		return {
+			error: `Allegro upload ${uploadResp.status}: ${txt.slice(0, 200)}`,
+		};
+	}
+	return { id: declared.id };
+}
+
+/**
  * Posts a text message into a buyer's Allegro discussion thread on behalf of
- * the company's earliest active ALLEGRO channel. Returns delivery status.
+ * the company's earliest active ALLEGRO channel. Optional attachments are
+ * uploaded first; if any upload fails the message still goes through with
+ * the ones that succeeded (the failure is reported in `error`).
  */
 export async function sendViaAllegroDirect(args: {
 	companyId: string;
 	threadId: string;
 	text: string;
+	attachments?: Array<{
+		fileName: string;
+		mimeType: string;
+		storageKey: string;
+	}>;
 }): Promise<{ ok: boolean; error?: string; messageId?: string }> {
 	if (!args.companyId) return { ok: false, error: 'No companyId' };
 
@@ -114,17 +191,40 @@ export async function sendViaAllegroDirect(args: {
 		};
 	}
 
+	// Pre-upload attachments to Allegro and collect their ids. Failures don't
+	// abort the send — we surface them in `error` and still send what we got.
+	const attachmentIds: string[] = [];
+	const uploadErrors: string[] = [];
+	for (const att of args.attachments ?? []) {
+		const result = await uploadAllegroAttachment({
+			apiBase,
+			token,
+			fileName: att.fileName,
+			mimeType: att.mimeType,
+			storageKey: att.storageKey,
+		});
+		if ('id' in result) {
+			attachmentIds.push(result.id);
+		} else {
+			uploadErrors.push(`${att.fileName}: ${result.error}`);
+		}
+	}
+
 	try {
+		const messageBody: Record<string, unknown> = { text: args.text };
+		if (attachmentIds.length > 0) {
+			messageBody.attachments = attachmentIds.map((id) => ({ id }));
+		}
 		const resp = await fetch(
 			`${apiBase}/messaging/threads/${encodeURIComponent(args.threadId)}/messages`,
 			{
 				method: 'POST',
 				headers: {
 					Authorization: `Bearer ${token}`,
-					Accept: 'application/vnd.allegro.public.v1+json',
-					'Content-Type': 'application/vnd.allegro.public.v1+json',
+					Accept: ALLEGRO_API_VND,
+					'Content-Type': ALLEGRO_API_VND,
 				},
-				body: JSON.stringify({ text: args.text }),
+				body: JSON.stringify(messageBody),
 			},
 		);
 		if (!resp.ok) {
@@ -135,7 +235,13 @@ export async function sendViaAllegroDirect(args: {
 			};
 		}
 		const data = (await resp.json()) as { id: string };
-		return { ok: true, messageId: data.id };
+		return {
+			ok: true,
+			messageId: data.id,
+			...(uploadErrors.length > 0
+				? { error: `Some attachments failed: ${uploadErrors.join('; ')}` }
+				: {}),
+		};
 	} catch (err) {
 		return {
 			ok: false,

@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { normalizeListResponse } from '@/lib/utils/normalize-response';
+import { listTags } from '@/services/messaging/tags.service';
+import { addConversationTag } from '@/services/messaging/conversations.service';
 import type { ConversationDetail, Tag } from './conversation-sidebar.types';
 
 interface Props {
@@ -22,11 +23,7 @@ export function SidebarTags({
 
 	const loadTags = useCallback(async () => {
 		try {
-			const res = await fetch('/api/messaging/tags');
-			if (res.ok) {
-				const data = await res.json();
-				setAllTags(normalizeListResponse(data));
-			}
+			setAllTags(await listTags());
 		} catch {
 			/* ignore */
 		}
@@ -34,11 +31,7 @@ export function SidebarTags({
 
 	const addTag = async (tagId: string) => {
 		try {
-			await fetch(`/api/messaging/conversations/${conversationId}/tags`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ tagId }),
-			});
+			await addConversationTag(conversationId, tagId);
 			setShowTagPicker(false);
 			onUpdate();
 		} catch {

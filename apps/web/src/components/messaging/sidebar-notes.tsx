@@ -1,7 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { normalizeListResponse } from '@/lib/utils/normalize-response';
+import {
+	listConversationNotes,
+	createNote,
+} from '@/services/messaging/notes.service';
 import type { Note } from './conversation-sidebar.types';
 
 interface Props {
@@ -15,9 +18,8 @@ export function SidebarNotes({ conversationId, canWriteNotes }: Props) {
 	const [savingNote, setSavingNote] = useState(false);
 
 	useEffect(() => {
-		fetch(`/api/messaging/conversations/${conversationId}/notes`)
-			.then(r => (r.ok ? r.json() : []))
-			.then(data => setNotes(normalizeListResponse(data)))
+		listConversationNotes(conversationId)
+			.then((data) => setNotes(data))
 			.catch(() => {});
 	}, [conversationId]);
 
@@ -26,16 +28,9 @@ export function SidebarNotes({ conversationId, canWriteNotes }: Props) {
 		if (!trimmed || savingNote) return;
 		setSavingNote(true);
 		try {
-			const res = await fetch('/api/messaging/notes', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ conversationId, body: trimmed }),
-			});
-			if (res.ok) {
-				const note = await res.json();
-				setNotes(prev => [...prev, note]);
-				setNewNote('');
-			}
+			const note = await createNote(conversationId, trimmed);
+			setNotes((prev) => [...prev, note]);
+			setNewNote('');
 		} catch {
 			/* ignore */
 		}

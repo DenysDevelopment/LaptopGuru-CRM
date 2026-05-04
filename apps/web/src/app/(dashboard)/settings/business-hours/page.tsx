@@ -12,6 +12,12 @@ import {
 	type DayKey,
 } from '@/lib/schemas/business-hours';
 import {
+	getBusinessHours,
+	createBusinessHours,
+	updateBusinessHours,
+	type BusinessHoursRecord,
+} from '@/services/messaging/business-hours.service';
+import {
 	Form,
 	FormControl,
 	FormField,
@@ -29,12 +35,6 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from '@/components/ui/select';
-
-interface BusinessHoursRecord {
-	id: string;
-	timezone: string;
-	schedule: BusinessHoursInput['schedule'];
-}
 
 const DAY_LABELS: Record<DayKey, string> = {
 	monday: 'Понедельник',
@@ -80,18 +80,14 @@ export default function BusinessHoursSettingsPage() {
 	});
 
 	useEffect(() => {
-		fetch('/api/messaging/business-hours')
-			.then((r) => (r.ok ? r.json() : null))
-			.then((data) => {
-				if (data) {
-					const item = Array.isArray(data) ? data[0] : data;
-					if (item) {
-						setRecord(item);
-						form.reset({
-							timezone: item.timezone || 'Europe/Warsaw',
-							schedule: item.schedule || DEFAULT_VALUES.schedule,
-						});
-					}
+		getBusinessHours()
+			.then((item) => {
+				if (item) {
+					setRecord(item);
+					form.reset({
+						timezone: item.timezone || 'Europe/Warsaw',
+						schedule: item.schedule || DEFAULT_VALUES.schedule,
+					});
 				}
 			})
 			.catch(() => {})
@@ -100,21 +96,14 @@ export default function BusinessHoursSettingsPage() {
 	}, []);
 
 	async function onSubmit(data: BusinessHoursInput) {
-		const url = record
-			? `/api/messaging/business-hours/${record.id}`
-			: '/api/messaging/business-hours';
-		const method = record ? 'PATCH' : 'POST';
-		const res = await fetch(url, {
-			method,
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(data),
-		});
-		if (res.ok) {
-			const saved = await res.json();
+		try {
+			const saved = record
+				? await updateBusinessHours(record.id, data)
+				: await createBusinessHours(data);
 			setRecord(saved);
 			setSaved(true);
 			setTimeout(() => setSaved(false), 2000);
-		}
+		} catch { /* ignore */ }
 	}
 
 	if (loading) {

@@ -9,6 +9,7 @@ import { EmailListItem } from "@/components/dashboard/emails/email-list-item";
 import { Pagination } from "@/components/ui/pagination";
 import { EmptyState } from "@/components/ui/empty-state";
 import { EditEmailModal } from "@/components/dashboard/edit-email-modal";
+import { getChannel } from "@/services/messaging/channels.service";
 
 export default function EmailsPage() {
   return (
@@ -35,11 +36,8 @@ function EmailsPageContent() {
     let cancelled = false;
     async function fetchChannelName() {
       try {
-        const res = await fetch(`/api/messaging/channels/${channelId}`);
-        if (res.ok && !cancelled) {
-          const data = await res.json();
-          setFetchedChannelName({ id: channelId, name: data.channel?.name || null });
-        }
+        const { name } = await getChannel(channelId!);
+        if (!cancelled) setFetchedChannelName({ id: channelId, name });
       } catch {
         if (!cancelled) setFetchedChannelName({ id: channelId, name: null });
       }

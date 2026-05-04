@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { NotificationsGateway } from './notifications.gateway';
 import { NotificationsService } from './notifications.service';
+import { WebSseBridgeService } from './web-sse-bridge.service';
 
 @Module({
   imports: [
@@ -15,7 +16,7 @@ import { NotificationsService } from './notifications.service';
       },
     }),
   ],
-  providers: [NotificationsGateway, NotificationsService],
-  exports: [NotificationsService, NotificationsGateway],
+  providers: [NotificationsGateway, NotificationsService, WebSseBridgeService],
+  exports: [NotificationsService, NotificationsGateway, WebSseBridgeService],
 })
 export class NotificationsModule {}

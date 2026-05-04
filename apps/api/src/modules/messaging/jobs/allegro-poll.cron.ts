@@ -1,11 +1,23 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { mkdir, writeFile } from 'fs/promises';
+import * as path from 'path';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AllegroProviderService } from '../providers/allegro/allegro-provider.service';
 import { AllegroOAuthService } from '../providers/allegro/allegro-oauth.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { WebSseBridgeService } from '../notifications/web-sse-bridge.service';
 import { ConversationStatusService } from '../conversations/status.service';
 import { ConversationStatus } from '../../../generated/prisma/client';
+import { decodeEntities } from '../../../lib/decode-entities';
+
+// Inbound Allegro attachments are saved into the Web app's public/uploads
+// tree so the existing storageUrl convention (`/uploads/...`) just works for
+// the browser. The Web process serves them statically.
+const WEB_UPLOADS_DIR = path.resolve(
+	process.cwd(),
+	'../web/public/uploads/messaging',
+);
 
 /**
  * Allegro doesn't push real-time webhooks for messages — sellers are
@@ -25,6 +37,7 @@ export class AllegroPollCron {
 		private readonly oauth: AllegroOAuthService,
 		private readonly notifications: NotificationsService,
 		private readonly statusService: ConversationStatusService,
+		private readonly webBridge: WebSseBridgeService,
 	) {}
 
 	@Cron(CronExpression.EVERY_MINUTE)
@@ -35,15 +48,17 @@ export class AllegroPollCron {
 		});
 		if (channels.length === 0) return;
 
-		for (const channel of channels) {
-			try {
-				await this.pollChannel(channel.id, channel.companyId);
-			} catch (err) {
-				this.logger.warn(
-					`Allegro poll failed for channel ${channel.id}: ${err instanceof Error ? err.message : err}`,
-				);
-			}
-		}
+		await Promise.all(
+			channels.map(async (channel) => {
+				try {
+					await this.pollChannel(channel.id, channel.companyId);
+				} catch (err) {
+					this.logger.warn(
+						`Allegro poll failed for channel ${channel.id}: ${err instanceof Error ? err.message : err}`,
+					);
+				}
+			}),
+		);
 	}
 
 	private async pollChannel(channelId: string, companyId: string): Promise<void> {
@@ -55,19 +70,31 @@ export class AllegroPollCron {
 		const sellerId = cfg.get('seller_id') ?? null;
 
 		// Pull recent threads (newest first); stop when older than cursor.
+		// Allegro caps `limit` at 20 for /messaging/threads.
 		const { threads } = await this.provider.listThreads(channelId, {
-			limit: 50,
+			limit: 20,
 			offset: 0,
 		});
 
 		let newest = lastPoll;
+		const fresh: typeof threads = [];
 		for (const t of threads) {
 			const lastMsgAt = new Date(t.lastMessageDateTime);
 			if (lastMsgAt > newest) newest = lastMsgAt;
-			if (lastMsgAt <= lastPoll) continue; // already ingested
-
-			await this.ingestThread(channelId, companyId, t, sellerId, lastPoll);
+			if (lastMsgAt > lastPoll) fresh.push(t);
 		}
+
+		await Promise.all(
+			fresh.map((t) =>
+				this.ingestThread(channelId, companyId, t, sellerId, lastPoll).catch(
+					(err) => {
+						this.logger.warn(
+							`Allegro thread ${t.id} ingest failed: ${err instanceof Error ? err.message : err}`,
+						);
+					},
+				),
+			),
+		);
 
 		await this.prisma.raw.channelConfig.upsert({
 			where: { channelId_key: { channelId, key: 'last_poll_at' } },
@@ -87,17 +114,29 @@ export class AllegroPollCron {
 		thread: {
 			id: string;
 			lastMessageDateTime: string;
-			interlocutor: { id: string; login: string };
+			interlocutor: { id?: string; login?: string };
 		},
 		sellerId: string | null,
 		cursor: Date,
 	): Promise<void> {
+		// Allegro's `interlocutor` reliably has `login`; `id` is sometimes
+		// missing. Fall back to login as the contact identifier.
+		const interId = thread.interlocutor.id ?? thread.interlocutor.login;
+		const interLogin =
+			thread.interlocutor.login ?? thread.interlocutor.id ?? 'unknown';
+		if (!interId) {
+			this.logger.warn(
+				`Skipping Allegro thread ${thread.id}: no interlocutor id/login`,
+			);
+			return;
+		}
+
 		// Find or create Contact + ContactChannel for this Allegro buyer.
 		let contactChannel = await this.prisma.raw.contactChannel.findFirst({
 			where: {
 				companyId,
 				channelType: 'ALLEGRO',
-				identifier: thread.interlocutor.id,
+				identifier: interId,
 			},
 		});
 		let contactId: string;
@@ -106,7 +145,7 @@ export class AllegroPollCron {
 		} else {
 			const contact = await this.prisma.raw.contact.create({
 				data: {
-					displayName: thread.interlocutor.login,
+					displayName: interLogin,
 					companyId,
 				},
 			});
@@ -115,7 +154,7 @@ export class AllegroPollCron {
 				data: {
 					contactId,
 					channelType: 'ALLEGRO',
-					identifier: thread.interlocutor.id,
+					identifier: interId,
 					companyId,
 				},
 			});
@@ -126,6 +165,7 @@ export class AllegroPollCron {
 			where: { channelId, externalId: thread.id },
 			select: { id: true, status: true },
 		});
+		let isNewConversation = false;
 		if (!conversation) {
 			const created = await this.prisma.raw.conversation.create({
 				data: {
@@ -139,50 +179,141 @@ export class AllegroPollCron {
 				select: { id: true, status: true },
 			});
 			conversation = created;
+			isNewConversation = true;
+			await this.prisma.raw.conversationEvent.create({
+				data: {
+					conversationId: created.id,
+					type: 'CONVERSATION_CREATED',
+					actorUserId: null,
+					payload: { source: 'allegro' },
+					companyId,
+				},
+			});
 		}
 
 		// Pull messages newer than cursor; Allegro returns them oldest first.
+		// Allegro caps `limit` at 20 for /messaging/threads/{id}/messages.
 		const { messages } = await this.provider.listMessages(channelId, thread.id, {
-			limit: 50,
+			limit: 20,
 		});
 
-		let hasNewInbound = false;
-		for (const m of messages) {
-			const createdAt = new Date(m.createdAt);
-			if (createdAt <= cursor) continue;
-			// Skip echoes of our own outbound — by author id matching seller_id.
-			if (sellerId && m.author.id === sellerId) continue;
-
-			const exists = await this.prisma.raw.message.findFirst({
-				where: { conversationId: conversation.id, externalId: m.id },
-				select: { id: true },
+		const candidates = messages.filter((m) => new Date(m.createdAt) > cursor);
+		const existingIds = new Set<string>();
+		if (candidates.length > 0) {
+			const found = await this.prisma.raw.message.findMany({
+				where: {
+					conversationId: conversation.id,
+					externalId: { in: candidates.map((m) => m.id) },
+				},
+				select: { externalId: true },
 			});
-			if (exists) continue;
+			for (const row of found) {
+				if (row.externalId) existingIds.add(row.externalId);
+			}
+		}
 
-			await this.prisma.raw.message.create({
+		let hasNewInbound = false;
+		let hasNewMessage = false;
+		for (const m of candidates) {
+			if (existingIds.has(m.id)) continue;
+			const createdAt = new Date(m.createdAt);
+
+			// Buyer messages → INBOUND. Seller's own messages (whether sent
+			// via CRM or directly from Allegro web/mobile) → OUTBOUND so the
+			// thread shows both sides.
+			let direction: 'INBOUND' | 'OUTBOUND';
+			if (m.author.isInterlocutor === true) direction = 'INBOUND';
+			else if (m.author.isInterlocutor === false) direction = 'OUTBOUND';
+			else if (sellerId && m.author.id === sellerId) direction = 'OUTBOUND';
+			else direction = 'INBOUND';
+
+			const hasAttachments = (m.attachments ?? []).length > 0;
+			const firstMime = m.attachments?.[0]?.mimeType ?? '';
+			const contentType = hasAttachments
+				? firstMime.startsWith('image/')
+					? 'IMAGE'
+					: 'FILE'
+				: 'TEXT';
+
+			const created = await this.prisma.raw.message.create({
 				data: {
 					conversationId: conversation.id,
 					channelId,
-					direction: 'INBOUND',
-					contentType: 'TEXT',
-					body: m.text,
+					direction,
+					contentType,
+					body: decodeEntities(m.text),
 					externalId: m.id,
 					contactId,
 					companyId,
 					createdAt,
 				},
+				select: { id: true },
 			});
-			hasNewInbound = true;
+
+			// Download any attachments and link them to the new Message.
+			for (const att of m.attachments ?? []) {
+				try {
+					const dl = await this.provider.downloadAttachment(channelId, att.id);
+					if (!dl) continue;
+					const dirKey = `${channelId}/${conversation.id}`;
+					const dirAbs = path.join(WEB_UPLOADS_DIR, dirKey);
+					await mkdir(dirAbs, { recursive: true });
+					const safeName = (
+						att.fileName ?? dl.fileName ?? `allegro-${att.id}`
+					).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 200);
+					const finalName = `${att.id.slice(0, 8)}-${safeName}`;
+					const filePath = path.join(dirAbs, finalName);
+					await writeFile(filePath, dl.buffer);
+					const storageKey = `uploads/messaging/${dirKey}/${finalName}`;
+					await this.prisma.raw.messageAttachment.create({
+						data: {
+							messageId: created.id,
+							fileName: att.fileName ?? dl.fileName ?? safeName,
+							mimeType: att.mimeType ?? dl.mimeType,
+							fileSize: att.size ?? dl.buffer.length,
+							storageKey,
+							storageUrl: `/${storageKey}`,
+						},
+					});
+				} catch (err) {
+					this.logger.warn(
+						`Allegro attachment ${att.id} save failed: ${err instanceof Error ? err.message : err}`,
+					);
+				}
+			}
+
+			hasNewMessage = true;
+			if (direction === 'INBOUND') hasNewInbound = true;
+			// Bridge to Web SSE so the open browser appends this single bubble
+			// without refetching the whole thread. Bridge runs after we wrote
+			// attachments so the resolved payload includes them.
+			void this.webBridge.pushNewMessage(conversation.id, created.id);
 		}
 
-		if (hasNewInbound) {
+		// First message in this thread? Tell connected clients to prepend the
+		// new conversation card to their list.
+		if (isNewConversation && hasNewMessage) {
+			void this.webBridge.pushNewConversation(conversation.id);
+		}
+
+		if (hasNewMessage) {
 			await this.prisma.raw.conversation.update({
 				where: { id: conversation.id },
 				data: { lastMessageAt: new Date(thread.lastMessageDateTime) },
 			});
+			// Push to UI so the conversation list reorders and the open
+			// thread re-fetches — fires for both buyer replies and seller
+			// messages typed in Allegro web/mobile.
+			await this.notifications.emitConversationUpdate(conversation.id, {
+				lastMessageAt: thread.lastMessageDateTime,
+			});
+		}
+
+		if (hasNewInbound) {
 			// If the buyer is replying after we closed the thread, reopen it
 			// (subject to the 4-hour manual-close grace window enforced by
-			// transitionStatus).
+			// transitionStatus). Only INBOUND should reopen — a seller-side
+			// message must not undo a manual close.
 			await this.statusService.transition({
 				conversationId: conversation.id,
 				toStatus: ConversationStatus.OPEN,
@@ -195,10 +326,6 @@ export class AllegroPollCron {
 					ConversationStatus.CLOSED,
 				],
 				respectManualCloseGrace: true,
-			});
-			// Push to UI
-			await this.notifications.emitConversationUpdate(conversation.id, {
-				lastMessageAt: thread.lastMessageDateTime,
 			});
 		}
 	}

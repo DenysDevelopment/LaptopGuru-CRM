@@ -32,22 +32,17 @@ export function MessagingToastNotifications() {
 	}, []);
 
 	useMessagingEvents((event) => {
-		if (event.type === 'new_message' && event.data) {
-			const { senderName, body, channelType } = event.data as {
-				senderName?: string;
-				body?: string;
-				channelType?: string;
-			};
-			if (senderName) {
-				addToast({
-					id: `${Date.now()}-${Math.random()}`,
-					senderName: senderName || 'Клиент',
-					body: (body || '').slice(0, 100) || 'Новое сообщение',
-					channelType: channelType || 'TELEGRAM',
-					conversationId: event.conversationId,
-				});
-			}
-		}
+		// Toast only on inbound messages from external channels.
+		if (event.type !== 'new_message' || !event.message) return;
+		if (event.message.direction !== 'INBOUND') return;
+		const senderName = event.message.contact?.name ?? 'Клиент';
+		addToast({
+			id: `${Date.now()}-${Math.random()}`,
+			senderName,
+			body: (event.message.body || '').slice(0, 100) || 'Новое сообщение',
+			channelType: 'TELEGRAM',
+			conversationId: event.conversationId,
+		});
 	});
 
 	if (toasts.length === 0) return null;

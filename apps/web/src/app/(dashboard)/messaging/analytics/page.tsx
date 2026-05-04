@@ -2,23 +2,15 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { ChannelIcon, getChannelLabel } from '@/components/messaging/channel-icon';
-import { normalizeListResponse } from '@/lib/utils/normalize-response';
+import {
+	getAnalyticsOverview,
+	getAnalyticsByChannel,
+	type AnalyticsOverview,
+	type AnalyticsByChannel,
+} from '@/services/messaging/analytics.service';
 
-interface OverviewStats {
-	totalConversations: number;
-	totalMessages: number;
-	avgResponseTime: number;
-	openConversations: number;
-	closedConversations: number;
-	newContacts: number;
-}
-
-interface ChannelStat {
-	channelType: string;
-	conversations: number;
-	messages: number;
-	avgResponseTime: number;
-}
+type OverviewStats = AnalyticsOverview;
+type ChannelStat = AnalyticsByChannel;
 
 function formatDuration(seconds: number): string {
 	if (seconds < 60) return `${Math.round(seconds)}с`;
@@ -59,21 +51,14 @@ export default function MessagingAnalyticsPage() {
 	const fetchData = useCallback(async () => {
 		setLoading(true);
 		const { from, to } = getDateRange();
-		const params = new URLSearchParams({ from, to });
 
 		try {
-			const [overviewRes, channelRes] = await Promise.all([
-				fetch(`/api/messaging/analytics/overview?${params}`),
-				fetch(`/api/messaging/analytics/by-channel?${params}`),
+			const [overviewData, channelData] = await Promise.all([
+				getAnalyticsOverview({ from, to }).catch(() => null),
+				getAnalyticsByChannel({ from, to }).catch(() => [] as ChannelStat[]),
 			]);
-
-			if (overviewRes.ok) {
-				setOverview(await overviewRes.json());
-			}
-			if (channelRes.ok) {
-				const data = await channelRes.json();
-				setChannelStats(normalizeListResponse(data));
-			}
+			if (overviewData) setOverview(overviewData);
+			setChannelStats(channelData);
 		} catch {
 			// silently fail
 		}

@@ -14,7 +14,9 @@ export async function GET(
   const { id } = await params;
 
   // Auto-transition: first time an admin of the same company looks at a NEW
-  // conversation, flip to OPEN. Race-safe via requireFromStatus.
+  // conversation, flip to OPEN. Race-safe via requireFromStatus + a guard
+  // against an existing viewed-by-admin event (concurrent GETs from React
+  // StrictMode / fast-refresh would otherwise stamp it twice).
   const preview = await prisma.conversation.findUnique({
     where: { id },
     select: { companyId: true, status: true },
@@ -24,13 +26,23 @@ export async function GET(
     preview.companyId === (session.user.companyId ?? "") &&
     preview.status === "NEW"
   ) {
-    await transitionConversationStatus({
-      conversationId: id,
-      toStatus: "OPEN",
-      actorUserId: session.user.id,
-      reason: "viewed-by-admin",
-      requireFromStatus: ["NEW"],
-    }).catch(() => {/* non-fatal */});
+    const alreadyOpened = await prisma.conversationEvent.findFirst({
+      where: {
+        conversationId: id,
+        type: "STATUS_CHANGED",
+        payload: { path: ["reason"], equals: "viewed-by-admin" },
+      },
+      select: { id: true },
+    });
+    if (!alreadyOpened) {
+      await transitionConversationStatus({
+        conversationId: id,
+        toStatus: "OPEN",
+        actorUserId: session.user.id,
+        reason: "viewed-by-admin",
+        requireFromStatus: ["NEW"],
+      }).catch(() => {/* non-fatal */});
+    }
   }
 
   const conversation = await prisma.conversation.findUnique({
@@ -75,6 +87,85 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  // Enrich LANDING_SENT events with live stats: visit count, first-visit time,
+  // video plays + best completion. Bulk-fetched in 3 parallel queries to avoid
+  // N+1 across the timeline.
+  const landingIds = conversation.events
+    .map((e) => (e.payload as { landingId?: string } | null)?.landingId)
+    .filter((v): v is string => typeof v === "string");
+
+  type LandingStats = {
+    views: number;
+    clicks: number;
+    firstVisitAt: string | null;
+    videoPlays: number;
+    bestCompletionPercent: number | null;
+  };
+  const statsByLandingId = new Map<string, LandingStats>();
+
+  if (landingIds.length > 0) {
+    const [landings, visitAgg, sessions] = await Promise.all([
+      prisma.landing.findMany({
+        where: { id: { in: landingIds } },
+        select: { id: true, clicks: true },
+      }),
+      prisma.landingVisit.groupBy({
+        by: ["landingId"],
+        where: { landingId: { in: landingIds } },
+        _count: { _all: true },
+        _min: { visitedAt: true },
+      }),
+      prisma.videoPlaybackSession.findMany({
+        where: { visit: { landingId: { in: landingIds } } },
+        select: {
+          completionPercent: true,
+          playCount: true,
+          visit: { select: { landingId: true } },
+        },
+      }),
+    ]);
+
+    const clicksByLanding = new Map(landings.map((l) => [l.id, l.clicks]));
+    const visitsByLanding = new Map(
+      visitAgg.map((v) => [
+        v.landingId,
+        {
+          count: v._count._all,
+          firstVisitAt: v._min.visitedAt ? v._min.visitedAt.toISOString() : null,
+        },
+      ]),
+    );
+
+    const sessionsByLanding = new Map<
+      string,
+      { plays: number; bestCompletion: number | null }
+    >();
+    for (const s of sessions) {
+      const lid = s.visit.landingId;
+      const acc = sessionsByLanding.get(lid) ?? { plays: 0, bestCompletion: null };
+      if ((s.playCount ?? 0) > 0) acc.plays += 1;
+      if (
+        s.completionPercent != null &&
+        (acc.bestCompletion == null || s.completionPercent > acc.bestCompletion)
+      ) {
+        acc.bestCompletion = s.completionPercent;
+      }
+      sessionsByLanding.set(lid, acc);
+    }
+
+    for (const lid of landingIds) {
+      const v = visitsByLanding.get(lid);
+      const s = sessionsByLanding.get(lid);
+      statsByLandingId.set(lid, {
+        views: v?.count ?? 0,
+        clicks: clicksByLanding.get(lid) ?? 0,
+        firstVisitAt: v?.firstVisitAt ?? null,
+        videoPlays: s?.plays ?? 0,
+        bestCompletionPercent: s?.bestCompletion ?? null,
+      });
+    }
+  }
+
   const contact = conversation.contact;
   const emailChannel = contact?.channels.find((ch) => ch.channelType === "EMAIL");
   const phoneChannel = contact?.channels.find(
@@ -115,13 +206,18 @@ export async function GET(
     events: conversation.events
       .slice()
       .reverse()
-      .map((e) => ({
-        id: e.id,
-        type: e.type,
-        actor: e.actor,
-        payload: e.payload,
-        createdAt: e.createdAt,
-      })),
+      .map((e) => {
+        const landingId = (e.payload as { landingId?: string } | null)?.landingId;
+        const stats = landingId ? statsByLandingId.get(landingId) ?? null : null;
+        return {
+          id: e.id,
+          type: e.type,
+          actor: e.actor,
+          payload: e.payload,
+          createdAt: e.createdAt,
+          landingStats: stats,
+        };
+      }),
   });
 }
 

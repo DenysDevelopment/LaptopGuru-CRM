@@ -7,6 +7,14 @@ import { AddChannelModal } from './add-channel-modal';
 import { type Channel, EMAIL_DEFAULTS } from './channels.config';
 import { DeleteChannelModal } from './delete-channel-modal';
 import { EditEmailModal } from './edit-email-modal';
+import {
+	listChannels as fetchChannelsRaw,
+	createChannel,
+	updateChannel,
+	deleteChannel,
+	testChannel,
+} from '@/services/messaging/channels.service';
+import { triggerEmailSync } from '@/services/emails/sync.service';
 
 export default function ChannelsSettingsPage() {
 	const [channels, setChannels] = useState<Channel[]>([]);
@@ -30,22 +38,18 @@ export default function ChannelsSettingsPage() {
 
 	const fetchChannels = async () => {
 		try {
-			const res = await fetch('/api/messaging/channels');
-			if (res.ok) {
-				const raw = await res.json();
-				const arr = Array.isArray(raw) ? raw : raw.items || [];
-				setChannels(arr.map((ch: Record<string, unknown>) => ({
-					id: ch.id,
-					type: ch.type,
-					name: ch.name,
-					status: ch.isActive ? 'CONNECTED' : 'DISCONNECTED',
-					enabled: ch.isActive ?? true,
-					config: Array.isArray(ch.config)
-						? Object.fromEntries((ch.config as { key: string; value: string }[]).map((c) => [c.key, c.value]))
-						: ch.config || {},
-					createdAt: ch.createdAt,
-				})) as Channel[]);
-			}
+			const items = await fetchChannelsRaw();
+			setChannels(items.map((ch) => ({
+				id: ch.id,
+				type: ch.type,
+				name: ch.name,
+				status: ch.isActive ? 'CONNECTED' : 'DISCONNECTED',
+				enabled: ch.isActive ?? true,
+				config: Array.isArray(ch.config)
+					? Object.fromEntries(ch.config.map((c) => [c.key, c.value]))
+					: ch.config || {},
+				createdAt: ch.createdAt,
+			})) as Channel[]);
 		} catch { /* ignore */ }
 		setLoading(false);
 	};
@@ -67,44 +71,33 @@ export default function ChannelsSettingsPage() {
 				if (!finalConfig.smtp_from) finalConfig.smtp_from = finalConfig.imap_user || '';
 			}
 
-			const res = await fetch('/api/messaging/channels', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					type: newChannelType,
-					name: newChannelName.trim(),
-					config: Object.entries(finalConfig)
-						.filter(([, v]) => v)
-						.map(([key, value]) => ({
-							key,
-							value,
-							isSecret: key.toLowerCase().includes('password') || key.toLowerCase().includes('token') || key.toLowerCase().includes('secret'),
-						})),
-				}),
+			await createChannel({
+				type: newChannelType,
+				name: newChannelName.trim(),
+				config: Object.entries(finalConfig)
+					.filter(([, v]) => v)
+					.map(([key, value]) => ({
+						key,
+						value,
+						isSecret: key.toLowerCase().includes('password') || key.toLowerCase().includes('token') || key.toLowerCase().includes('secret'),
+					})),
 			});
-			if (res.ok) {
-				setShowModal(false);
-				setNewChannelName('');
-				setNewChannelConfig({});
-				fetchChannels();
-				if (newChannelType === 'EMAIL') {
-					syncEmail();
-				}
-			} else {
-				const err = await res.json();
-				alert(err.error || 'Ошибка создания канала');
+			setShowModal(false);
+			setNewChannelName('');
+			setNewChannelConfig({});
+			fetchChannels();
+			if (newChannelType === 'EMAIL') {
+				syncEmail();
 			}
-		} catch { /* ignore */ }
+		} catch (err) {
+			alert(err instanceof Error ? err.message : 'Ошибка создания канала');
+		}
 		setSaving(false);
 	};
 
 	const toggleChannel = async (channelId: string, enabled: boolean) => {
 		try {
-			await fetch(`/api/messaging/channels/${channelId}`, {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ isActive: enabled }),
-			});
+			await updateChannel(channelId, { isActive: enabled });
 			setChannels((prev) =>
 				prev.map((ch) => (ch.id === channelId ? { ...ch, enabled } : ch)),
 			);
@@ -120,26 +113,22 @@ export default function ChannelsSettingsPage() {
 		if (!deletingChannelId || deleting) return;
 		setDeleting(true);
 		try {
-			const res = await fetch(`/api/messaging/channels/${deletingChannelId}?deleteData=${deleteData}`, {
-				method: 'DELETE',
-			});
-			if (res.ok) {
-				setDeletingChannelId(null);
-				if (deleteData) {
-					setChannels((prev) => prev.filter((ch) => ch.id !== deletingChannelId));
-				} else {
-					fetchChannels();
-				}
+			await deleteChannel(deletingChannelId, deleteData);
+			setDeletingChannelId(null);
+			if (deleteData) {
+				setChannels((prev) => prev.filter((ch) => ch.id !== deletingChannelId));
 			} else {
-				alert('Ошибка удаления');
+				fetchChannels();
 			}
-		} catch { /* ignore */ }
+		} catch {
+			alert('Ошибка удаления');
+		}
 		setDeleting(false);
 	};
 
 	const syncEmail = async () => {
 		try {
-			await fetch('/api/emails/sync', { method: 'POST' });
+			await triggerEmailSync();
 		} catch {
 		}
 	};
@@ -147,12 +136,8 @@ export default function ChannelsSettingsPage() {
 	const testConnection = async (channelId: string) => {
 		setTesting(channelId);
 		try {
-			const res = await fetch(`/api/messaging/channels/${channelId}/test`, { method: 'POST' });
-			if (res.ok) {
-				alert('Подключение успешно!');
-			} else {
-				alert('Ошибка подключения');
-			}
+			await testChannel(channelId);
+			alert('Подключение успешно!');
 		} catch {
 			alert('Ошибка подключения');
 		}
@@ -184,22 +169,15 @@ export default function ChannelsSettingsPage() {
 					isSecret: key.toLowerCase().includes('password') || key.toLowerCase().includes('token') || key.toLowerCase().includes('secret'),
 				}));
 
-			const res = await fetch(`/api/messaging/channels/${editingChannel.id}`, {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					name: editChannelName.trim() || undefined,
-					config: configEntries.length > 0 ? configEntries : undefined,
-				}),
+			await updateChannel(editingChannel.id, {
+				name: editChannelName.trim() || undefined,
+				config: configEntries.length > 0 ? configEntries : undefined,
 			});
-			if (res.ok) {
-				setEditingChannel(null);
-				fetchChannels();
-			} else {
-				const err = await res.json();
-				alert(err.error || 'Ошибка сохранения');
-			}
-		} catch { /* ignore */ }
+			setEditingChannel(null);
+			fetchChannels();
+		} catch (err) {
+			alert(err instanceof Error ? err.message : 'Ошибка сохранения');
+		}
 		setSaving(false);
 	};
 

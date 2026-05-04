@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { normalizeListResponse } from '@/lib/utils/normalize-response';
+import { listTeams } from '@/services/messaging/teams.service';
+import { assignConversation as assignConversationService } from '@/services/messaging/conversations.service';
 import type { ConversationDetail, Team } from './conversation-sidebar.types';
 
 interface Props {
@@ -22,11 +23,7 @@ export function SidebarAssignee({
 
 	const loadTeams = useCallback(async () => {
 		try {
-			const res = await fetch('/api/messaging/teams');
-			if (res.ok) {
-				const data = await res.json();
-				setTeams(normalizeListResponse(data));
-			}
+			setTeams(await listTeams());
 		} catch {
 			/* ignore */
 		}
@@ -34,11 +31,7 @@ export function SidebarAssignee({
 
 	const assignConversation = async (assigneeId: string) => {
 		try {
-			await fetch(`/api/messaging/conversations/${conversationId}/assign`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ assigneeId }),
-			});
+			await assignConversationService(conversationId, assigneeId);
 			setShowAssignPicker(false);
 			onUpdate();
 		} catch {

@@ -2,6 +2,7 @@ import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
 import { prisma } from "@/lib/db";
 import { emitMessagingEvent } from "@/lib/messaging-events";
+import { buildConversationSummary } from "@/lib/messaging/conversation-summary";
 import { parseEmail } from "@/lib/parser";
 import fs from "fs";
 import path from "path";
@@ -190,6 +191,15 @@ async function syncSingleChannel(
               companyId: channel!.companyId,
             },
           });
+          await prisma.conversationEvent.create({
+            data: {
+              conversationId: conversation.id,
+              type: "CONVERSATION_CREATED",
+              actorUserId: null,
+              payload: { source: "email" },
+              companyId: channel!.companyId,
+            },
+          });
         }
 
         const hasAttachments = parsed.attachments && parsed.attachments.length > 0;
@@ -253,16 +263,39 @@ async function syncSingleChannel(
           },
         });
 
-        emitMessagingEvent({
-          type: isNew ? "new_conversation" : "new_message",
-          conversationId: conversation.id,
-          data: {
-            messageId: message.id,
-            body: subject || body.slice(0, 100),
-            senderName,
-            channelType: "EMAIL",
-          },
-        });
+        if (isNew) {
+          const summary = await buildConversationSummary(conversation.id);
+          if (summary) {
+            emitMessagingEvent({
+              type: "new_conversation",
+              conversationId: conversation.id,
+              conversation: summary,
+            });
+          }
+        } else {
+          emitMessagingEvent({
+            type: "new_message",
+            conversationId: conversation.id,
+            message: {
+              id: message.id,
+              conversationId: conversation.id,
+              direction: "INBOUND",
+              contentType: hasAttachments ? "FILE" : "TEXT",
+              body: body.slice(0, 10000),
+              createdAt: message.createdAt.toISOString(),
+              contact: {
+                id: contact.id,
+                name: contact.displayName,
+                avatarUrl: contact.avatarUrl,
+              },
+              status: "DELIVERED",
+            },
+            conversationPatch: {
+              lastMessageAt: (parsed.date || new Date()).toISOString(),
+              lastMessagePreview: (subject || body.slice(0, 100)).slice(0, 120),
+            },
+          });
+        }
 
         imported++;
       }

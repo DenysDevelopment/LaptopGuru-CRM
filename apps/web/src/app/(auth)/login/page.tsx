@@ -2,6 +2,7 @@
 
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -52,8 +53,16 @@ export default function LoginPage() {
 	return (
 		<div className='w-full max-w-md'>
 			<div className='bg-white rounded-2xl shadow-sm border border-gray-100 p-8'>
-				<div className='text-center mb-8'>
-					<h1 className='text-2xl font-bold text-gray-900'>LaptopGuru CRM</h1>
+				<div className='flex justify-center mb-8'>
+					<Image
+						src='/LG_logo2.webp'
+						alt='LaptopGuru'
+						width={180}
+						height={72}
+						priority
+						className='h-16 w-auto object-contain'
+						unoptimized
+					/>
 				</div>
 
 				<Form {...form}>
@@ -111,8 +120,15 @@ export default function LoginPage() {
 					</form>
 				</Form>
 
-				<p className='mt-6 text-center text-sm text-gray-400'>
-					LaptopGuru CRM — laptopguru.pl
+				<p className='mt-6 text-[10px] text-gray-500 text-center'>
+					Developed with 💛 by{' '}
+					<a
+						href='https://t.me/denys_maksymuck'
+						target='_blank'
+						rel='noreferrer'
+						className='hover:text-gray-700'>
+						Denys
+					</a>
 				</p>
 			</div>
 		</div>

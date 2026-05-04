@@ -5,6 +5,8 @@ import { MessageBubble } from './message-bubble';
 import type { Message } from './message-bubble';
 import { ConversationTimelineEvent, type TimelineEvent } from './timeline-event';
 import { useMessagingEvents } from '@/hooks/use-messaging-events';
+import { listMessages } from '@/services/messaging/messages.service';
+import { getConversation } from '@/services/messaging/conversations.service';
 
 interface MessageThreadProps {
 	conversationId: string;
@@ -56,6 +58,9 @@ function groupByDate(items: TimelineItem[]): { date: string; items: TimelineItem
 export function MessageThread({ conversationId }: MessageThreadProps) {
 	const [messages, setMessages] = useState<Message[]>([]);
 	const [events, setEvents] = useState<TimelineEvent[]>([]);
+	const [conversationCreatedAt, setConversationCreatedAt] = useState<
+		string | null
+	>(null);
 	const [loading, setLoading] = useState(true);
 	const [loadingMore, setLoadingMore] = useState(false);
 	const [page, setPage] = useState(1);
@@ -70,42 +75,36 @@ export function MessageThread({ conversationId }: MessageThreadProps) {
 			else setLoading(true);
 
 			try {
-				const [msgRes, convRes] = await Promise.all([
-					fetch(
-						`/api/messaging/conversations/${conversationId}/messages?page=${pageNum}&limit=50`,
-					),
-					fetch(`/api/messaging/conversations/${conversationId}`),
+				const [msgItems, conv] = await Promise.all([
+					listMessages(conversationId, { page: pageNum, limit: 50 }).catch(() => [] as RawMessage[]),
+					prepend ? Promise.resolve(null) : getConversation(conversationId).catch(() => null),
 				]);
 
-				if (msgRes.ok) {
-					const data = await msgRes.json();
-					const items = (data.items || data.data || data) as RawMessage[];
-					const list: Message[] = (Array.isArray(items) ? items : []).map(
-						(m) => ({
-							id: m.id,
-							direction: m.direction,
-							body: m.body ?? '',
-							contentType: m.contentType,
-							channelType: m.channelType ?? '',
-							status: m.status ?? 'SENT',
-							createdAt: m.createdAt,
-							attachments: m.attachments,
-							sender: m.sender,
-							metadata: m.metadata ?? null,
-						}),
-					) as unknown as Message[];
+				const list: Message[] = (msgItems as RawMessage[]).map((m) => ({
+					id: m.id,
+					direction: m.direction,
+					body: m.body ?? '',
+					contentType: m.contentType,
+					channelType: m.channelType ?? '',
+					status: m.status ?? 'SENT',
+					createdAt: m.createdAt,
+					attachments: m.attachments,
+					sender: m.sender,
+					metadata: m.metadata ?? null,
+				})) as unknown as Message[];
 
-					if (prepend) {
-						setMessages((prev) => [...list.reverse(), ...prev]);
-					} else {
-						setMessages(list.reverse());
-					}
-					setHasMore(list.length >= 50);
+				if (prepend) {
+					setMessages((prev) => [...list.reverse(), ...prev]);
+				} else {
+					setMessages(list.reverse());
 				}
+				setHasMore(list.length >= 50);
 
-				if (!prepend && convRes.ok) {
-					const conv = await convRes.json();
-					setEvents(Array.isArray(conv.events) ? conv.events : []);
+				if (!prepend && conv) {
+					setEvents(
+						(Array.isArray(conv.events) ? conv.events : []) as unknown as TimelineEvent[],
+					);
+					setConversationCreatedAt(conv.createdAt ?? null);
 				}
 			} catch {
 				// silently fail
@@ -133,11 +132,58 @@ export function MessageThread({ conversationId }: MessageThreadProps) {
 	}, [messages, events]);
 
 	useMessagingEvents((event) => {
-		if (
-			event.conversationId === conversationId &&
-			(event.type === 'new_message' || event.type === 'conversation_updated')
-		) {
+		if (event.conversationId !== conversationId) return;
+
+		if (event.type === 'new_message') {
+			// Prefer the in-payload message: append a single bubble at the bottom
+			// without touching the rest of the thread. Falls back to a refetch
+			// only if the emitter didn't provide the full payload.
+			if (event.message) {
+				const m = event.message;
+				const incoming: Message = {
+					id: m.id,
+					direction: m.direction,
+					body: m.body ?? '',
+					contentType: m.contentType,
+					channelType: '',
+					status: m.status ?? 'SENT',
+					createdAt: m.createdAt,
+					attachments: m.attachments,
+					sender: m.sender ?? null,
+					// metadata propagates through to LANDING_SENT stitching.
+					...(m.metadata ? { metadata: m.metadata } : {}),
+				} as unknown as Message;
+				setMessages((prev) => {
+					if (prev.some((p) => p.id === incoming.id)) return prev;
+					return [...prev, incoming];
+				});
+				const container = containerRef.current;
+				if (container) {
+					const nearBottom =
+						container.scrollHeight - container.scrollTop - container.clientHeight < 200;
+					if (nearBottom) {
+						setTimeout(
+							() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }),
+							50,
+						);
+					}
+				}
+				return;
+			}
+			// Fallback only when payload is missing (legacy emitters).
 			fetchAll(1, false);
+			return;
+		}
+
+		if (event.type === 'conversation_updated') {
+			// Status changes / read events: just refresh the lightweight events
+			// timeline, never the full message list. Avoids the "thread blanks
+			// out and reloads" UX.
+			getConversation(conversationId)
+				.then((conv) => {
+					if (Array.isArray(conv.events)) setEvents(conv.events as unknown as TimelineEvent[]);
+				})
+				.catch(() => {});
 		}
 	});
 
@@ -147,19 +193,55 @@ export function MessageThread({ conversationId }: MessageThreadProps) {
 		fetchAll(next, true);
 	};
 
+	// Optimistic UI: MessageInput dispatches a window event the instant the
+	// user clicks "send". We append the bubble with a spinner status before
+	// the network round-trip; once the server confirms, we swap the temp id
+	// for the real one and flip status to SENT (or FAILED).
 	useEffect(() => {
-		const el = containerRef.current;
-		if (el) {
-			(el as HTMLDivElement & { addMessage?: (m: Message) => void }).addMessage =
-				(msg) => {
-					setMessages((prev) => [...prev, msg]);
-					setTimeout(
-						() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }),
-						50,
-					);
-				};
-		}
-	});
+		const onAdd = (e: Event) => {
+			const detail = (e as CustomEvent).detail as {
+				conversationId: string;
+				message: Message;
+			};
+			if (!detail || detail.conversationId !== conversationId) return;
+			setMessages((prev) => {
+				if (prev.some((p) => p.id === detail.message.id)) return prev;
+				return [...prev, detail.message];
+			});
+			setTimeout(
+				() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }),
+				30,
+			);
+		};
+		const onConfirm = (e: Event) => {
+			const detail = (e as CustomEvent).detail as {
+				conversationId: string;
+				tempId: string;
+				realId: string;
+				status: string;
+			};
+			if (!detail || detail.conversationId !== conversationId) return;
+			setMessages((prev) => {
+				// If SSE arrived before the POST response, the real message is
+				// already in the list — drop the temp one to avoid duplicates.
+				const realAlreadyThere = prev.some((m) => m.id === detail.realId);
+				if (realAlreadyThere) {
+					return prev.filter((m) => m.id !== detail.tempId);
+				}
+				return prev.map((m) =>
+					m.id === detail.tempId
+						? ({ ...m, id: detail.realId, status: detail.status } as Message)
+						: m,
+				);
+			});
+		};
+		window.addEventListener('messaging:optimistic-add', onAdd);
+		window.addEventListener('messaging:optimistic-confirm', onConfirm);
+		return () => {
+			window.removeEventListener('messaging:optimistic-add', onAdd);
+			window.removeEventListener('messaging:optimistic-confirm', onConfirm);
+		};
+	}, [conversationId]);
 
 	// Build merged timeline:
 	//   1. Drop messages whose metadata.eventType === 'LANDING_SENT' (the
@@ -177,7 +259,28 @@ export function MessageThread({ conversationId }: MessageThreadProps) {
 		const meta = (m as Message & { metadata?: Record<string, unknown> | null }).metadata;
 		return !(meta && meta.eventType === 'LANDING_SENT');
 	});
-	const decoratedEvents: TimelineEvent[] = events.map((e) => {
+	// Dedupe viewed-by-admin events: a race in concurrent GETs can create
+	// multiple "open ticket" events at once. Keep only the earliest one so the
+	// timeline shows a single "Чат открыт" line.
+	const seenViewedByAdmin = new Set<string>();
+	const dedupedEvents = events
+		.slice()
+		.sort(
+			(a, b) =>
+				new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+		)
+		.filter((e) => {
+			if (
+				e.type === 'STATUS_CHANGED' &&
+				(e.payload as { reason?: string } | null)?.reason === 'viewed-by-admin'
+			) {
+				const key = `${conversationId}:viewed-by-admin`;
+				if (seenViewedByAdmin.has(key)) return false;
+				seenViewedByAdmin.add(key);
+			}
+			return true;
+		});
+	const decoratedEvents: TimelineEvent[] = dedupedEvents.map((e) => {
 		if (e.type === 'LANDING_SENT') {
 			const landingId = e.payload?.landingId as string | undefined;
 			const related = landingId ? messagesByLandingId.get(landingId) : undefined;
@@ -185,6 +288,21 @@ export function MessageThread({ conversationId }: MessageThreadProps) {
 		}
 		return e;
 	});
+
+	// Backfill a synthetic "Чат создан" header for legacy conversations that
+	// predate the CONVERSATION_CREATED event type.
+	const hasCreatedEvent = decoratedEvents.some(
+		(e) => e.type === 'CONVERSATION_CREATED',
+	);
+	if (!hasCreatedEvent && conversationCreatedAt) {
+		decoratedEvents.unshift({
+			id: `synthetic-created-${conversationId}`,
+			type: 'CONVERSATION_CREATED',
+			actor: null,
+			payload: { source: 'legacy' },
+			createdAt: conversationCreatedAt,
+		});
+	}
 
 	const timeline: TimelineItem[] = [
 		...visibleMessages.map((m) => ({

@@ -9,6 +9,7 @@ import {
 	type SendVideoFromChatInput,
 } from '@/lib/schemas/messaging';
 import type { SendLanguage } from '@/lib/schemas/send';
+import { CHAT_TEMPLATE_BY_LANG } from '@/lib/constants/languages';
 import {
 	Form,
 	FormControl,
@@ -28,7 +29,7 @@ interface Video {
 	youtubeId: string | null;
 }
 
-interface SendVideoModalProps {
+interface SendLandingModalProps {
 	conversationId: string;
 	onClose: () => void;
 	onSent: () => void;
@@ -44,11 +45,19 @@ const LANGUAGES: { value: SendLanguage; label: string }[] = [
 	{ value: 'lv', label: 'LV' },
 ];
 
-export function SendVideoModal({ conversationId, onClose, onSent }: SendVideoModalProps) {
+export function SendLandingModal({
+	conversationId,
+	onClose,
+	onSent,
+}: SendLandingModalProps) {
 	const [videos, setVideos] = useState<Video[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [search, setSearch] = useState('');
 	const [apiError, setApiError] = useState('');
+	// Tracks whether the agent has manually edited the chat-text field. While
+	// untouched, switching language auto-rewrites the field with the new
+	// language's default template. Once touched we leave it alone.
+	const [chatTouched, setChatTouched] = useState(false);
 
 	const form = useForm<SendVideoFromChatInput>({
 		resolver: zodResolver(sendVideoFromChatSchema),
@@ -57,6 +66,7 @@ export function SendVideoModal({ conversationId, onClose, onSent }: SendVideoMod
 			videoId: '',
 			language: 'pl',
 			personalNote: '',
+			messageBody: CHAT_TEMPLATE_BY_LANG.pl,
 		},
 	});
 
@@ -70,6 +80,15 @@ export function SendVideoModal({ conversationId, onClose, onSent }: SendVideoMod
 			.catch(() => setLoading(false));
 	}, []);
 
+	const selectedVideoId = form.watch('videoId');
+	const selectedLanguage = form.watch('language');
+
+	// Re-fill chat template on language change while the agent hasn't edited it
+	useEffect(() => {
+		if (chatTouched) return;
+		form.setValue('messageBody', CHAT_TEMPLATE_BY_LANG[selectedLanguage]);
+	}, [selectedLanguage, chatTouched, form]);
+
 	async function onSubmit(data: SendVideoFromChatInput) {
 		setApiError('');
 		try {
@@ -82,13 +101,12 @@ export function SendVideoModal({ conversationId, onClose, onSent }: SendVideoMod
 						videoId: data.videoId,
 						personalNote: data.personalNote?.trim() || undefined,
 						language: data.language,
+						messageBody: data.messageBody?.trim() || undefined,
 					}),
 				},
 			);
 
 			if (res.ok) {
-				const payload = await res.json();
-				alert(`Видео-рецензия отправлена!\n${payload.shortUrl}`);
 				onSent();
 			} else {
 				const err = await res.json();
@@ -99,8 +117,6 @@ export function SendVideoModal({ conversationId, onClose, onSent }: SendVideoMod
 		}
 	}
 
-	const selectedVideoId = form.watch('videoId');
-	const selectedLanguage = form.watch('language');
 	const filteredVideos = search
 		? videos.filter((v) => v.title.toLowerCase().includes(search.toLowerCase()))
 		: videos;
@@ -115,7 +131,7 @@ export function SendVideoModal({ conversationId, onClose, onSent }: SendVideoMod
 						{/* Header */}
 						<div className='p-5 border-b border-gray-100 flex items-center justify-between'>
 							<h2 className='text-lg font-semibold text-gray-900'>
-								Отправить видео-рецензию
+								Отправить лендинг с видео-обзором
 							</h2>
 							<button
 								type='button'
@@ -163,9 +179,7 @@ export function SendVideoModal({ conversationId, onClose, onSent }: SendVideoMod
 													<button
 														key={video.id}
 														type='button'
-														onClick={() =>
-															field.onChange(video.id)
-														}
+														onClick={() => field.onChange(video.id)}
 														className={`text-left rounded-xl overflow-hidden border-2 transition-all ${
 															selectedVideoId === video.id
 																? 'border-brand ring-2 ring-brand/20'
@@ -197,7 +211,7 @@ export function SendVideoModal({ conversationId, onClose, onSent }: SendVideoMod
 								name='language'
 								render={({ field }) => (
 									<FormItem>
-										<FormLabel>Язык письма</FormLabel>
+										<FormLabel>Язык лендинга и шаблона</FormLabel>
 										<div className='flex gap-2 flex-wrap'>
 											{LANGUAGES.map((lang) => (
 												<button
@@ -218,19 +232,41 @@ export function SendVideoModal({ conversationId, onClose, onSent }: SendVideoMod
 								)}
 							/>
 
-							{/* Personal note */}
+							{/* Chat message body — editable per-send */}
+							<FormField
+								control={form.control}
+								name='messageBody'
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Текст сообщения клиенту</FormLabel>
+										<FormControl>
+											<Textarea
+												rows={4}
+												{...field}
+												onChange={(e) => {
+													setChatTouched(true);
+													field.onChange(e);
+												}}
+											/>
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+
+							{/* Personal note — appears on the landing page itself */}
 							<FormField
 								control={form.control}
 								name='personalNote'
 								render={({ field }) => (
 									<FormItem>
 										<FormLabel>
-											Персональная заметка (необязательно)
+											Заметка на странице лендинга (необязательно)
 										</FormLabel>
 										<FormControl>
 											<Textarea
 												rows={2}
-												placeholder='Добрый день! Вот видео-рецензия на ваш ноутбук...'
+												placeholder='Видна клиенту на самой странице лендинга, не в сообщении.'
 												{...field}
 											/>
 										</FormControl>

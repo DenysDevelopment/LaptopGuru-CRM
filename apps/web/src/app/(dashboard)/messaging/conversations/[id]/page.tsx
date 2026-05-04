@@ -1,35 +1,40 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback, type CSSProperties } from 'react';
+import { useParams, usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { MessageThread } from '@/components/messaging/message-thread';
 import { MessageInput } from '@/components/messaging/message-input';
 import { ConversationSidebar } from '@/components/messaging/conversation-sidebar';
-import { ChannelIcon, getChannelLabel } from '@/components/messaging/channel-icon';
+import { getChannelColor, getChannelLabel } from '@/components/messaging/channel-icon';
+import { ContactAvatar } from '@/components/messaging/contact-avatar';
 import type { ConversationDetail } from '@/components/messaging/conversation-sidebar';
-import { SendVideoModal } from '@/components/messaging/send-video-modal';
-import { StatusControl } from '@/components/messaging/status-control';
+import {
+	getConversation,
+	markConversationRead,
+} from '@/services/messaging/conversations.service';
+import { SendLandingModal } from '@/components/messaging/send-landing-modal';
+import { SendPhotoModal } from '@/components/messaging/send-photo-modal';
 
 export default function ConversationDetailPage() {
 	const params = useParams();
 	const router = useRouter();
+	const pathname = usePathname();
+	// Stay inside whichever section the user came from (/allegro vs /messaging)
+	// when they hit "back" or click "Вернуться к входящим".
+	const basePath = pathname.startsWith('/allegro') ? '/allegro' : '/messaging';
 	const conversationId = params.id as string;
 
 	const [conversation, setConversation] = useState<ConversationDetail | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(false);
 	const [showVideoModal, setShowVideoModal] = useState(false);
+	const [showPhotoModal, setShowPhotoModal] = useState(false);
 
 	const fetchConversation = useCallback(async () => {
 		try {
-			const res = await fetch(`/api/messaging/conversations/${conversationId}`);
-			if (!res.ok) {
-				setError(true);
-				return;
-			}
-			const data = await res.json();
-			setConversation(data);
+			const data = await getConversation(conversationId);
+			setConversation(data as unknown as ConversationDetail);
 		} catch {
 			setError(true);
 		} finally {
@@ -39,8 +44,7 @@ export default function ConversationDetailPage() {
 
 	useEffect(() => {
 		fetchConversation();
-		// Mark messages as read when opening conversation
-		fetch(`/api/messaging/conversations/${conversationId}/read`, { method: 'POST' }).catch(() => {});
+		markConversationRead(conversationId).catch(() => {});
 	}, [fetchConversation, conversationId]);
 
 	if (loading) {
@@ -57,7 +61,7 @@ export default function ConversationDetailPage() {
 				<div className='text-center'>
 					<p className='text-gray-400 mb-2'>Разговор не найден</p>
 					<Link
-						href='/messaging'
+						href={basePath}
 						className='text-sm text-brand hover:underline'>
 						Вернуться к входящим
 					</Link>
@@ -107,66 +111,56 @@ export default function ConversationDetailPage() {
 				<div className='flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 flex-shrink-0'>
 					{/* Mobile back button */}
 					<button
-						onClick={() => router.push('/messaging')}
+						onClick={() => router.push(basePath)}
 						className='md:hidden flex-shrink-0 p-1 -ml-1 text-gray-400 hover:text-gray-600'>
 						<svg className='w-5 h-5' fill='none' viewBox='0 0 24 24' strokeWidth={1.5} stroke='currentColor'>
 							<path strokeLinecap='round' strokeLinejoin='round' d='M15.75 19.5 8.25 12l7.5-7.5' />
 						</svg>
 					</button>
 
-					{/* Avatar */}
-					{contact?.avatarUrl ? (
-						<img
-							src={contact.avatarUrl}
-							alt={contactName}
-							className='w-9 h-9 rounded-full object-cover flex-shrink-0'
-						/>
-					) : (
-						<div className='w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-sm font-medium text-gray-600 flex-shrink-0'>
-							{contactName[0]?.toUpperCase() || '?'}
-						</div>
-					)}
+					<ContactAvatar
+						name={contactName}
+						seed={contact?.id || contact?.email || contact?.phone || contactName}
+						avatarUrl={contact?.avatarUrl}
+						size={40}
+					/>
 
 					<div className='flex-1 min-w-0'>
-						<div className='flex items-center gap-2 flex-wrap'>
-							<h1 className='text-sm font-semibold text-gray-900 truncate'>
-								{contactName}
-							</h1>
-							<ChannelIcon channel={conversation.channelType} size={14} />
-							<StatusControl
-								conversationId={conversationId}
-								status={conversation.status as Parameters<typeof StatusControl>[0]['status']}
-								lastStatusChangedAt={
-									(conversation as ConversationDetail & {
-										lastStatusChangedAt?: string | null;
-									}).lastStatusChangedAt ?? null
-								}
-								lastStatusChangedBy={
-									(conversation as ConversationDetail & {
-										lastStatusChangedBy?: {
-											id: string;
-											name: string | null;
-											email: string;
-										} | null;
-									}).lastStatusChangedBy ?? null
-								}
-								onChange={fetchConversation}
-							/>
+						<h1 className='text-[15px] font-semibold text-gray-900 truncate leading-tight'>
+							{contactName}
+						</h1>
+						<div className='flex items-center gap-1.5 mt-1 text-xs text-gray-500 min-w-0'>
+							<span
+								className='inline-flex items-center px-1.5 py-0.5 rounded font-semibold uppercase tracking-wide text-[10px] flex-shrink-0'
+								style={{
+									color: getChannelColor(conversation.channelType),
+									backgroundColor: `${getChannelColor(conversation.channelType)}15`,
+								}}>
+								{getChannelLabel(conversation.channelType)}
+							</span>
+							{contact?.email && (
+								<>
+									<span className='text-gray-300'>·</span>
+									<span className='truncate'>{contact.email}</span>
+								</>
+							)}
+							{conversation.subject && (
+								<>
+									<span className='text-gray-300'>·</span>
+									<span className='truncate'>{conversation.subject}</span>
+								</>
+							)}
 						</div>
-						<p className='text-xs text-gray-400 truncate'>
-							{getChannelLabel(conversation.channelType)}
-							{contact?.email ? ` • ${contact.email}` : ''}
-							{conversation.subject ? ` • ${conversation.subject}` : ''}
-						</p>
 					</div>
 
-					{/* Assignee badge */}
+					{/* Right cluster: assignee only — status switcher and "Завершить"
+					    CTA now live in the right sidebar. */}
 					{conversation.assignee && (
-						<div className='hidden sm:flex items-center gap-1.5 text-xs text-gray-400'>
-							<div className='w-6 h-6 rounded-full bg-brand-light flex items-center justify-center text-[10px] font-medium text-brand'>
+						<div className='hidden lg:flex items-center gap-1.5 flex-shrink-0 text-xs text-gray-500'>
+							<div className='w-6 h-6 rounded-full bg-brand-light flex items-center justify-center text-[10px] font-semibold text-brand'>
 								{conversation.assignee.name?.[0]?.toUpperCase() || '?'}
 							</div>
-							<span className='hidden lg:inline'>{conversation.assignee.name}</span>
+							<span className='truncate max-w-[120px]'>{conversation.assignee.name}</span>
 						</div>
 					)}
 				</div>
@@ -178,6 +172,8 @@ export default function ConversationDetailPage() {
 				<MessageInput
 					conversationId={conversationId}
 					disabled={conversation.status === 'CLOSED'}
+					onOpenSendLanding={() => setShowVideoModal(true)}
+					onOpenPhoneCamera={() => setShowPhotoModal(true)}
 				/>
 			</div>
 
@@ -187,15 +183,23 @@ export default function ConversationDetailPage() {
 				onUpdate={fetchConversation}
 			/>
 
-			{/* Send Video Modal */}
+			{/* Send Landing Modal */}
 			{showVideoModal && (
-				<SendVideoModal
+				<SendLandingModal
 					conversationId={conversationId}
 					onClose={() => setShowVideoModal(false)}
 					onSent={() => {
 						setShowVideoModal(false);
 						fetchConversation();
 					}}
+				/>
+			)}
+
+			{/* Phone-camera QR Modal */}
+			{showPhotoModal && (
+				<SendPhotoModal
+					conversationId={conversationId}
+					onClose={() => setShowPhotoModal(false)}
 				/>
 			)}
 		</div>

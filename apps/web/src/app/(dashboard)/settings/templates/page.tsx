@@ -1,20 +1,15 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { normalizeListResponse } from '@/lib/utils/normalize-response';
 import { TemplateForm } from '@/components/dashboard/settings/template-form';
 import { Button } from '@/components/ui/button';
 import type { TemplateInput } from '@/lib/schemas/template';
-
-interface Template {
-	id: string;
-	name: string;
-	body: string;
-	channelType: string | null;
-	status: string;
-	variables: string[];
-	createdAt: string;
-}
+import {
+	listTemplates,
+	createTemplate,
+	updateTemplate,
+	type Template,
+} from '@/services/messaging/templates.service';
 
 const STATUS_BADGES: Record<string, { label: string; class: string }> = {
 	DRAFT: { label: 'Черновик', class: 'bg-gray-100 text-gray-600' },
@@ -35,11 +30,7 @@ export default function TemplatesSettingsPage() {
 
 	const fetchTemplates = useCallback(async () => {
 		try {
-			const res = await fetch('/api/messaging/templates');
-			if (res.ok) {
-				const data = await res.json();
-				setTemplates(normalizeListResponse(data));
-			}
+			setTemplates(await listTemplates());
 		} catch { /* ignore */ }
 		setLoading(false);
 	}, []);
@@ -60,23 +51,20 @@ export default function TemplatesSettingsPage() {
 	};
 
 	const handleSave = async (data: TemplateInput) => {
-		const url = editingTemplate
-			? `/api/messaging/templates/${editingTemplate.id}`
-			: '/api/messaging/templates';
-		const method = editingTemplate ? 'PATCH' : 'POST';
-		const res = await fetch(url, {
-			method,
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
+		try {
+			const payload = {
 				name: data.name,
 				body: data.body,
 				channelType: data.channelType || null,
-			}),
-		});
-		if (res.ok) {
+			};
+			if (editingTemplate) {
+				await updateTemplate(editingTemplate.id, payload);
+			} else {
+				await createTemplate(payload);
+			}
 			setShowModal(false);
 			fetchTemplates();
-		}
+		} catch { /* ignore */ }
 	};
 
 	return (

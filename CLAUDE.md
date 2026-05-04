@@ -77,7 +77,7 @@ docs/          PRD.md, DESIGN.md, superpowers specs
 ## Local Setup
 
 1. Copy `.env.example` → `.env` and fill required vars.
-2. Start infra: `docker compose -f docker-compose.dev.yml up -d` (Postgres on 5433, Redis on 6379).
+2. Start infra: `docker compose up -d db redis` (Postgres on 5435, Redis on 6379). The repo's `docker-compose.override.yml` publishes the host ports automatically.
 3. `npm install && npm run db:migrate && npm run db:seed`
 4. `npm run dev`
 

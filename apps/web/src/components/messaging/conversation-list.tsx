@@ -1,14 +1,21 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { ConversationListItem } from './conversation-list-item';
 import type { Conversation } from './conversation-list-item';
 import { useMessagingEvents } from '@/hooks/use-messaging-events';
+import { listConversations } from '@/services/messaging/conversations.service';
 
 interface ConversationListProps {
 	status?: string;
 	assigneeId?: string;
+	/**
+	 * When provided, scopes the list to channels of this type regardless of
+	 * URL search params (used by `/allegro/*`). Falls back to `?channelType`
+	 * from the URL otherwise.
+	 */
+	forceChannelType?: string;
 }
 
 const TABS = [
@@ -19,8 +26,18 @@ const TABS = [
 	{ key: 'RESOLVED', label: 'Завершённые' },
 ];
 
-export function ConversationList({ status: initialStatus }: ConversationListProps) {
+export function ConversationList({
+	status: initialStatus,
+	forceChannelType,
+}: ConversationListProps) {
 	const pathname = usePathname();
+	const searchParams = useSearchParams();
+	// Sidebar links to /messaging?channel=<id>; use that to scope the list.
+	const channelFilter = searchParams.get('channel') ?? '';
+	const channelTypeFilter =
+		forceChannelType ?? searchParams.get('channelType') ?? '';
+	const channelTypesFilter = searchParams.get('channelTypes') ?? '';
+	const smartFilter = searchParams.get('filter') ?? '';
 	const [conversations, setConversations] = useState<Conversation[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [search, setSearch] = useState('');
@@ -33,21 +50,22 @@ export function ConversationList({ status: initialStatus }: ConversationListProp
 	const fetchConversations = useCallback(async (pageNum: number, append: boolean) => {
 		setLoading(!append);
 		try {
-			const params = new URLSearchParams();
-			if (activeTab === 'mine') {
-				params.set('assigneeId', 'me');
-			} else if (activeTab) {
-				params.set('status', activeTab);
-			}
-			if (search) params.set('search', search);
-			params.set('page', String(pageNum));
-			params.set('limit', '30');
-
-			const res = await fetch(`/api/messaging/conversations?${params}`);
-			if (!res.ok) return;
-			const data = await res.json();
-			const items = data.items || data.data || data;
-			const list = Array.isArray(items) ? items : [];
+			const list = await listConversations({
+				page: pageNum,
+				limit: 30,
+				...(activeTab === 'mine'
+					? { assigneeId: 'me' }
+					: activeTab
+						? { status: activeTab }
+						: {}),
+				// Smart sidebar filters override the activeTab when present.
+				...(smartFilter === 'mine' ? { assigneeId: 'me' } : {}),
+				...(smartFilter === 'urgent' ? { priority: 'HIGH,URGENT' } : {}),
+				...(channelFilter ? { channelId: channelFilter } : {}),
+				...(channelTypeFilter ? { channelType: channelTypeFilter } : {}),
+				...(channelTypesFilter ? { channelTypes: channelTypesFilter } : {}),
+				...(search ? { search } : {}),
+			});
 
 			if (append) {
 				setConversations((prev) => [...prev, ...list]);
@@ -56,22 +74,77 @@ export function ConversationList({ status: initialStatus }: ConversationListProp
 			}
 			setHasMore(list.length >= 30);
 		} catch {
-			// silently fail
+			// silently fail — TODO: surface via toast once we add a global error handler
 		} finally {
 			setLoading(false);
 		}
-	}, [activeTab, search]);
+	}, [activeTab, search, channelFilter, channelTypeFilter, channelTypesFilter, smartFilter]);
 
 	useEffect(() => {
 		setPage(1);
 		fetchConversations(1, false);
 	}, [fetchConversations]);
 
-	// Real-time updates via SSE
+	// Real-time updates via SSE — patch local state instead of refetching.
+	// Without this, every incoming message would blank out the list while a
+	// new fetch round-trips, causing the "everything reloads" UX.
 	useMessagingEvents((event) => {
-		if (event.type === 'new_message' || event.type === 'new_conversation') {
-			// Refresh the list to show new/updated conversations
-			fetchConversations(1, false);
+		if (event.type === 'new_conversation') {
+			// Apply the same filters the server used so we don't insert
+			// conversations that wouldn't match the current view.
+			const conv = event.conversation;
+			if (channelTypeFilter && conv.channelType !== channelTypeFilter) return;
+			if (activeTab && activeTab !== 'mine' && conv.status !== activeTab) return;
+			setConversations((prev) => {
+				if (prev.some((c) => c.id === conv.id)) return prev;
+				return [conv as unknown as Conversation, ...prev];
+			});
+			return;
+		}
+
+		if (event.type === 'new_message') {
+			setConversations((prev) => {
+				const idx = prev.findIndex((c) => c.id === event.conversationId);
+				if (idx === -1) {
+					// Conversation isn't in the visible page — only refetch if it's
+					// likely a brand-new one we missed. We deliberately stay quiet
+					// otherwise to avoid stampedes.
+					return prev;
+				}
+				const current = prev[idx];
+				const patch = event.conversationPatch ?? {};
+				const isInbound = event.message?.direction === 'INBOUND';
+				const updated: Conversation = {
+					...current,
+					lastMessageAt:
+						(patch.lastMessageAt as string | null | undefined) ??
+						event.message?.createdAt ??
+						new Date().toISOString(),
+					lastMessagePreview:
+						(patch.lastMessagePreview as string | null | undefined) ??
+						(event.message?.body ? event.message.body.slice(0, 120) : current.lastMessagePreview),
+					unreadCount: isInbound ? current.unreadCount + 1 : current.unreadCount,
+				};
+				const next = [...prev];
+				next.splice(idx, 1);
+				// Re-sort by lastMessageAt desc — bring updated conversation to top.
+				next.unshift(updated);
+				return next;
+			});
+			return;
+		}
+
+		if (event.type === 'conversation_updated') {
+			setConversations((prev) => {
+				const idx = prev.findIndex((c) => c.id === event.conversationId);
+				if (idx === -1) return prev;
+				const next = [...prev];
+				const patch = (event.patch ?? {}) as Partial<Conversation>;
+				// "read" action: zero out unread badge instantly.
+				const unreadOverride = event.action === 'read' ? { unreadCount: 0 } : {};
+				next[idx] = { ...next[idx], ...patch, ...unreadOverride };
+				return next;
+			});
 		}
 	});
 

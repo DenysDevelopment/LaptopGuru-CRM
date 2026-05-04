@@ -8,7 +8,17 @@ import { buildEmailHtml } from "@/lib/email-template";
 import type { EmailLanguage } from "@/lib/email-template";
 import { emitMessagingEvent } from "@/lib/messaging-events";
 import { transitionConversationStatus } from "@/lib/messaging/transition-status";
-import { VALID_LANGUAGES, SUBJECT_BY_LANG, TITLE_BY_LANG, FALLBACK_NAME, BUY_BUTTON_BY_LANG } from "@/lib/constants/languages";
+import { sendViaAllegroDirect } from "@/lib/messaging/allegro-send";
+import {
+  VALID_LANGUAGES,
+  SUBJECT_BY_LANG,
+  TITLE_BY_LANG,
+  FALLBACK_NAME,
+  BUY_BUTTON_BY_LANG,
+  CHAT_TEMPLATE_BY_LANG,
+  applyChatTemplate,
+  joinChatBody,
+} from "@/lib/constants/languages";
 
 export async function POST(
   request: NextRequest,
@@ -19,7 +29,7 @@ export async function POST(
 
   const { id } = await params;
   const body = await request.json();
-  const { videoId, personalNote, language } = body;
+  const { videoId, personalNote, language, messageBody } = body;
   const lang: EmailLanguage = VALID_LANGUAGES.includes(language) ? language : "pl";
 
   if (!videoId) {
@@ -31,7 +41,7 @@ export async function POST(
     include: {
       contact: {
         include: {
-          channels: { where: { channelType: "EMAIL" } },
+          channels: true,
           customFields: true,
         },
       },
@@ -42,20 +52,20 @@ export async function POST(
   if (!conversation || conversation.companyId !== (session.user.companyId ?? "")) {
     return NextResponse.json({ error: "Разговор не найден" }, { status: 404 });
   }
-
   if (!conversation.contact) {
     return NextResponse.json({ error: "Разговор не найден" }, { status: 404 });
   }
 
-  const emailChannel = conversation.contact.channels[0];
-  if (!emailChannel) {
-    return NextResponse.json({ error: "У контакта нет email" }, { status: 400 });
+  const channelType = conversation.channel?.type;
+  if (!channelType) {
+    return NextResponse.json({ error: "Канал не найден" }, { status: 400 });
   }
-
-  const customerEmail = emailChannel.identifier;
   const customerName = conversation.contact.displayName;
-  const productUrl = conversation.contact.customFields.find((f) => f.fieldName === "productUrl")?.fieldValue || "";
-  const productName = conversation.contact.customFields.find((f) => f.fieldName === "productName")?.fieldValue || null;
+  const productUrl =
+    conversation.contact.customFields.find((f) => f.fieldName === "productUrl")?.fieldValue || "";
+  const productName =
+    conversation.contact.customFields.find((f) => f.fieldName === "productName")?.fieldValue ||
+    null;
 
   const video = await prisma.video.findUnique({ where: { id: videoId } });
   if (!video || !video.active || video.companyId !== (session.user.companyId ?? "")) {
@@ -66,7 +76,11 @@ export async function POST(
 
   try {
     let slug = generateSlug();
-    while (await prisma.landing.findFirst({ where: { slug, companyId: session.user.companyId ?? "" } })) {
+    while (
+      await prisma.landing.findFirst({
+        where: { slug, companyId: session.user.companyId ?? "" },
+      })
+    ) {
       slug = generateSlug();
     }
 
@@ -81,6 +95,15 @@ export async function POST(
         customerName,
         productName,
         language: lang,
+        // For ALLEGRO threads, remember the thread id so the landing knows
+        // which Allegro conversation it belongs to (used by analytics/sidebar).
+        type: channelType === "ALLEGRO" ? "allegro" : "email",
+        allegroThreadId: channelType === "ALLEGRO" ? conversation.externalId : null,
+        allegroBuyerLogin:
+          channelType === "ALLEGRO"
+            ? conversation.contact.channels.find((c) => c.channelType === "ALLEGRO")?.identifier ??
+              null
+            : null,
         userId: session.user.id,
         companyId: session.user.companyId ?? "",
       },
@@ -89,44 +112,121 @@ export async function POST(
     const shortCode = await createShortLink(landing.id);
     const shortUrl = `${appUrl}/r/${shortCode}`;
 
-    const html = buildEmailHtml({
-      customerName: customerName || FALLBACK_NAME[lang],
-      videoTitle: video.title,
-      thumbnail: video.thumbnail,
-      landingUrl: shortUrl,
-      personalNote: personalNote || undefined,
-      language: lang,
+    // Build the chat-side message that goes into the conversation timeline
+    // (and into Allegro/Telegram chat). Falls back to a per-language default
+    // template when the agent didn't customize it. Split into text + URL so
+    // chat adapters can deliver them as two separate messages — that way the
+    // customer can long-press the URL to copy without grabbing the text.
+    const userTemplate = (messageBody || "").trim();
+    const template = userTemplate || CHAT_TEMPLATE_BY_LANG[lang];
+    const chatParts = applyChatTemplate(template, {
+      url: shortUrl,
+      name: customerName,
+      productName,
     });
+    // Single string used for the archived Message body and EMAIL plain text.
+    const chatBody = joinChatBody(chatParts);
 
-    const emailSubject = SUBJECT_BY_LANG[lang](
-      customerName || undefined,
-      productName || undefined,
-    );
+    // ── Outbound delivery ────────────────────────────────────────────────
+    let deliveryStatus: "SENT" | "FAILED" = "FAILED";
+    let externalId: string | undefined;
+    let deliveryError: string | undefined;
 
-    await sendEmail({
-      to: customerEmail,
-      subject: emailSubject,
-      html,
-    });
+    if (channelType === "EMAIL") {
+      const emailChannel = conversation.contact.channels.find(
+        (c) => c.channelType === "EMAIL",
+      );
+      if (!emailChannel) {
+        return NextResponse.json({ error: "У контакта нет email" }, { status: 400 });
+      }
+      const customerEmail = emailChannel.identifier;
+      const html = buildEmailHtml({
+        customerName: customerName || FALLBACK_NAME[lang],
+        videoTitle: video.title,
+        thumbnail: video.thumbnail,
+        landingUrl: shortUrl,
+        personalNote: personalNote || undefined,
+        language: lang,
+      });
+      const emailSubject = SUBJECT_BY_LANG[lang](
+        customerName || undefined,
+        productName || undefined,
+      );
+      try {
+        await sendEmail({ to: customerEmail, subject: emailSubject, html });
+        await prisma.sentEmail.create({
+          data: {
+            to: customerEmail,
+            subject: emailSubject,
+            landingId: landing.id,
+            userId: session.user.id,
+            status: "sent",
+            companyId: session.user.companyId ?? "",
+          },
+        });
+        deliveryStatus = "SENT";
+      } catch (err) {
+        deliveryError = err instanceof Error ? err.message : "SMTP error";
+        console.error("[send-landing/EMAIL] error:", err);
+      }
+    } else if (channelType === "ALLEGRO") {
+      if (!conversation.externalId) {
+        return NextResponse.json(
+          { error: "Allegro thread id missing on conversation" },
+          { status: 400 },
+        );
+      }
+      // Two separate Allegro messages: lead-in text first, then the bare URL
+      // so the buyer can long-press to copy without dragging the text.
+      // The text message is optional (only when the template has any prose).
+      if (chatParts.text) {
+        const textRes = await sendViaAllegroDirect({
+          companyId: conversation.companyId,
+          threadId: conversation.externalId,
+          text: chatParts.text,
+        });
+        if (!textRes.ok) {
+          deliveryError = textRes.error;
+          console.error("[send-landing/ALLEGRO] text-part error:", textRes.error);
+        }
+      }
+      const urlRes = await sendViaAllegroDirect({
+        companyId: conversation.companyId,
+        threadId: conversation.externalId,
+        text: chatParts.url,
+      });
+      if (urlRes.ok) {
+        deliveryStatus = "SENT";
+        // The URL message id is the canonical externalId for the LANDING_SENT
+        // marker — buyers will reply to that message in most cases.
+        externalId = urlRes.messageId;
+      } else {
+        deliveryError = urlRes.error;
+        console.error("[send-landing/ALLEGRO] url-part error:", urlRes.error);
+      }
+    } else {
+      return NextResponse.json(
+        { error: `Канал ${channelType} пока не поддерживается для отправки лендинга` },
+        { status: 400 },
+      );
+    }
 
-    await prisma.sentEmail.create({
-      data: {
-        to: customerEmail,
-        subject: emailSubject,
-        landingId: landing.id,
-        userId: session.user.id,
-        status: "sent",
-        companyId: session.user.companyId ?? "",
-      },
-    });
+    if (deliveryStatus === "FAILED") {
+      return NextResponse.json(
+        { error: deliveryError || "Ошибка доставки" },
+        { status: 502 },
+      );
+    }
 
+    // ── Persist as a Message in the conversation timeline ────────────────
     const message = await prisma.message.create({
       data: {
         conversationId: id,
         channelId: conversation.channelId,
         direction: "OUTBOUND",
         contentType: "TEXT",
-        body: `Видео-рецензия отправлена: ${video.title}\n${shortUrl}`,
+        body: chatBody,
+        externalId,
         // Marks this Message as the raw text behind a LANDING_SENT event so
         // the timeline UI can hide it in favour of the rich event card.
         metadata: {
@@ -143,7 +243,6 @@ export async function POST(
       data: { messageId: message.id, status: "SENT" },
     });
 
-    // Rich timeline event for the landing send
     await prisma.conversationEvent.create({
       data: {
         conversationId: id,
@@ -157,6 +256,7 @@ export async function POST(
           videoThumbnail: video.thumbnail,
           shortUrl,
           messageId: message.id,
+          previewToken: landing.previewToken,
         },
         companyId: session.user.companyId ?? "",
       },
@@ -172,12 +272,31 @@ export async function POST(
       actorUserId: session.user.id,
       reason: "landing-sent",
       requireFromStatus: ["NEW", "OPEN", "RESOLVED"],
-    }).catch(() => {/* non-fatal */});
+    }).catch(() => {
+      /* non-fatal */
+    });
 
     emitMessagingEvent({
       type: "new_message",
       conversationId: id,
-      data: { messageId: message.id, direction: "OUTBOUND" },
+      message: {
+        id: message.id,
+        conversationId: id,
+        direction: "OUTBOUND",
+        contentType: message.contentType,
+        body: message.body ?? "",
+        createdAt: message.createdAt.toISOString(),
+        sender: { id: session.user.id, name: session.user.name ?? null },
+        metadata: {
+          eventType: "LANDING_SENT",
+          landingId: landing.id,
+        },
+        status: "SENT",
+      },
+      conversationPatch: {
+        lastMessageAt: new Date().toISOString(),
+        lastMessagePreview: (message.body ?? "").slice(0, 120),
+      },
     });
 
     return NextResponse.json({
@@ -187,9 +306,9 @@ export async function POST(
       videoTitle: video.title,
     });
   } catch (err) {
-    console.error("[Send Video] Error:", err);
+    console.error("[send-landing] Error:", err);
     return NextResponse.json(
-      { error: "Ошибка отправки видео" },
+      { error: "Ошибка отправки лендинга" },
       { status: 500 },
     );
   }

@@ -43,13 +43,25 @@ export async function POST(
         status: "READ" as const,
       })),
     });
-  }
 
-  if (unreadMessages.length > 0) {
+    // Audit-trail event: "<Agent> прочитал N сообщений" — only when there
+    // were genuinely unread messages, so reopening an already-read thread
+    // doesn't spam the timeline.
+    await prisma.conversationEvent.create({
+      data: {
+        conversationId: id,
+        type: "READ_BY_AGENT",
+        actorUserId: session.user!.id,
+        payload: { messageCount: unreadMessages.length },
+        companyId: session.user!.companyId ?? "",
+      },
+    });
+
     emitMessagingEvent({
       type: "conversation_updated",
       conversationId: id,
-      data: { action: "read" },
+      action: "read",
+      patch: { unreadCount: 0 },
     });
   }
 
