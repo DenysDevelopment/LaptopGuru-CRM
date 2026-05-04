@@ -30,12 +30,6 @@ interface NavItem {
 	collapsibleKey?: string;
 	defaultOpen?: boolean;
 	count?: number;
-	/**
-	 * When set, the item renders as a nested row under another sibling
-	 * (matched by that sibling's `collapsibleKey`). Visually indented + a
-	 * vertical rail; visibility follows the parent's collapsed state.
-	 */
-	nestedUnder?: string;
 }
 
 interface MessagingChannel {
@@ -283,8 +277,22 @@ export function Sidebar() {
 		}
 	});
 
-	// Build per-category sidebar entries from connected channels.
-	const messagingCategoryItems: NavItem[] = useMemo(() => {
+	// Inbox is a single nav row; the channel categories (Email / Мессенджеры
+	// / Allegro) render as a horizontal segmented control directly under it,
+	// with the *active* segment's channels listed below. No more vertically
+	// stacked nested rows.
+	type MessagingSegment = {
+		key: string;
+		label: string;
+		shortLabel: string;
+		icon: React.ReactNode;
+		href: string;
+		typesParam: string;
+		channelTypes: string[];
+		allLabel: string;
+		channels: MessagingChannel[];
+	};
+	const messagingSegments: MessagingSegment[] = useMemo(() => {
 		return MESSAGING_CATEGORIES.flatMap((cat) => {
 			const channels = messagingChannels
 				.filter((ch) => cat.channelTypes.includes(ch.type))
@@ -297,62 +305,71 @@ export function Sidebar() {
 			if (channels.length === 0) return [];
 
 			const typesParam = cat.channelTypes.join(',');
-			const allHref =
+			const href =
 				cat.channelTypes.length === 1
 					? `/messaging?channelType=${cat.channelTypes[0]}`
 					: `/messaging?channelTypes=${typesParam}`;
 
-			const channelChildren: NavChild[] = channels.map((ch) => {
-				const typeLabel = CHANNEL_TYPE_LABELS[ch.type] ?? ch.type;
-				// The category header already shows the type ("Email", "Allegro"),
-				// so child rows only need the channel's own identifier/name —
-				// no "Email: ..." prefix.
-				return {
-					href: `/messaging?channel=${ch.id}`,
-					label: ch.name || typeLabel,
-					permission: PERMISSIONS.MESSAGING_INBOX_READ,
-				};
-			});
+			// "Мессенджеры" is too long for a 3-up segmented pill; abbreviate
+			// to "Чаты" inside the segment but keep the long form for tooltip
+			// + active-segment header.
+			const shortLabel = cat.key === 'messengers' ? 'Чаты' : cat.label;
 
 			return [
 				{
-					href: allHref,
+					key: cat.key,
 					label: cat.label,
-					module: 'messaging',
-					permission: PERMISSIONS.MESSAGING_INBOX_READ,
+					shortLabel,
 					icon: cat.icon,
-					collapsibleKey: `cat:${cat.key}`,
-					defaultOpen: true,
-					nestedUnder: 'inbox',
-					children: [
-						{
-							href: allHref,
-							label: cat.allLabel,
-							permission: PERMISSIONS.MESSAGING_INBOX_READ,
-						},
-						...channelChildren,
-					],
+					href,
+					typesParam,
+					channelTypes: cat.channelTypes,
+					allLabel: cat.allLabel,
+					channels,
 				},
 			];
 		});
 	}, [messagingChannels]);
 
-	// Splice category entries right after the Inbox item.
-	const navItems: NavItem[] = useMemo(() => {
-		const items: NavItem[] = [];
-		for (const item of baseNavItems) {
-			items.push(item);
-			if (item.label === 'Inbox') items.push(...messagingCategoryItems);
+	// Which segment is "active" right now, derived from URL params. Returns
+	// null when the user is on /messaging with no filters.
+	const activeSegmentKey: string | null = useMemo(() => {
+		if (currentChannelId) {
+			const ch = messagingChannels.find((c) => c.id === currentChannelId);
+			if (ch) {
+				const seg = messagingSegments.find((s) =>
+					s.channelTypes.includes(ch.type),
+				);
+				return seg?.key ?? null;
+			}
 		}
-		return items;
-	}, [messagingCategoryItems]);
+		if (currentChannelType) {
+			const seg = messagingSegments.find(
+				(s) => s.channelTypes.length === 1 && s.channelTypes[0] === currentChannelType,
+			);
+			return seg?.key ?? null;
+		}
+		if (currentChannelTypes) {
+			const seg = messagingSegments.find(
+				(s) => s.typesParam === currentChannelTypes,
+			);
+			return seg?.key ?? null;
+		}
+		return null;
+	}, [
+		currentChannelId,
+		currentChannelType,
+		currentChannelTypes,
+		messagingChannels,
+		messagingSegments,
+	]);
+	const activeSegment =
+		messagingSegments.find((s) => s.key === activeSegmentKey) ?? null;
 
-	const visibleItems = navItems.filter(
+	const visibleItems = baseNavItems.filter(
 		(item) =>
-			(!item.permission ||
-				hasPermission(userRole, userPermissions, item.permission)) &&
-			// Nested items disappear when their parent group is collapsed.
-			!(item.nestedUnder && collapsed.has(item.nestedUnder)),
+			!item.permission ||
+			hasPermission(userRole, userPermissions, item.permission),
 	);
 
 	function isChildActive(child: NavChild, parentHref: string): boolean {
@@ -433,13 +450,7 @@ export function Sidebar() {
 
 					{/* Navigation */}
 					<nav className='flex-1 px-3 py-2 space-y-0.5 overflow-y-auto'>
-						{visibleItems.map((item, idx) => {
-							// Add a gap above the first non-nested item that follows a
-							// nested group, so Inbox + its categories breathe before the
-							// next top-level section.
-							const prev = idx > 0 ? visibleItems[idx - 1] : null;
-							const groupBreak =
-								!item.nestedUnder && !!prev?.nestedUnder;
+						{visibleItems.map((item) => {
 							if (item.comingSoon) {
 								return (
 									<div key={item.href}>
@@ -482,21 +493,20 @@ export function Sidebar() {
 
 							const hasChildren = !!item.children?.length;
 							const collapsibleKey = item.collapsibleKey;
-							// Inbox has no `children` of its own — its category siblings
-							// (Email/Messengers/Allegro) live as nested top-level rows
-							// pointing back via `nestedUnder`. Show the caret + collapse
-							// when either children or nested siblings exist.
-							const hasNestedSiblings = !!(
+							// Inbox has no `children` of its own — what it controls is
+							// the segmented control + active-segment channel list
+							// rendered below the row. Treat that as togglable content.
+							const hasSegmentedControl =
+								collapsibleKey === 'inbox' && messagingSegments.length > 0;
+							const togglable = !!(
 								collapsibleKey &&
-								navItems.some((other) => other.nestedUnder === collapsibleKey)
+								(hasChildren || hasSegmentedControl)
 							);
-							const togglable = !!(collapsibleKey && (hasChildren || hasNestedSiblings));
 							const isCollapsed =
 								togglable && collapsibleKey
 									? collapsed.has(collapsibleKey) ||
 										(!collapsed.has(collapsibleKey) && item.defaultOpen === false)
 									: false;
-							const isNested = !!item.nestedUnder;
 
 							// Highlight rule: show the full brand-light background only on
 							// a *leaf* item that's the current page. Parents that merely
@@ -540,12 +550,9 @@ export function Sidebar() {
 							return (
 								<div
 									key={item.href + item.label}
-									className={[
-										isNested ? 'ml-5' : '',
-										groupBreak ? 'mt-6' : '',
-									]
-										.filter(Boolean)
-										.join(' ') || undefined}>
+									className={
+										collapsibleKey === 'inbox' ? 'mb-2' : undefined
+									}>
 									<div className='flex items-center'>
 										{isExternal ? (
 											<a
@@ -617,6 +624,63 @@ export function Sidebar() {
 														</Link>
 													);
 												})}
+										</div>
+									)}
+									{hasSegmentedControl && !isCollapsed && (
+										<div className='mt-1.5 ml-3 mr-1 space-y-1'>
+											<div className='flex gap-0.5 p-0.5 bg-gray-100 rounded-lg'>
+												{messagingSegments.map((seg) => {
+													const segActive = activeSegmentKey === seg.key;
+													return (
+														<Link
+															key={seg.key}
+															href={seg.href}
+															title={seg.label}
+															className={`flex-1 flex items-center justify-center gap-1 px-1.5 py-1.5 rounded-md text-[11px] font-medium transition-colors ${
+																segActive
+																	? 'bg-white text-brand shadow-sm'
+																	: 'text-gray-500 hover:text-gray-700'
+															}`}>
+															<span className='[&_svg]:w-3.5 [&_svg]:h-3.5'>
+																{seg.icon}
+															</span>
+															<span className='truncate'>{seg.shortLabel}</span>
+														</Link>
+													);
+												})}
+											</div>
+											{activeSegment && (
+												<div className='ml-3 space-y-0.5'>
+													<Link
+														href={activeSegment.href}
+														className={`relative flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+															!currentChannelId
+																? 'text-brand bg-brand-light/60 before:absolute before:-left-3 before:top-0 before:bottom-0 before:w-0.5 before:bg-brand before:rounded-r'
+																: 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
+														}`}>
+														<span className='truncate'>{activeSegment.allLabel}</span>
+													</Link>
+													{activeSegment.channels.map((ch) => {
+														const chActive = currentChannelId === ch.id;
+														const typeLabel =
+															CHANNEL_TYPE_LABELS[ch.type] ?? ch.type;
+														return (
+															<Link
+																key={ch.id}
+																href={`/messaging?channel=${ch.id}`}
+																className={`relative flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+																	chActive
+																		? 'text-brand bg-brand-light/60 before:absolute before:-left-3 before:top-0 before:bottom-0 before:w-0.5 before:bg-brand before:rounded-r'
+																		: 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
+																}`}>
+																<span className='truncate'>
+																	{ch.name || typeLabel}
+																</span>
+															</Link>
+														);
+													})}
+												</div>
+											)}
 										</div>
 									)}
 								</div>
