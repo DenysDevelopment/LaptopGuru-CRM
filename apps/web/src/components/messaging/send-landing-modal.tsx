@@ -35,28 +35,35 @@ interface Video {
  * `<img alt>` text across the full 16:9 box — long titles wrap into many
  * lines and look like a stack of black bars. We swap to a play-icon
  * placeholder instead so the grid stays readable either way.
+ *
+ * The 16:9 box is enforced by an aspect-ratio wrapper rather than by
+ * `aspect-video` on the <img>/placeholder directly — without a sized
+ * wrapper the placeholder div collapses to 0px height before the image
+ * loads (or forever, if the image never loads), which is why nothing was
+ * showing in the picker.
  */
 function VideoThumb({ src, title }: { src: string | null; title: string }) {
 	const [failed, setFailed] = useState(!src);
-	if (failed || !src) {
-		return (
-			<div
-				className='w-full aspect-video bg-gray-100 flex items-center justify-center text-gray-300'
-				aria-label={title}>
-				<svg className='w-8 h-8' fill='currentColor' viewBox='0 0 24 24'>
-					<path d='M8 5v14l11-7z' />
-				</svg>
-			</div>
-		);
-	}
 	return (
-		// eslint-disable-next-line @next/next/no-img-element
-		<img
-			src={src}
-			alt=''
-			onError={() => setFailed(true)}
-			className='w-full aspect-video object-cover bg-gray-100'
-		/>
+		<div className='relative w-full aspect-video bg-gray-100'>
+			{failed || !src ? (
+				<div
+					className='absolute inset-0 flex items-center justify-center text-gray-300'
+					aria-label={title}>
+					<svg className='w-8 h-8' fill='currentColor' viewBox='0 0 24 24'>
+						<path d='M8 5v14l11-7z' />
+					</svg>
+				</div>
+			) : (
+				// eslint-disable-next-line @next/next/no-img-element
+				<img
+					src={src}
+					alt=''
+					onError={() => setFailed(true)}
+					className='absolute inset-0 w-full h-full object-cover'
+				/>
+			)}
+		</div>
 	);
 }
 
