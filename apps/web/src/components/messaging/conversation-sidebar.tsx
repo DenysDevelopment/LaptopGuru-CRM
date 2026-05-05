@@ -9,7 +9,6 @@ import {
 	type ConversationDetail,
 } from './conversation-sidebar.types';
 import { SidebarAllegroOffer } from './sidebar-allegro-offer';
-import { SidebarContact } from './sidebar-contact';
 import { SidebarMetadata } from './sidebar-metadata';
 import { SidebarNotes } from './sidebar-notes';
 import {
@@ -79,8 +78,6 @@ export function ConversationSidebar({
 						))}
 					</select>
 				</section>
-
-				{conversation.contact && <SidebarContact contact={conversation.contact} />}
 
 				{conversation.allegroOffer && (
 					<SidebarAllegroOffer
