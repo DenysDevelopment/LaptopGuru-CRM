@@ -262,25 +262,23 @@ export default function LinksPage() {
 											</td>
 											<td className='px-4 py-3 text-right'>
 												<div className='inline-flex items-center gap-3 text-xs'>
-													<button
-														type='button'
-														onClick={() => {
-															// On a custom domain, middleware rewrites
-															// `/{slug}` -> `/l/{slug}` internally; the
-															// public URL must NOT include the /l/ prefix.
-															// CRM origin keeps the explicit /l/ path.
-															const path = effectiveDomain
+													<a
+														// On a custom domain, middleware rewrites
+														// `/{slug}` -> `/l/{slug}` internally; the
+														// public URL must NOT include the /l/ prefix.
+														// CRM origin keeps the explicit /l/ path.
+														href={`${shortUrlBase}${
+															effectiveDomain
 																? `/${landing.slug}`
-																: `/l/${landing.slug}`;
-															copyToClipboard(
-																`${shortUrlBase}${path}?preview=${landing.previewToken}`,
-															);
-														}}
+																: `/l/${landing.slug}`
+														}?preview=${landing.previewToken}`}
+														target='_blank'
+														rel='noopener noreferrer'
 														className='text-gray-500 hover:text-gray-900 font-medium transition-colors inline-flex items-center gap-1'
-														title='Скопировать превью-ссылку без трекинга'>
+														title='Открыть превью-ссылку в новой вкладке (без трекинга)'>
 														<Eye className='w-3.5 h-3.5' />
 														<span className='hidden md:inline'>Превью</span>
-													</button>
+													</a>
 													<Link
 														href={`/analytics/${landing.slug}`}
 														className='text-brand hover:text-brand-hover font-medium transition-colors inline-flex items-center gap-1'>
