@@ -32,7 +32,7 @@ interface Video {
 /**
  * Video thumbnail with a graceful fallback. If the CloudFront signature is
  * absent (missing env vars in dev) or the URL 404s, browsers render the
- * `<img alt>` text across the full 16:10 box — long titles wrap into many
+ * `<img alt>` text across the full 16:9 box — long titles wrap into many
  * lines and look like a stack of black bars. We swap to a play-icon
  * placeholder instead so the grid stays readable either way.
  */
@@ -41,7 +41,7 @@ function VideoThumb({ src, title }: { src: string | null; title: string }) {
 	if (failed || !src) {
 		return (
 			<div
-				className='w-full aspect-[16/10] bg-gray-100 flex items-center justify-center text-gray-300'
+				className='w-full aspect-video bg-gray-100 flex items-center justify-center text-gray-300'
 				aria-label={title}>
 				<svg className='w-8 h-8' fill='currentColor' viewBox='0 0 24 24'>
 					<path d='M8 5v14l11-7z' />
@@ -55,7 +55,7 @@ function VideoThumb({ src, title }: { src: string | null; title: string }) {
 			src={src}
 			alt=''
 			onError={() => setFailed(true)}
-			className='w-full aspect-[16/10] object-cover bg-gray-100'
+			className='w-full aspect-video object-cover bg-gray-100'
 		/>
 	);
 }
